@@ -1,5 +1,6 @@
 --extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
-torch
+torch==2.8.0
+torchao==0.17.0
 torchaudio
 numpy
 modelscope

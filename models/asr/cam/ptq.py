@@ -225,9 +225,25 @@ def parse_args():
     parser.add_argument(
         "--model-size", type=str, default=None, help="model size"
     )
+    parser.add_argument(
+        "--model-dir",
+        "--model_dir",
+        dest="model_dir",
+        type=str,
+        default=None,
+        help="path to the downloaded ModelScope model",
+    )
     parser.add_argument("--onnx-path", type=Path, default=None)
     parser.add_argument("--simplified-onnx-path", type=Path, default=None)
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
+    parser.add_argument(
+        "--output-dir",
+        "--output_dir",
+        dest="output_dir",
+        type=Path,
+        default=Path(DEFAULT_OUT_DIR),
+        help="directory used to publish the quantized HMONNX model",
+    )
     parser.add_argument("--quant-type", type=str, default=None)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--fixed-frames", type=int, default=DEFAULT_FIXED_FRAMES)
@@ -246,7 +262,10 @@ def parse_args():
     args.quant_type = first_not_none(
         args.quant_type, model_config.get("quant_type", "w8a8_sefp")
     )
-    args.model_dir = get_default_model_dir(model_config)
+    args.model_dir = first_not_none(
+        args.model_dir,
+        get_default_model_dir(model_config),
+    )
     return args
 
 
@@ -278,8 +297,7 @@ if __name__ == "__main__":
         quant_scheme = QuantScheme(target_device=target_device, quant_type=args.quant_type)
         quant_config = create_quant_config(quant_scheme)
         onnx_name = Path(onnx_path).stem
-        # Output to output/xh2/hmquant/ to match build.py default model_dir
-        hmonnx_dir = Path(DEFAULT_OUT_DIR)
+        hmonnx_dir = args.output_dir
         hmonnx_dir.mkdir(parents=True, exist_ok=True)
         hmonnx_path = hmonnx_dir / f"{onnx_name}_{target_device}_{args.quant_type}.onnx"
 

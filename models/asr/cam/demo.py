@@ -8,6 +8,7 @@
 
 import argparse
 import os
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -38,11 +39,8 @@ class CAMHMMInference:
         self.fixed_frames = fixed_frames
 
         from modelscope.pipelines import pipeline
-        self.feature_extractor = pipeline(
-            "speaker-verification",
-            model=model_dir,
-            model_revision="v1.0.0"
-        ).model
+
+        self.feature_extractor = pipeline("speaker-verification", model=model_dir, model_revision="v1.0.0").model
 
     def _extract_feature(self, audio_path):
         waveform, sample_rate = torchaudio.load(audio_path)
@@ -56,7 +54,7 @@ class CAMHMMInference:
         if frames < self.fixed_frames:
             feature = F.pad(feature, (0, 0, 0, self.fixed_frames - frames))
         else:
-            feature = feature[:, :self.fixed_frames, :]
+            feature = feature[:, : self.fixed_frames, :]
         return feature
 
     def _normalize_embedding(self, embedding):
@@ -78,6 +76,7 @@ class CAMHMMInference:
             dict with 'similarity', 'threshold', 'same_speaker'
         """
         import time
+
         threshold = thr if thr is not None else DEFAULT_THRESHOLD
 
         audio1, audio2 = audio_pair
@@ -106,14 +105,10 @@ class CAMHMMInference:
         similarity = self._cosine_similarity(embedding1[0], embedding2[0])
         is_same = similarity > threshold
 
-        result = {
-            'similarity': similarity,
-            'threshold': threshold,
-            'same_speaker': is_same
-        }
+        result = {"similarity": similarity, "threshold": threshold, "same_speaker": is_same}
 
         if output_emb:
-            result['embs'] = [embedding1, embedding2]
+            result["embs"] = [embedding1, embedding2]
 
         logger.success("=" * 100)
         logger.success("                    Model Inference Performance Summary Report")
@@ -162,6 +157,20 @@ def get_args() -> argparse.Namespace:
         help="model size",
     )
     parser.add_argument(
+        "--model_path",
+        type=str,
+        default=None,
+        help="path to the compiled CAMPPlus HMM model",
+    )
+    parser.add_argument(
+        "--assets-dir",
+        "--assets_dir",
+        dest="assets_dir",
+        type=str,
+        default=None,
+        help="path to the downloaded ModelScope model and example audio files",
+    )
+    parser.add_argument(
         "--audio_files",
         dest="audio_files",
         type=str,
@@ -176,11 +185,6 @@ def get_args() -> argparse.Namespace:
         default=DEFAULT_THRESHOLD,
         help="similarity threshold",
     )
-    parser.add_argument(
-        "--device_monitor",
-        action="store_true",
-        help="enable device memory monitoring",
-    )
     return parser.parse_args()
 
 
@@ -188,29 +192,35 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     model_name = first_not_none(args.model_name, default_model_name)
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})
-    assets_dir = get_default_assets_dir(model_config)
-
-    model_path = os.path.join("output", HOUMO_TARGET, "cam_embedding.hmm")
+    assets_dir = Path(
+        first_not_none(
+            args.assets_dir,
+            get_default_assets_dir(model_config),
+        )
+    ).expanduser()
+    model_path = first_not_none(
+        args.model_path,
+        os.path.join("output", HOUMO_TARGET, "cam_embedding.hmm"),
+    )
 
     print(f"Initializing HMM inference pipeline...")
     print(f"  Model: {model_name}-{model_size}")
     print(f"  Model path: {model_path}")
 
     # Use example files from the downloaded raw model directory
-    speaker1_a_wav = f"./{assets_dir}/examples/speaker1_a_cn_16k.wav"
-    speaker1_b_wav = f"./{assets_dir}/examples/speaker1_b_cn_16k.wav"
-    speaker2_a_wav = f"./{assets_dir}/examples/speaker2_a_cn_16k.wav"
+    examples_dir = assets_dir / "examples"
+    speaker1_a_wav = examples_dir / "speaker1_a_cn_16k.wav"
+    speaker1_b_wav = examples_dir / "speaker1_b_cn_16k.wav"
+    speaker2_a_wav = examples_dir / "speaker2_a_cn_16k.wav"
 
     with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
         sv_pipeline = CAMHMMInference(
             model_path=model_path,
-            model_dir=f"./{assets_dir}",
+            model_dir=str(assets_dir),
         )
 
         # 相同说话人语音
@@ -231,9 +241,7 @@ if __name__ == "__main__":
         # 可以传入output_emb参数，输出结果中就会包含提取到的说话人embedding
         print("\n=== With embeddings output ===")
         result = sv_pipeline([speaker1_a_wav, speaker2_a_wav], output_emb=True)
-        print("Embedding shapes:", result['embs'][0].shape, result['embs'][1].shape)
-        print("Outputs:", {'similarity': result['similarity'], 'same_speaker': result['same_speaker']})
+        print("Embedding shapes:", result["embs"][0].shape, result["embs"][1].shape)
+        print("Outputs:", {"similarity": result["similarity"], "same_speaker": result["same_speaker"]})
 
-    print(
-        f"\n=== Demo completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
-    )
+    print(f"\n=== Demo completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ===")

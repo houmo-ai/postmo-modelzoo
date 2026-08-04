@@ -45,6 +45,16 @@ def test_embedding_bge_get_model(setup_logging) -> None:
     _get_model_func("bge", setup_logging)
 
 
+@pytest.mark.cam
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_asr_cam_get_model")
+def test_asr_cam_get_model(setup_logging) -> None:
+    """test_asr_cam_get_model"""
+    _get_model_func("cam", setup_logging)
+
+
 @pytest.mark.copaw_flash
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

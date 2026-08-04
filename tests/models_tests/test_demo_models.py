@@ -44,6 +44,15 @@ def test_embedding_bge_demo(setup_logging) -> None:
     _demo_func("bge", setup_logging)
 
 
+@pytest.mark.cam
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_asr_cam_demo(setup_logging) -> None:
+    """test_asr_cam_demo"""
+    _demo_func("cam", setup_logging)
+
+
 @pytest.mark.copaw_flash
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

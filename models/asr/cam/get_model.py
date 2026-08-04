@@ -112,8 +112,6 @@ def download_raw_from_modelscope(repo_id: str, download_dir: str = "."):
     """Download raw model from ModelScope."""
     repo_name = repo_id.strip().rsplit("/", 1)[-1]
     local_dir = os.path.join(download_dir, repo_name)
-    if os.path.exists(local_dir):
-        shutil.rmtree(local_dir)
     print(f"Downloading {repo_id} from ModelScope...")
     subprocess.run(
         [
@@ -132,9 +130,7 @@ def download_raw_from_modelscope(repo_id: str, download_dir: str = "."):
 if __name__ == "__main__":
     args = get_args()
 
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     model_name = first_not_none(args.model_name, default_model_name)
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})

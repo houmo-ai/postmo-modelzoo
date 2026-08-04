@@ -39,6 +39,14 @@
 | feature (输入) | [batch, 529, 80] | FBank声学特征 |
 | embedding (输出) | [batch, 192] | 说话人嵌入向量 |
 
+### 资源要求
+
+**后摩设备运行要求：** 单卡 12 GB可运行
+
+**量化硬件要求：** 需要 GPU，显存最小 1 GB
+
+**编译时 host 内存要求：** 需要空闲 host 内存最小 10 GB
+
 ## 2 快速开始
 
 目前CAMPPlus模型仅提供python脚本编译方式。芯片模型只能在linux环境下量化和编译。
@@ -75,7 +83,7 @@ python3 get_model.py --type raw --model_name campplus --model_size standard
 
 ### 2.3 量化
 
-量化需要使用GPU，并在宿主机安装与CUDA兼容的驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID，显存需要达到40GB以上，空闲内存需要达到100GB以上。参考命令：
+量化需要使用GPU，并在宿主机安装与CUDA兼容的驱动。启动docker时将GPU映射到docker内，并指定可用的GPU ID。参考命令：
 
 ```bash
 docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
@@ -88,10 +96,6 @@ source env.sh
 cd models/asr/cam
 python3 ptq.py --model-name campplus --model-size standard
 ```
-
-**量化资源需求：**
-- Host内存: ~20GB
-- GPU内存: ~8GB
 
 产物：
 - `work_dirs/cam/export_fp32/onnx/model.onnx` — 原始导出ONNX
@@ -117,9 +121,6 @@ python3 ptq.py --model-name campplus --model-size standard
 ```bash
 python3 build.py --model_name campplus --model_size standard
 ```
-
-**编译资源需求：**
-- Host内存: ~16GB
 
 默认输出名称分别为：
 

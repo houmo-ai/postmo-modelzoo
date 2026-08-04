@@ -1,596 +1,461 @@
 ---
 name: generate-model-pytest-cases
-description: 为 imodelzoo 中指定模型生成 `tests/models_tests` 风格的 pytest 测例，包括模型配置 JSON、test.sh 参数组与 Python demo 开关、pytest 入口、marker 注册、`imodelExampleConfig.yaml` 聚合配置。适用于新增模型测例、补齐 get_model/quant/compile/demo/perf/eval/compare 流程。
+description: 为 imodelzoo 模型新增或维护 tests/models_tests JSON 驱动的 pytest 用例。覆盖模型能力识别、Python/HMATC 混合 flow、参数矩阵、cache 与 separate/release 行为、test.sh、阈值、自动生成入口、imodelExampleConfig.yaml 和验证流程。
 ---
 
-# 为指定模型生成 pytest 测例
-
-## 存放规则
-
-1. `SKILL.md` 必须放在 `.github` 目录下，推荐路径为 `.github/skills/<skill-name>/SKILL.md`。
-2. 不要把 `SKILL.md` 放在仓库根目录。
-3. 如果历史上已经在仓库根目录创建过 `SKILL.md`，迁移到 `.github/skills/` 后应删除旧文件，避免出现多个版本。
-4. 与技能相关的模板、参考材料和辅助脚本，也优先放在 `.github/skills/<skill-name>/` 子目录中统一管理。
+# 为模型生成或更新 pytest 用例
 
 ## 目标
 
-为指定模型接入 `tests/models_tests` 统一测试框架，并保证：
+将指定模型接入当前 `tests/models_tests` 统一框架，主要交付物是模型 JSON，而不是手写 pytest 函数。框架根据 JSON 生成 pytest 入口和 marker，并在运行时为每个 flow 选择 Python 脚本或 HMATC handler。
 
-1. 模型有独立配置文件 `model_cfg_<model>.json`。
-2. 对应 flow 在 `test_*.py` 中有 pytest 入口。
-3. 模型名已注册到 `model_names.txt`。
-4. `config/imodelExampleConfig.yaml` 中使用 `models_tests` 风格，而不是直接跑 `test.sh`。
-5. 不要修改这些文件:
-    - `tests/conftest.py`
-    - `tests/models_tests/conftest.py`
-    - `tests/models_tests/test_models_utils.py`
-    - `tests/models_tests/update_test_py.py`
-    - `tests/tests_utils/tests_common_utils.py`
-    - `tests/tests_utils/tests_pyvenv_utils.py`
+完成后应满足：
+
+1. `tests/models_tests/model_configs/model_cfg_<model>.json` 准确描述模型能力和参数；
+2. `python -m tests.models_tests.update_test_py` 已生成对应 pytest 入口和 `model_names.txt`；
+3. 需要纳入示例聚合时，`config/imodelExampleConfig.yaml` 使用 `test_type: models_tests`；
+4. 配置加载、生成器检查和定向 pytest 收集通过；
+5. 不为单个模型在公共框架中增加可由 JSON 表达的特判。
 
 ## 先读这些文件
 
-1. `tests/models_tests/README.md`
-2. `tests/models_tests/test_models_utils.py`
-3. `tests/models_tests/update_test_py.py`
-4. `config/imodelExampleConfig.yaml`
-5. 目标模型目录下的 `README.md`、`get_model.py`、`ptq.py`、`build.py`、`demo.py`、`perf.py`、`test.sh`
+开始修改前按顺序阅读：
 
-## 必须修改的文件
+1. `tests/models_tests/README.md`：运行方式、JSON 字段、cache 和排错；
+2. `tests/models_tests/ARCHITECTURE.md`：需要修改框架代码时再读；
+3. `tests/models_tests/model_configs/model_cfg_template_cv.json` 或 `model_cfg_template_llm.json`；
+4. 一个 family、runner 组合相近的现有模型配置；
+5. 目标模型目录中的 README、Python 入口、YAML、requirements 和 `test.sh`；
+6. 需要聚合到示例测试时读取 `config/imodelExampleConfig.yaml` 的相邻条目。
 
-按需修改以下文件：
+重点检查目标模型：
 
-1. `tests/models_tests/model_configs/model_cfg_<model>.json`
-2. `tests/models_tests/model_names.txt`
-3. `tests/models_tests/test_get_models.py`
-4. `tests/models_tests/test_quant_models.py` （仅当支持 quant）
-5. `tests/models_tests/test_compile_models.py`
-6. `tests/models_tests/test_demo_models.py`
-7. `tests/models_tests/test_perf_models.py`（仅当支持 perf）
-8. `tests/models_tests/test_eval_models.py`（仅当支持 eval）
-9. `tests/models_tests/test_compare_models.py`（仅当支持 compare）
-10. `config/imodelExampleConfig.yaml`
+- `get_model.py`；
+- `ptq.py`；
+- `build.py`；
+- `demo.py`、`demo_multibatch.py` 或自定义 demo 脚本；
+- HMATC `config.yml/yaml` 及多组件 YAML；
+- `test.sh`；
+- README 中的标准运行命令和默认参数。
 
-## 执行顺序（强制）
+## 修改边界
 
-1. 先阅读目标模型目录，确认实际支持的 flow 和脚本参数。
-2. 再创建/修改 `model_cfg_<model>.json`。
-3. 把模型 marker 写入 `model_names.txt`。
-4. 在对应 `test_*.py` 中补 pytest 函数。
-5. 若 `imodelExampleConfig.yaml` 里已有该模型但走的是脚本直跑，改成 `models_tests` 风格。
-6. 最后跑 `pytest --collect-only` 做最小验证。
+通常只修改：
 
-## 第一步：识别模型能力
+1. `tests/models_tests/model_configs/model_cfg_<model>.json`；
+2. 必要时修改 `config/imodelExampleConfig.yaml`；
+3. 如果发现通用框架确实无法表达模型行为，经确认后才修改 `test_flows/`、`model_workflow/` 并补充 `tests/unit_tests/models/` 测试。
 
-需要从模型目录判断以下信息：
+以下文件由生成器维护，不得手工编辑：
 
-### 1. 基础信息
+- `tests/models_tests/model_names.txt`；
+- `tests/models_tests/test_get_models.py`；
+- `tests/models_tests/test_quant_models.py`；
+- `tests/models_tests/test_compile_models.py`；
+- `tests/models_tests/test_demo_models.py`；
+- `tests/models_tests/test_compare_models.py`；
+- `tests/models_tests/test_eval_models.py`；
+- `tests/models_tests/test_perf_models.py`。
 
-- 模型目录：如 `models/tts/cosyvoice3`
-- 模型类型：`cv` 或 `llm`
-- 支持 backend：如 `xh2`
-- 支持平台：通常从 README 和脚本中的 `HOUMO_TARGET` / 平台断言判断
-- 设备依赖：如 `ndevice=1`、`dev_mem=12g`
-
-### 2. 支持 flow
-
-结合脚本是否存在来判断：
-
-- `get_model.py` -> `get_model`
-- `ptq.py` -> `quant`
-- `build.py` -> `compile`
-- `demo.py` -> `demo`
-- `test.sh` -> 在 ASIC 环境的 `demo` flow 中优先执行；根据脚本接口生成 `test_sh_params`
-- `demo_multibatch.py` -> 在 `support_flow` 中额外加入 `demo_multibatch`，并补 `demo_multibatch_params`；它作为 `demo` flow 的附加执行步骤，不新增独立 `test_*.py`
-- `demo.py` 中带 perf 输出，且测试框架可解析 perf 输出日志 -> `perf`
-- `hmatc` compare/eval 配置 -> `compare` / `eval`
-
-### 3. 参数名
-
-重点核对脚本参数是否和框架默认假设一致：
-
-- `ptq.py` 常见参数：`--out-dir` 或 `--output_dir`
-- `ptq.py` 模型路径参数：`--model` 或 `--model_dir`
-- `build.py` 常见参数：`--model_dir`、`--output_dir`、`--context_length`
-- `demo.py` 常见参数：hmm 路径、embedding 路径、tokenizer 路径
-- 若模型 demo 入口不是 `demo.py`，优先在 `demo_params` / `demo_multibatch_params` 中增加 `script` 字段指定脚本名，而不是为单个模型在共享逻辑里写特判
-
-优先规则：
-
-- `model_cfg_<model>.json` 中的参数名，应优先与模型脚本的真实对外接口保持一致。
-- 如果 `ptq.py` 对外接口是 `--output_dir`，则 `quant_params` 中就写 `output_dir`；不要为了迁就历史习惯，强行把模型脚本改成 `--out-dir`。
-- 只有在现有统一框架无法通过配置表达、且最小兼容修改可以明确降低维护成本时，才考虑改模型脚本或框架。
-
-## 第二步：编写 `model_cfg_<model>.json`
-
-### 1. 命名规则
-
-文件命名必须为：
+这些文件包含：
 
 ```text
-tests/models_tests/model_configs/model_cfg_<模型名>.json
+Generated by update_test_py.py. Do not edit manually.
 ```
 
-例如：
+不要为了接入一个普通模型修改：
+
+- `tests/conftest.py`；
+- `tests/models_tests/conftest.py`；
+- `tests/models_tests/test_models_utils.py`；
+- `tests/models_tests/update_test_py.py`；
+- `tests/tests_utils/` 中的共享基础设施；
+- `history_codes/`；
+- vendored/third-party 目录。
+
+如果配置表达能力不足，先说明缺口、影响模型范围和最小公共设计，不要直接增加按模型名分支。
+
+## 工作流程
+
+### 1. 识别模型能力
+
+确认：
+
+- `model_dir`，例如 `models/segmentation/sam2`；
+- `model_type`：`cv` 或 `llm`；
+- `support_backend`：当前为 `xh1`、`xh2`；
+- `support_platform`：例如 `x86_64`、`aarch64`；
+- `dependencies.ndevice/dev_mem`；
+- 每个 backend 真正支持的 flow；
+- 每个 flow 使用 Python 脚本还是 HMATC；
+- producer 输出目录和 consumer 输入路径是否一致；
+- release、DEFAULT、SEPARATE_NO_INFER、SEPARATE_INFER 是否有特殊要求。
+
+脚本存在不等于必须声明对应 flow。以 README、实际 CLI、依赖和可验证输出为准。
+
+### 2. 从模板创建 JSON
+
+文件必须命名为：
 
 ```text
-tests/models_tests/model_configs/model_cfg_cosyvoice3.json
+tests/models_tests/model_configs/model_cfg_<model-name>.json
 ```
 
-### 2. 最小字段集合
+最小骨架：
 
 ```json
 {
-    "obsolete": false,
-    "model_dir": "models/tts/cosyvoice3",
-    "model_type": "llm",
-    "dependencies": {
-        "ndevice": [1],
-        "dev_mem": ["12g"]
-    },
-    "support_platform": ["x86_64"],
-    "support_backend": ["xh2"],
-    "support_core_num": {
-        "xh2": [2]
-    },
-    "support_flow": {
-        "xh2": ["get_model", "compile", "demo"]
-    },
-    "support_hmatc": null,
-    "get_model_params": {},
-    "compile_params": {},
-    "demo_params": {}
+  "obsolete": false,
+  "model_dir": "models/<category>/<model-name>",
+  "model_type": "cv",
+  "dependencies": {
+    "ndevice": [1],
+    "dev_mem": ["12g"]
+  },
+  "support_platform": ["x86_64"],
+  "support_backend": ["xh2"],
+  "support_core_num": {
+    "xh2": [1]
+  },
+  "support_flow": {
+    "xh2": ["get_model", "quant", "compile", "demo"]
+  },
+  "support_hmatc": null
 }
 ```
 
-### 3. context_length 规则（非常重要）
+`obsolete: true` 不会删除生成函数或 marker，只会在运行时 skip。不要通过 obsolete 临时隐藏 schema 错误后提交 active 模型。
 
-如果模型的量化/编译依赖固定上下文长度，配置文件中必须显式写出来，并反映到缓存目录名中。
+### 3. 为每个 flow 选择 runner
 
-例如：
+每个 flow 独立选择实现，可以自由混合：
 
-- `ptq.py` 默认 `context_length=2048`
-- 则目录命名不应写成 `hmquant_xh2`
-- 应显式写成 `hmquant_xh2_2k`
+| flow | Python/模型脚本 | HMATC |
+| --- | --- | --- |
+| `get_model` | `get_model_params` → `get_model.py` | 无独立 HMATC get_model |
+| `quant` | `quant_params` → `ptq.py` | 存在 `hmquant_params` 时使用 HMATC quant |
+| `compile` | `compile_params` → `build.py` | 当前 backend 存在 `hmbuild_params` 时使用 HMATC quant/build |
+| `demo` | `demo_params` → `demo.py` 或 `script` | 存在 `hmdemo_params` 且非 aarch64 时使用 HMATC demo |
+| `compare` | 无通用 Python runner | CV 使用 `hmcompare_params` |
+| `eval` | 无通用 Python runner | CV 使用 `hmeval_params` + `eval_threshold` |
+| `perf` | `perf_params: "demo"` 或代码侧 custom runner | 默认使用 `hmperf_params` |
 
-推荐映射：
+`support_flow` 决定是否生成和运行 flow。`support_hmatc` 只是兼容性能力描述，不是执行开关；真正的 runner 选择只看对应参数 section。
 
-- `2048` -> `2k`
-- `8192` -> `8k`
-- `16384` -> `16k`
-- `32768` -> `32k`
-
-补充规则：
-
-- `get_model_params` 中 `hmm` 下载项的 `context_length`，必须与 `get_model.py` 的默认值或该测试项实际传入值一致。
-- `get_model_params.extract_dir` 的目录后缀，也必须与该 `context_length` 一致，例如 `8k` 应写成 `cached_models/hmm_xh2_8k`。
-- `compile_params.context_length` 应优先与 `get_model_params` 中对应 `hmm` 产物的上下文长度保持一致。
-- `compile_params.model_dir` 指向的量化输入目录，可以与 `compile_params.output_dir` 的上下文后缀不同；也就是说，允许“输入 `hmquant_xh2_2k`，输出 `hmm_xh2_8k`”。
-- 一旦 `compile_params.output_dir` 的上下文后缀发生变化，`demo_params`、`perf` 读取路径中引用的 hmm/embedding 路径也要同步更新，避免仍指向旧目录。
-
-以 `cosyvoice3` 为例：
-
-```json
-"get_model_params": {
-    "xh2": {
-        "type": ["raw", "raw", "hmm"],
-        "download_dir": ["cached_models", "cached_models", "cached_models"],
-        "extract_dir": [null, null, "cached_models/hmm_xh2_2k"],
-        "source_type": [null, "modelscope", null],
-        "context_length": [null, null, "2k"]
-    }
-},
-"quant_params": {
-    "xh2": {
-        "output_dir": ["cached_results/hmquant_xh2_2k"],
-        "context_length": ["2048"]
-    }
-},
-"compile_params": {
-    "xh2": {
-        "model_dir": ["cached_results/hmquant_xh2_2k"],
-        "context_length": ["2048"],
-        "output_dir": ["cached_results/hmm_xh2_2k"]
-    }
-}
-```
-
-如果是类似 `glm-ocr` 这种“下载的预编译 hmm 默认是 `8k`，但量化输入目录仍是 `2k`”的场景，可以写成：
-
-```json
-"get_model_params": {
-    "xh2": {
-        "type": ["raw", "hmm"],
-        "download_dir": ["cached_models", "cached_models"],
-        "extract_dir": [null, "cached_models/hmm_xh2_8k"],
-        "context_length": [null, "8k"]
-    }
-},
-"quant_params": {
-    "xh2": {
-        "output_dir": ["cached_results/hmquant_xh2_2k"],
-        "max_sequence_length": ["2048"]
-    }
-},
-"compile_params": {
-    "xh2": {
-        "model_dir": ["cached_results/hmquant_xh2_2k"],
-        "context_length": ["8192"],
-        "output_dir": ["cached_results/hmm_xh2_8k"]
-    }
-},
-"demo_params": {
-    "xh2": {
-        "embedding_path": ["cached_results/hmm_xh2_8k/hmquant/quant_embedding.pt"],
-        "prefill_path": ["cached_results/hmm_xh2_8k/<model>_prefill.hmm"],
-        "decode_path": ["cached_results/hmm_xh2_8k/<model>_decode.hmm"]
-    }
-}
-```
-
-### 4. LLM 模型的经验规则
-
-- `model_type` 通常写 `llm`。
-- `quant` / `compile` 很可能依赖 GPU，框架会在 `execute_quant_flow()` / `execute_compile_flow()` 中按 `llm` 分支处理。
-- `compare` / `eval` 不要盲目加，先确认模型确实有这两类脚本或 `hmatc` 配置。
-- 如果模型目录下存在 `demo_multibatch.py`，默认应在配置里加入 `demo_multibatch` 与 `demo_multibatch_params`。若 multibatch 依赖单独的 batch 编译产物，应在 `compile_params` 中额外增加一组 `batch` / `output_dir`，并让 `demo_multibatch_params` 指向对应目录。
-
-### 5. perf 配置规则
-
-如果支持 `perf`：
-
-- `support_flow` 要包含 `perf`
-- 必须加 `perf_metrics`
-- 如果 perf 走 `demo.py` 输出性能日志，则写：
-
-```json
-"perf_params": "demo"
-```
-
-如果 demo 走的不是默认脚本名，可在 `demo_params` 中补充：
-
-```json
-"demo_params": {
-    "xh2": {
-        "script": ["demo_asr.py"]
-    }
-}
-```
-
-`perf_params: "demo"` 时，perf 默认复用 `demo_params` 中的 `script`。`demo_multibatch.py` 也支持通过 `demo_multibatch_params` 中的 `script` 覆盖脚本名。
-
-### 6. `test.sh` 与 Python demo 配置规则
-
-如果模型目录存在 `test.sh`，检查其参数接口和 README 中的典型调用方式，并按需生成 `test_sh_params`。该字段只在 ASIC 环境且模型临时工作目录存在 `test.sh` 时生效。
-
-使用参数数组表示多次执行，每个内层数组对应一次 `test.sh`：
-
-```json
-"test_sh_params": [
-    ["--model_size", "0.8b"],
-    ["--model_size", "27b", "--model_name", "qwen3.6"]
-]
-```
-
-以上配置依次执行：
-
-```bash
-bash test.sh --model_size 0.8b
-bash test.sh --model_size 27b --model_name qwen3.6
-```
-
-需要同时覆盖默认参数和其他参数时，把空数组作为一组测试参数，并按期望执行顺序放置：
-
-```json
-"test_sh_params": [
-    [],
-    ["--model_size", "0.8b"],
-    ["--model_size", "27b", "--model_name", "qwen3.6"]
-]
-```
-
-以上配置依次执行：
-
-```bash
-bash test.sh
-bash test.sh --model_size 0.8b
-bash test.sh --model_size 27b --model_name qwen3.6
-```
-
-需要按 backend 区分时，在 backend 下分别配置参数数组：
-
-```json
-"test_sh_params": {
-    "xh1": [
-        [],
-        ["--model_size", "7b"]
-    ],
-    "xh2": [
-        [],
-        ["--model_size", "7b"],
-        ["--model_size", "14b"]
-    ]
-}
-```
-
-也可使用与其他参数矩阵一致的按参数列格式，但该格式不适合表达“默认参数组 + 其他参数组”；有默认参数组时必须优先使用参数数组：
-
-```json
-"test_sh_params": {
-    "xh2": {
-        "model_size": ["7b", "14b"],
-        "use_cache": [true, false]
-    }
-}
-```
-
-未配置 `test_sh_params` 或配置为空数组时，执行一次默认命令 `bash test.sh`。所有参数组都会执行，任意一组失败都会使 demo 测例失败。
-
-使用 `enable_demo_test` 控制 `test.sh` 后是否继续执行 Python demo 测试。该字段缺省为 `true`：
-
-```json
-"enable_demo_test": true
-```
-
-如果只验证默认参数及其他参数的 `test.sh`，不执行 `demo.py`、`demo_multibatch.py`、模型准备和 Python 虚拟环境安装，配置：
-
-```json
-"test_sh_params": [
-    [],
-    ["--model_size", "7b"]
-],
-"enable_demo_test": false
-```
-
-即使设置 `enable_demo_test: false`，也要在 `support_flow.<backend>` 中保留 `demo`，并生成 `test_demo_models.py` 的 pytest 入口；`test.sh` 由 `execute_demo_flow()` 内部执行，不要在 `imodelExampleConfig.yaml` 中改回直接运行脚本。
-
-## 第三步：注册 marker
-
-把模型 marker 追加到：
+例如混合模型可以配置为：
 
 ```text
-tests/models_tests/model_names.txt
+get_model -> get_model.py
+quant     -> HMATC
+compile   -> HMATC
+demo      -> 自定义 Python demo
+```
+
+这种情况保留 `hmquant_params/hmbuild_params` 和 `demo_params`，不要增加“mixed mode”字段。
+
+### 4. 配置参数矩阵
+
+普通 section 通常是：
+
+```text
+section -> backend -> 列式参数对象
+```
+
+同一索引组成一个 case：
+
+```json
+"compile_params": {
+  "xh2": {
+    "model_dir": ["cached_results/hmquant_xh2_2k", "cached_results/hmquant_xh2_8k"],
+    "context_length": ["2048", "8192"],
+    "output_dir": ["cached_results/hmm_xh2_2k", "cached_results/hmm_xh2_8k"]
+  }
+}
 ```
 
 规则：
 
-- `-` -> `_`
-- `.` -> `dot`
+- 所有列表列必须非空且等长；
+- `null` 和字符串 `"default"` 省略参数；
+- boolean `true` 生成 flag，`false` 省略；
+- key 原样渲染为 `--<key>`，不会自动转换 `_` 和 `-`；
+- 参数名必须与目标脚本真实 CLI 一致；
+- `script` 选择 Python 入口但不渲染为 `--script`；
+- 不要为了迎合历史 JSON 改坏模型脚本的公开参数。
 
-例如：
+### 5. 配置 cache 路径
 
-- `qwen2.5` -> `qwen2dot5`
-- `deepseek-r1-qwen3-8b` -> `deepseek_r1_qwen3_8b`
-- `cosyvoice3` -> `cosyvoice3`
+JSON 中使用逻辑路径：
 
-## 第四步：补 pytest 入口
-
-### 1. `get_model`
-
-在 `tests/models_tests/test_get_models.py` 中增加目标模型测试用例，参考如下：
-
-```python
-@pytest.mark.cosyvoice3
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.get_model
-@pytest.mark.dependency(name="test_tts_cosyvoice3_get_model")
-def test_tts_cosyvoice3_get_model(setup_logging) -> None:
-    """test_tts_cosyvoice3_get_model"""
-    model_name = "cosyvoice3"
-    _get_model_func(model_name, setup_logging)
+```text
+cached_models/<resource-or-case>
+cached_results/<artifact-case>
 ```
 
-### 2. `quant`
+通常：
 
-在 `tests/models_tests/test_quant_models.py` 中增加目标模型测试用例，参考如下：
+- `cached_models`：raw ONNX、tokenizer/HF 资源、get_model 下载和 workspace 副作用；
+- `cached_results`：quant、compiled HMM、HMATC inference bundle和推理最终消费产物。
 
-```python
-@pytest.mark.cosyvoice3
-@pytest.mark.quant
-@pytest.mark.dependency(
-    name="test_tts_cosyvoice3_quant",
-    depends_on=["test_get_models.py::test_tts_cosyvoice3_get_model"],
-)
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-def test_tts_cosyvoice3_quant(setup_logging) -> None:
-    """test_tts_cosyvoice3_quant"""
-    model_name = "cosyvoice3"
-    _quant_func(model_name, setup_logging)
+约束：
+
+- producer 的输出和 consumer 的输入必须指向同一逻辑 case；
+- Python compile 即使输出到 `cached_models`，infer 最终仍消费镜像后的 `cached_results`；
+- demo/perf 参数引用 `cached_models/<folder>` 时，目录为空才会匹配并执行 `get_model type=hmm`；
+- 不要在 JSON 中写机器相关绝对 cache 路径；
+- 有固定 context/batch/model size 的 LLM，case 目录名应包含可区分后缀，例如 `2k`、`8k`、`b4`、`1.7b`；
+- 修改 compile 输出 case 后，同步更新 demo、multibatch 和 perf 引用。
+
+`context_length` 使用脚本需要的真实值。目录后缀只是 case identity，不会替代命令参数：
+
+```text
+2048  -> 2k
+8192  -> 8k
+16384 -> 16k
+32768 -> 32k
 ```
 
-### 3. `compile`
+允许 quant 输入与 compile 输出使用不同上下文 case，例如输入 `hmquant_xh2_2k`、输出 `hmm_xh2_8k`，但必须确认模型工具链确实支持，并同步所有 consumer。
 
-在 `tests/models_tests/test_compile_models.py` 中增加目标模型测试用例，参考如下：
+### 6. 配置 get_model
 
-```python
-@pytest.mark.cosyvoice3
-@pytest.mark.compile
-@pytest.mark.dependency(
-    name="test_tts_cosyvoice3_compile",
-    depends_on=["test_quant_models.py::test_tts_cosyvoice3_quant"],
-)
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-def test_tts_cosyvoice3_compile(setup_logging) -> None:
-    """test_tts_cosyvoice3_compile"""
-    model_name = "cosyvoice3"
-    _compile_func(model_name, setup_logging)
+`get_model_params` 直接渲染为 `python3 get_model.py` 参数。常见 `type`：
+
+- `raw`：原始 ONNX 或 Python quant/HMATC 需要的原始模型；
+- `quant`：预量化模型；
+- `hmm`：release compiled HMM 或 demo 配套资源。
+
+按脚本真实接口选择 `model_dir`、`download_dir`、`extract_dir`、`quant_model_dir`、`build_model_dir` 等字段。HMATC 模型若需要指定 raw 下载路径，优先使用模型 `get_model.py` 已实现的 `--model_dir`；HMM 压缩包与解压目标通常分别使用 `--model_dir` 和 `--build_model_dir`，但必须以当前脚本 argparse 为准。
+
+框架会保存 raw get_model 对 workspace 产生的相对目录结构，以便 separate-infer 恢复。不要假设“确保 raw artifact”等于每次重新下载。
+
+### 7. 检查 release 和 separate 行为
+
+当前默认 `USE_RELEASED_MODELS=ON`。接入和 smoke 时注意：
+
+- release 下 LLM raw get_model case 会被过滤；
+- LLM Python quant 只在 development + GPU 执行；
+- LLM compile 在 release 下 skip，CV compile 不因此 skip；
+- release inference 可用匹配的 `get_model type=hmm` 补充缺失 artifact；有效目录不会重复下载；
+- `SKIP_INFER=ON` 和 `SKIP_INFER=OFF` 都表示启用 separate，no-infer/infer 由当前机器是否为 ASIC 决定；
+- SEPARATE_NO_INFER 负责 producer flow 和推理 artifact 持久化；
+- SEPARATE_INFER 跳过 get_model/quant/compile，恢复相同 backend、资源 marker 和 cache 布局后执行推理。
+
+不要为了让 release smoke 强行执行 development-only flow。需要测试本地 quant/compile 时，明确使用 `USE_RELEASED_MODELS=OFF`。
+
+### 8. 配置 HMATC
+
+共享 HMATC section 结构：
+
+```json
+"hmquant_params": {
+  "params": {
+    "required": {"config": ["./config.yml"]},
+    "optional": {"target": [null]}
+  }
+}
 ```
 
-### 4. `demo`
+`hmbuild_params` 按 backend 配置，少一层 `params`：
 
-在 `tests/models_tests/test_demo_models.py` 中增加目标模型测试用例，参考如下：
-
-```python
-@pytest.mark.cosyvoice3
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.demo
-def test_tts_cosyvoice3_demo(setup_logging) -> None:
-    """test_tts_cosyvoice3_demo"""
-    model_name = "cosyvoice3"
-    _demo_func(model_name, setup_logging)
+```json
+"hmbuild_params": {
+  "xh2": {
+    "required": {"config": ["./config.yml"]},
+    "optional": {"ncore": [null], "opt_level": [null]}
+  }
+}
 ```
 
-### 5. `perf`
+当前 HMATC inference bundle 支持一个或多个自定义 YAML。需要保证：
 
-如果支持 `perf`，在 `tests/models_tests/test_perf_models.py` 中增加目标模型测试用例，参考如下：
+- JSON 中所有 `config` 位于模型 workspace 内；
+- 多组件 YAML 的 `model.save_dir` 非空且相同；
+- 当前框架只接受 workspace-relative 的 `model_path/save_dir`；
+- `<save_dir>/<backend>` 最终包含非空 `.hmm/.hmms` 和 `hmquant/*with_act.onnx`；
+- raw get_model 能生成 YAML `model_path` 引用的 ONNX 和配套文件。
 
-```python
-@pytest.mark.cosyvoice3
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.perf
-def test_tts_cosyvoice3_perf(setup_logging) -> None:
-    """test_tts_cosyvoice3_perf"""
-    model_name = "cosyvoice3"
-    _perf_func(model_name, setup_logging)
+当前 copy/restore 是测试框架约束，不代表 HMATC 工具本身不能指定绝对输入输出路径。不要在只接入模型的任务中顺带切换到尚未实现的新缓存架构。
+
+### 9. 配置 demo、multibatch 和 `test.sh`
+
+非默认 Python demo 通过 `script` 指定：
+
+```json
+"demo_params": {
+  "xh2": {
+    "script": ["demo_asr.py"],
+    "model_dir": ["cached_models/example"],
+    "hmm_path": ["cached_results/hmm_xh2/example.hmm"]
+  }
+}
 ```
 
-### 6. `eval`
+`demo_multibatch` 是 demo 的附加 case：
 
-如果支持 `eval`，在 `tests/models_tests/test_eval_models.py` 中增加目标模型测试用例，参考如下：
+- 在 `support_flow` 中声明 `demo_multibatch`；
+- 配置 `demo_multibatch_params`；
+- 不会生成独立 pytest 文件；
+- 若需要独立 batch compiled artifact，在 compile 矩阵中增加对应 case。
 
-```python
-@pytest.mark.cosyvoice3
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.eval
-def test_tts_cosyvoice3_eval(setup_logging) -> None:
-    """test_tts_cosyvoice3_eval"""
-    model_name = "cosyvoice3"
-    _eval_func(model_name, setup_logging)
+模型存在 `test.sh` 时，demo flow 在 ASIC 上可先执行它。`test_sh_params` 支持：
+
+```json
+"test_sh_params": [
+  [],
+  ["--model_size", "1.7b"]
+]
 ```
 
-### 7. `compare`
+也支持 backend 包装或列式参数。空值/未配置等价于执行一次 `bash test.sh`。
 
-如果支持 `compare`，在 `tests/models_tests/test_compare_models.py` 中增加目标模型测试用例，参考如下：
+`enable_demo_test=false` 只在 release 模式下阻止 `test.sh` 后继续执行标准 Python/HMATC demo；development 模式仍执行标准 demo。即使为 false，也必须在 `support_flow` 中保留 `demo`。
 
-```python
-@pytest.mark.cosyvoice3
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_12g
-@pytest.mark.compare
-def test_tts_cosyvoice3_compare(setup_logging) -> None:
-    """test_tts_cosyvoice3_compare"""
-    model_name = "cosyvoice3"
-    _compare_func(model_name, setup_logging)
+### 10. 配置 compare、eval、perf 和阈值
+
+可覆写的 backend cosine 阈值只有：
+
+```json
+"validation": {
+  "xh2": {
+    "compile_cosine_threshold": 0.85,
+    "compare_cosine_threshold": 0.90
+  }
+}
 ```
 
-## 第五步：修改 `imodelExampleConfig.yaml`
+值必须在 `[0, 1]`。未配置时默认：
 
-如果该模型在 `config/imodelExampleConfig.yaml` 中原来直接执行 `test.sh`，应改为与现有 `models_tests` 一致的风格。
-如果该模型不在 `config/imodelExampleConfig.yaml` 中，应为模型新增测试配置，保持与现有 `models_tests` 一致的风格。
+| backend | compile | compare |
+| --- | ---: | ---: |
+| `xh1` | `0.99` | `1.0` |
+| `xh2` | `0.90` | `0.90` |
 
-### 不推荐
+eval 使用独立的 metric 比例：
 
-```yaml
-tts_cosyvoice3:
-    example_case:
-        - tts_cosyvoice3_test:
-              script: ../models/tts/cosyvoice3/test.sh
+```json
+"eval_threshold": {
+  "top1_acc": 0.95,
+  "map50": 0.90
+}
 ```
 
-### 推荐
+校验为 `HM >= ONNX * threshold`；未设置 `HOUMO_FULL_DATASET` 时 threshold 再乘 `0.5`。
 
-```yaml
-tts_cosyvoice3:
-    include:
-        - models/tts/cosyvoice3
-    exclude:
-        - models/tts/cosyvoice3/README.MD
-    example_case:
-        - tts_cosyvoice3_test:
-              test_type: models_tests
-              script: cosyvoice3
-              args: all
-    test:
-        - tts_cosyvoice3_test
+perf 必须配置基线：
+
+```json
+"perf_metrics": {
+  "xh2": {
+    "x86_64": {
+      "qps": 480.0
+    }
+  }
+}
 ```
 
-## 最低交付物
+platform 下直接写数字等价于 qps 基线。development/release 的最低比例、指标日志 key、方向和聚合属于代码 policy，不能通过模型 JSON 覆写。只有确认通用解析无法覆盖时，才在 `perf_metric_validation.py` 增加最小代码侧行为并补单元测试。
 
-新增一个模型 pytest 测例时，最低要交付：
+### 11. 生成 pytest 入口和 marker
 
-1. `model_cfg_<model>.json`
-2. `model_names.txt` 中的 marker
-3. 至少 `get_model` / `compile` / `demo` 的 pytest 入口
-4. 如果模型支持，则补 `quant` / `perf` / `eval` / `compare`
-5. `config/imodelExampleConfig.yaml` 中对应 `models_tests` 风格配置
-6. 一次 `pytest --collect-only` 验证结果
-
-## 推荐验证命令
-
-### 1. 收集指定模型用例
+完成 JSON 后执行：
 
 ```bash
-pytest tests/models_tests/test_get_models.py \
-  tests/models_tests/test_quant_models.py \
-  tests/models_tests/test_compile_models.py \
-  tests/models_tests/test_demo_models.py \
-  -k <model_name> --collect-only -q
+python -m tests.models_tests.update_test_py
+python -m tests.models_tests.update_test_py --check
 ```
 
-例如：
+生成器会全量更新七个入口和 `model_names.txt`。不要在运行生成器后只保留目标模型对应的局部文件改动；应审阅所有生成差异，确认没有意外 schema 或排序影响。
+
+生成规则：
+
+- 模型 marker：`-` → `_`，`.` → `dot`；
+- 测试函数类别取 `model_dir` 第二段；
+- 每个模型、每个受支持 flow 生成一个 pytest 函数；
+- 具体参数 case 在 handler 内执行；
+- `demo_multibatch` 不生成独立函数；
+- obsolete 模型仍保留函数和 marker；
+- quant/compile dependency 由代码 policy 自动生成，禁止手写。
+
+### 12. 更新 `imodelExampleConfig.yaml`
+
+仅在模型需要纳入示例聚合或已有旧条目需要迁移时修改。使用：
+
+```yaml
+tts_example:
+  include:
+    - models/tts/example
+  exclude:
+    - models/tts/example/README.md
+  example_case:
+    - tts_example_test:
+        test_type: models_tests
+        script: example
+        args: all
+  test:
+    - tts_example_test
+```
+
+`script` 是 pytest marker 表达式，可按现有配置使用单个规范化 marker或组合表达式。不要为了测试 `test.sh` 改回直接执行 shell；`test.sh` 已属于 demo flow。
+
+## 验证
+
+至少执行：
 
 ```bash
-pytest tests/models_tests/test_get_models.py \
-  tests/models_tests/test_quant_models.py \
-  tests/models_tests/test_compile_models.py \
-  tests/models_tests/test_demo_models.py \
-  -k cosyvoice3 --collect-only -q
+# 生成文件必须与 JSON 一致
+python -m tests.models_tests.update_test_py --check
+
+# 配置 schema、handler 注册和生成器 contract
+pytest -q \
+  tests/unit_tests/models/test_model_config_repository.py \
+  tests/unit_tests/models/test_update_test_py.py
+
+# 定向收集模型
+pytest tests/models_tests --collect-only -q -m "<normalized_model_marker>"
+
+# 检查格式和空白
+git diff --check
 ```
 
-## 生成新模型测例时的检查清单
+条件允许时，再在目标 backend/platform 执行最小 smoke：
 
-- [ ] 已阅读目标模型目录中的脚本和 README
-- [ ] 已确定模型类型是 `cv` 还是 `llm`
-- [ ] 已确认实际支持哪些 flow
-- [ ] `quant_params` / `compile_params` 的参数名与脚本真实接口一致（如 `output_dir` vs `out-dir`）
-- [ ] `context_length` 已显式写入配置
-- [ ] `get_model_params` 的 `hmm` 默认 `context_length` 与 `get_model.py` 默认值一致
-- [ ] 缓存目录名已反映 `2k` / `8k` / `16k` 等信息
-- [ ] `compile_params.context_length` 与目标 hmm 上下文一致
-- [ ] `demo_params` / `perf` 读取路径已跟随 `compile_params.output_dir` 同步
-- [ ] 如模型存在 `test.sh`，已核对是否需要生成多组 `test_sh_params`
-- [ ] 如需覆盖默认命令和带参数命令，`test_sh_params` 已使用 `[]` 表示默认参数组
-- [ ] `test_sh_params` 未使用对象数组或字符串参数组
-- [ ] 已根据是否继续运行 Python demo 正确设置 `enable_demo_test`；未配置时确认默认开启符合预期
-- [ ] 即使 `enable_demo_test` 为 `false`，`support_flow` 和 pytest 入口仍保留 `demo`
-- [ ] `model_names.txt` 已追加 marker
-- [ ] 对应 `test_*.py` 已补 pytest 入口
-- [ ] `imodelExampleConfig.yaml` 已改为 `models_tests` 风格
-- [ ] 如有必要，`test_models_utils.py` 已做最小兼容改动
-- [ ] `pytest --collect-only` 已通过
+```bash
+pytest -s -v tests/models_tests -m "<model_marker> and get_model"
+pytest -s -v tests/models_tests -m "<model_marker> and demo"
+```
 
-## 不要这样做
+根据模型支持情况增加 quant、compile、compare、eval 或 perf。不要在没有设备、网络、数据集或授权时假装执行成功。
 
-1. 不要只写 `model_cfg_<model>.json`，却不补 `test_*.py`。
-2. 不要忘记更新 `model_names.txt`。
-3. 不要在 `imodelExampleConfig.yaml` 里继续用 `test.sh` 替代 `models_tests`，除非该模型明确不接入统一框架。
-4. 不要把 `hmquant_xh2`、`hmm_xh2` 这种不含上下文长度的信息用于有固定 context 的 LLM 模型。
-5. 不要因为历史经验里常见 `--out-dir`，就把实际只支持 `--output_dir` 的模型脚本强行改接口。
-6. 不要只改 `compile_params.output_dir` 的上下文后缀，却忘了同步 `demo_params` / `perf` 对应路径。
-7. 不要修改 `apis/common/` 或 `tools/common/` 下的 vendored 内容。
+## 交付检查清单
 
-## `cosyvoice3` 经验总结
+- [ ] 已阅读目标模型 README、脚本 CLI、YAML、requirements 和 `test.sh`
+- [ ] 已从 CV/LLM 模板创建正确命名的 JSON
+- [ ] `model_type`、backend、platform、device/memory marker 正确
+- [ ] `support_flow` 只声明真实可运行的 flow
+- [ ] 每个 flow 的 Python/HMATC section 与期望 runner 一致
+- [ ] 没有把 `support_hmatc` 当作 runner 开关
+- [ ] 所有参数列表等长，key 与脚本真实 CLI 一致
+- [ ] producer 输出和 demo/perf/eval/compare consumer 路径一致
+- [ ] context、batch、model size 等 case identity 已体现在目录后缀
+- [ ] HMATC YAML 的 `model_path/save_dir` 满足当前 workspace-relative 约束
+- [ ] 多 YAML 使用相同 `model.save_dir`
+- [ ] `cached_models` 与 `cached_results` 职责没有混淆
+- [ ] `test_sh_params` 覆盖必要参数组，`enable_demo_test` release 语义正确
+- [ ] eval/perf/validation 阈值配置符合当前 schema
+- [ ] 已运行生成器，没有手改生成文件
+- [ ] 需要时已更新 `imodelExampleConfig.yaml`
+- [ ] 配置单元测试、定向 collect 和 `git diff --check` 通过
 
-本次接入 `cosyvoice3` 时，实际落地经验如下：
+## 禁止事项
 
-1. 该模型应走 `models_tests` 统一框架，而不是在 `imodelExampleConfig.yaml` 中直接跑 `test.sh`。
-2. `ptq.py` 默认 `context_length=2048`，因此量化/编译/下载的目录需要统一命名为 `*_2k`。
-3. `ptq.py` 使用的是 `model_dir` / `output_dir` 参数名，不是典型的 `model` / `out-dir`，框架侧需要兼容。
-4. `demo.py` 的 perf 日志字段与通用 LLM 略有差异，必要时需要补 perf 解析兼容。
-5. 对 TTS/多组件模型，`demo_params` 往往比普通 LLM 更长，必须逐个核对 hmm 和 embedding 路径。
-
-## `glm-ocr` 经验补充
-
-本次接入 `glm-ocr` 时，额外确认了以下规则：
-
-1. `get_model.py` 的 `--context_length` 默认值是 `8k`，因此 `get_model_params` 中的 `hmm` 下载项必须写成 `8k`，并对应 `cached_models/hmm_xh2_8k`。
-2. `ptq.py` 的真实对外接口是 `--output_dir`，因此 `quant_params` 应写 `output_dir`，不应为了适配历史习惯强制改脚本为 `--out-dir`。
-3. `compile_params.context_length` 最好与 `get_model_params` 中目标 hmm 的上下文保持一致；对 `glm-ocr`，应使用 `8192`。
-4. `compile_params.model_dir` 可以继续指向 `hmquant_xh2_2k`，而 `compile_params.output_dir` 使用 `hmm_xh2_8k`，这是允许的。
-5. 当 `compile_params.output_dir` 改为 `hmm_xh2_8k` 后，`demo_params` 中的 `embedding_path`、`vit_path`、`prefill_path`、`decode_path` 也必须同步改到 `hmm_xh2_8k`。
+1. 不要只写 JSON 而忘记运行生成器。
+2. 不要手工追加 `model_names.txt` 或 pytest 函数。
+3. 不要把 flow 默认排序写成所有 flow 的强制依赖链。
+4. 不要根据 `support_hmatc` 推断 runner。
+5. 不要写机器相关的 cache 绝对路径。
+6. 不要只修改 compile 输出目录而遗漏所有 consumer。
+7. 不要为一个模型把 regex、指标方向、聚合方式或失败词例外扩展成任意 JSON DSL。
+8. 不要用 `test.sh` 替代标准 flow 接入。
+9. 不要通过修改 obsolete 来规避 active schema 校验。
+10. 不要修改 vendored、third-party 或 `history_codes` 内容。

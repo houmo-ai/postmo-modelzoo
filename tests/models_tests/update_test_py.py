@@ -182,7 +182,6 @@ import pytest
 
 from .test_models_utils import {executor}
 
-
 logger = logging.getLogger(__name__)
 
 

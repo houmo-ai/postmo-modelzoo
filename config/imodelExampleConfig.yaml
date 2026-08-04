@@ -1,5 +1,11 @@
-###### modelzoo ######
+#####################################################
+# modelzoo
 # args: all, quant, compile, demo, compare, eval, perf
+#####################################################
+
+#####################################################
+# =================== autodrive =================== #
+#####################################################
 autodrive_yolop:
   include:
     - models/autodrive/yolop
@@ -13,6 +19,9 @@ autodrive_yolop:
   test:
     - autodrive_yolop_test
 
+#####################################################
+# ===================    asr    =================== #
+#####################################################
 asr_emotion2vec:
   include:
     - models/asr/emotion2vec
@@ -25,6 +34,18 @@ asr_emotion2vec:
         args: all
   test:
     - asr_emotion2vec_test
+asr_cam:
+  include:
+    - models/asr/cam
+  exclude:
+    - models/asr/cam/README.MD
+  example_case:
+    - asr_cam_test:
+        test_type: models_tests
+        script: cam
+        args: all
+  test:
+    - asr_cam_test
 asr_sensevoice:
   include:
     - models/asr/sensevoice
@@ -86,6 +107,9 @@ asr_ct_transformer:
   test:
     - asr_ct_transformer_test
 
+#####################################################
+# =================== backbone =================== #
+#####################################################
 backbone_resnet50:
   include:
     - models/backbone/resnet50
@@ -147,6 +171,9 @@ backbone_dinov3-base:
   test:
     - backbone_dinov3-base_test
 
+#####################################################
+# =================== detection =================== #
+#####################################################
 detection_yolov3:
   include:
     - models/detection/yolov3
@@ -304,6 +331,9 @@ detection_yolo12m:
   test:
     - detection_yolo12m_test
 
+#####################################################
+# ================== estimation ================== #
+#####################################################
 estimation_yolov8m_pose:
   include:
     - models/estimation/yolov8m-pose
@@ -317,6 +347,9 @@ estimation_yolov8m_pose:
   test:
     - estimation_yolov8m_pose_test
 
+#####################################################
+# ================= segmentation ================= #
+#####################################################
 segmentation_yolov8m_seg:
   include:
     - models/segmentation/yolov8m-seg
@@ -340,6 +373,9 @@ segmentation_sam2:
   test:
     - segmentation_sam2_test
 
+#####################################################
+# ====================== ocr ====================== #
+#####################################################
 ocr_lprnet:
   include:
     - models/ocr/lprnet
@@ -414,6 +450,9 @@ ocr_mineru2.5:
   test:
     - ocr_mineru2.5_test
 
+#####################################################
+# =================== reranker =================== #
+#####################################################
 reranker_qwen3-reranker:
   include:
     - models/reranker/qwen3-reranker
@@ -427,6 +466,9 @@ reranker_qwen3-reranker:
   test:
     - reranker_qwen3-reranker_test
 
+#####################################################
+# ====================== llm ====================== #
+#####################################################
 llm_qwen3:
   include:
     - models/llm/qwen3
@@ -524,6 +566,9 @@ llm_copaw-flash:
   test:
     - llm_copaw-flash_test
 
+#####################################################
+# ====================== vlm ====================== #
+#####################################################
 vlm_qwen2.5-vl:
   include:
     - models/vlm/qwen2.5-vl
@@ -561,6 +606,9 @@ vlm_gemma4:
   test:
     - vlm_gemma4_test
 
+#####################################################
+# =================== embedding =================== #
+#####################################################
 embedding_siglip2:
   include:
     - models/embedding/siglip2
@@ -622,6 +670,9 @@ embedding_qwen3-vl-embedding:
   test:
     - embedding_qwen3-vl-embedding_test
 
+#####################################################
+# ===================== omni ===================== #
+#####################################################
 omni_minicpmo:
   include:
     - models/omni/minicpmo
@@ -647,6 +698,9 @@ omni_qwen3_omni:
   test:
     - omni_qwen3_omni_test
 
+#####################################################
+# ====================== tts ====================== #
+#####################################################
 tts_cosyvoice3:
   include:
     - models/tts/cosyvoice3
@@ -672,6 +726,9 @@ tts_qwen3_tts:
   test:
     - tts_qwen3_tts_test
 
+#####################################################
+# =================== diffusion =================== #
+#####################################################
 diffusion_z_image_turbo:
   include:
     - models/diffusion/z-image
@@ -685,7 +742,10 @@ diffusion_z_image_turbo:
   test:
     - diffusion_z_image_turbo_test
 
-###### utils ######
+#####################################################
+# utils
+#####################################################
+
 utils:
   include:
     - utils
@@ -708,7 +768,9 @@ llm_engine:
     - asr_whisper_test
     - llm_qwen3.5_test
 
-###### hmatc ######
+#####################################################
+# hmatc
+#####################################################
 hmatc:
   include:
     - hmatc
@@ -721,7 +783,9 @@ hmatc:
     - backbone_resnet50_test
     - detection_yolov5s_test
 
-###### apis ######
+#####################################################
+# apis
+#####################################################
 inferences_resnet50:
   include:
     - apis/inferences/resnet50
@@ -820,7 +884,10 @@ apis_common:
     - inferences_resnet50_pipeline_test
     - inferences_qwen3_test
 
-###### tools ######
+#####################################################
+# tools
+#####################################################
+
 # tools_tcim_perf:
 #   include:
 #     - tools/tcim_perf
@@ -888,7 +955,9 @@ hmeval_examples_vlm:
   test:
     - hmeval_examples_vlm_test
 
-###### tests ######
+#####################################################
+# tests
+#####################################################
 models_tests:
   include:
     - tests/models_tests
@@ -921,7 +990,6 @@ models_tests:
     - inferences_resnet50_test
     # - llm_qwen3_test
     # - vlm_qwen3-vl_test
-
 apis_tests:
   include:
     - tests/apis_tests
@@ -932,7 +1000,9 @@ apis_tests:
     - inferences_yolov5s_test
     - inferences_resnet50_pipeline_test
 
-###### all ######
+#####################################################
+# tests
+#####################################################
 all:
   include:
     - run_all.py

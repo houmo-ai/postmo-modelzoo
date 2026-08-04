@@ -48,6 +48,19 @@ def test_embedding_bge_quant(setup_logging) -> None:
     _quant_func("bge", setup_logging)
 
 
+@pytest.mark.cam
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_asr_cam_quant",
+    depends_on=["test_get_models.py::test_asr_cam_get_model"],
+)
+def test_asr_cam_quant(setup_logging) -> None:
+    """test_asr_cam_quant"""
+    _quant_func("cam", setup_logging)
+
+
 @pytest.mark.copaw_flash
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
