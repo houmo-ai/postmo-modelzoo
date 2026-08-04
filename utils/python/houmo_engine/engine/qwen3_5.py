@@ -37,6 +37,7 @@ class Qwen35Engine(HoumoEngine):
         tokenizer_path,
         *,
         vision_path=None,
+        lora_path=None,
         ndevice: int = 1,
         batch: int = 1,
         max_size_h: int = 896,
@@ -54,6 +55,7 @@ class Qwen35Engine(HoumoEngine):
             prefill_path,
             decode_path,
             vision_path=vision_path,
+            lora_path=lora_path,
             ndevice=ndevice,
             perf=self.perf,
         )

@@ -64,6 +64,13 @@ MTP 流程额外产物命名为：
 - `${model_name}-${model_size}_prefill_mtp.hmm`
 - `${model_name}-${model_size}_decode_mtp.hmm`
 
+LoRA 流程当前仅在 `qwen3.6-35b-a3b` 示例中提供，使用 `--lora` 作为能力开关，不在 `config.yaml` 中新增独立模型名。LoRA 编译会复用标准 prefill/decode 输出名称，并额外导出带 adapter 名的 LoRA input 目录：
+
+- `${model_name}-${model_size}_prefill.hmm`
+- `${model_name}-${model_size}_decode.hmm`
+- `${model_name}-${model_size}_${adapter_name}_prefill_lora_input/`
+- `${model_name}-${model_size}_${adapter_name}_decode_lora_input/`
+
 `demo.py` 与 `demo_mtp.py` 默认从 `config.yaml` 中读取 `modelscope_repo`，并使用其最后一段作为 `tokenizer_dir` 默认值。
 
 ### 用于校准的数据集
@@ -102,6 +109,9 @@ pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 python3 get_model.py --type raw --model_name qwen3.5 --model_size 9b
 python3 get_model.py --type raw --model_name qwen3.6 --model_size 35b-a3b
 
+# 下载 Qwen3.6-35B-A3B LoRA 流程所需原始模型和 LoRA 数据
+python3 get_model.py --type raw --model_name qwen3.6 --model_size 35b-a3b --lora
+
 # 下载预编译模型用于演示
 python3 get_model.py --type hmm --model_name qwen3.6 --model_size 35b-a3b
 ```
@@ -131,6 +141,15 @@ cd models/llm/qwen3.5
 python3 ptq.py \
   --model_name qwen3.6 \
   --model_size 35b-a3b
+```
+
+LoRA 量化导出当前用于 `qwen3.6-35b-a3b` 示例，可增加 `--lora` 自动选择对应的 `_lora.yaml` workflow：
+
+```bash
+python3 ptq.py \
+  --model_name qwen3.6 \
+  --model_size 35b-a3b \
+  --lora
 ```
 
 常用可选参数：
@@ -175,6 +194,7 @@ python3 ptq.py \
 - `--model_dir`：原始模型目录；不传时根据 `modelscope_repo` 自动生成。
 - `--quant_config_path`：显式 workflow yaml；不传时根据 `workflow_config` 自动生成。
 - `--mtp`：使用自动生成的 `_mtp.yaml` workflow。
+- `--lora`：使用自动生成的 `_lora.yaml` workflow，并导出 LoRA adapter 相关 hmonnx。
 - `--output_dir`：最终 hmquant 产物输出目录，默认 `./output/${HOUMO_TARGET}/hmquant`。
 - `--work_dir`：quant/export 中间输出目录，默认 `./work_dirs`。
 - `--device`：quant、export、golden 和 quick test 使用的设备，默认 `cuda`。
@@ -212,6 +232,14 @@ MTP 编译：
 python3 build.py --model_name qwen3.6 --model_size 35b-a3b --mtp
 ```
 
+LoRA 编译：
+
+```bash
+python3 build.py --model_name qwen3.6 --model_size 35b-a3b --lora
+```
+
+LoRA 编译会在 `output/${HOUMO_TARGET}/hmquant/lora/` 下查找 adapter。若存在多个 adapter，脚本会逐个编译并为每个 adapter 保存独立的 LoRA input 目录，避免互相覆盖。其中编译出的对应的hmm模型仅保留一个，因为不同的lora对应的模型结构是一致的。
+
 标准输出名称为：
 
 - `${model_name}-${model_size}_prefill.hmm`
@@ -222,6 +250,11 @@ python3 build.py --model_name qwen3.6 --model_size 35b-a3b --mtp
 
 - `${model_name}-${model_size}_prefill_mtp.hmm`
 - `${model_name}-${model_size}_decode_mtp.hmm`
+
+LoRA 编译还会生成：
+
+- `${model_name}-${model_size}_${adapter_name}_prefill_lora_input/`
+- `${model_name}-${model_size}_${adapter_name}_decode_lora_input/`
 
 ### 2.5 演示
 
@@ -236,6 +269,27 @@ MTP 演示：
 ```bash
 python3 demo_mtp.py --model_name qwen3.6 --model_size 35b-a3b
 ```
+
+LoRA 演示：
+
+```bash
+python3 demo.py --model_name qwen3.6 --model_size 35b-a3b --lora
+python3 python/demo.py --model_name qwen3.6 --model_size 35b-a3b --lora
+```
+
+开启 `--lora` 后，demo 会在 `output/${HOUMO_TARGET}` 下自动查找 `${model_name}-${model_size}_${adapter_name}_prefill_lora_input/`。若存在多个 adapter，默认选择排序后的第一个目录，并在日志中打印选中的 LoRA input 目录。
+
+交互模式下可输入 `switch lora` 动态切换 LoRA：
+
+```bash
+python3 demo.py --model_name qwen3.6 --model_size 35b-a3b --lora --it
+```
+
+输入 `switch lora` 后：
+
+- 输入有效 LoRA input 目录：切换到该 LoRA adapter。
+- 输入 `base`：切换到 base 模式，LoRA input 使用 zero 填充。
+- 输入不存在的目录：提示重新输入。
 
 多设备场景下，demo 脚本会自动把 `prefill` / `decode` 默认模型后缀从 `.hmm` 切换为 `.hmms`，`visual` 仍保持 `.hmm`。
 
@@ -270,6 +324,7 @@ Usage: test.sh [options]
   -size, --model_size     Model size.
   --ndevice               Number of devices. Default: 1.
   --mtp                   Enable mtp mode.
+  --lora                  Enable lora mode.
   --skip_download         Skip model download steps.
   -h, --help              Show this help message.
 ```
@@ -298,16 +353,23 @@ bash test.sh -s all --model_name qwen3.5 --model_size 0.8b
 # MTP 完整流程
 bash test.sh -s all --mtp --model_name qwen3.6 --model_size 35b-a3b
 
+# LoRA 完整流程
+bash test.sh -s all --lora --model_name qwen3.6 --model_size 35b-a3b
+
 # 跳过下载，直接使用当前目录已有模型
 bash test.sh -s demo --skip_download --model_name qwen3.6 --model_size 35b-a3b
+
+# 使用已有 LoRA 编译产物直接运行 demo
+bash test.sh -s demo --skip_download --lora --model_name qwen3.6 --model_size 35b-a3b
 ```
 
 当前脚本行为说明：
 
-- `quant`：下载原始模型并调用 `ptq.py` 执行量化导出；启用 `--mtp` 时会把 `--mtp` 同步传给 `ptq.py`，由 `ptq.py` 自动选择 `_mtp.yaml` workflow。
-- `build`：默认调用 `build.py`；当 `--mtp` 启用时调用 `build.py` 并配置参数 `--mtp`。
-- `demo`：下载预编译模型后执行 `demo.py`；当 `--mtp` 启用时执行 `demo_mtp.py`。
+- `quant`：下载原始模型并调用 `ptq.py` 执行量化导出；启用 `--mtp` 时会把 `--mtp` 同步传给 `ptq.py`，由 `ptq.py` 自动选择 `_mtp.yaml` workflow；启用 `--lora` 时会把 `--lora` 同步传给 `ptq.py`，由 `ptq.py` 自动选择 `_lora.yaml` workflow。
+- `build`：默认调用 `build.py`；当 `--mtp` 启用时调用 `build.py` 并配置参数 `--mtp`；当 `--lora` 启用时调用 `build.py --lora` 并逐个编译 LoRA adapter。
+- `demo`：下载预编译模型后执行 `demo.py`；当 `--mtp` 启用时执行 `demo_mtp.py`；当 `--lora` 启用时执行 `demo.py --lora` 和 `python/demo.py --lora`。
 - 非 MTP `demo`：先执行 Python demo，再生成 C++ demo 使用的 embedding 文件并编译 C++ demo；单设备时执行 C++ demo，环境中存在 `llm_perf` 时继续执行性能测试。
+- LoRA `demo`：跳过 prefix caching、C++ demo 和 `llm_perf`。
 - C++ demo 和 `llm_perf` 会按以下顺序选择第一个存在的 visual HMM：`visual_896x896x2.hmm`、`visual_448x448x2.hmm`、`visual.hmm`。如果同时存在多个文件，优先使用排序更靠前的文件；如果三个文件都不存在，脚本会报错退出。
 
 ## 4 参考结果

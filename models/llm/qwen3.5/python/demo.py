@@ -19,6 +19,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
@@ -35,6 +36,8 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
 DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / HOUMO_TARGET
 DEFAULT_IMAGE_PATHS = [str(HOUMO_EXAMPLES_PATH / "data" / "pic" / "beach.jpeg")]
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class HmQwen35:
@@ -48,6 +51,9 @@ class HmQwen35:
         embedding_path,
         tokenizer_path,
         vision_path=None,
+        lora: bool = False,
+        model_name: str | None = None,
+        model_size: str | None = None,
         ndevice: int = 1,
         batch: int = 1,
         max_size_w: int = 896,
@@ -72,6 +78,50 @@ class HmQwen35:
             sampling_params=sampling_params,
             perf=perf,
         )
+        self._init_lora(
+            lora=lora,
+            model_name=model_name,
+            model_size=model_size,
+        )
+
+    @staticmethod
+    def _discover_lora_path(model_name: str | None, model_size: str | None) -> Path | None:
+        if model_name is None or model_size is None:
+            return None
+        model_prefix = f"{model_name}-{model_size}"
+        candidates = sorted(
+            path
+            for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_*_prefill_lora_input")
+            if path.is_dir()
+        )
+        if not candidates:
+            candidates = sorted(
+                path
+                for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_prefill_lora_input")
+                if path.is_dir()
+            )
+        logger.info("Found %d LoRA input directories for %s", len(candidates), model_prefix)
+        if not candidates:
+            return None
+        lora_path = candidates[0].resolve()
+        logger.info("Selected LoRA input directory: %s", lora_path)
+        return lora_path
+
+    def _init_lora(
+        self,
+        *,
+        lora: bool,
+        model_name: str | None,
+        model_size: str | None,
+    ) -> None:
+        if not lora:
+            return
+        lora_path = self._discover_lora_path(model_name, model_size)
+        if lora_path is None:
+            logger.warning("LoRA mode requested, but no LoRA input directory was found")
+            return
+        self.engine.module.reset_lora(lora_path)
+        logger.info("Initialized LoRA with path: %s", lora_path)
 
     def generate(
         self,
@@ -122,6 +172,32 @@ def _read_images(default_images=None):
     if not value:
         return default_images
     return [path.strip() for path in value.split(",") if path.strip()]
+
+
+def _switch_lora(model: HmQwen35) -> None:
+    lora_input_names = model.engine.module.lora_input_names
+    if not lora_input_names:
+        logger.warning("This model does not support LoRA import")
+        return
+    while True:
+        try:
+            lora_path = input("Please input LoRA path (or 'base'): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return
+        if not lora_path:
+            return
+        if lora_path.lower() == "base":
+            model.engine.module.reset_lora(None)
+            logger.info("Successfully switched LoRA: base")
+            return
+        lora_path = Path(lora_path).expanduser().resolve()
+        if not lora_path.is_dir():
+            logger.warning("LoRA path does not exist, please input again: %s", lora_path)
+            continue
+        model.engine.module.reset_lora(lora_path)
+        logger.info("Successfully switched LoRA: %s", lora_path)
+        return
 
 
 def get_args() -> argparse.ArgumentParser:
@@ -188,6 +264,13 @@ def get_args() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="path to the vision HMM model",
+    )
+    parser.add_argument(
+        "--lora",
+        dest="lora",
+        action="store_true",
+        default=False,
+        help="enable LoRA mode and auto-discover LoRA weights",
     )
     parser.add_argument(
         "--tokenizer_dir",
@@ -362,19 +445,24 @@ def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
     return args
 
 
-def main():
-    args = _resolve_args(get_args().parse_args())
-    sampling = GreedySamplingParams(
+def _build_sampling_params(args: argparse.Namespace) -> GreedySamplingParams:
+    return GreedySamplingParams(
         temperature=args.temperature,
         top_k=args.top_k,
         top_p=args.top_p,
         presence_penalty=args.presence_penalty,
         repetition_penalty=args.repetition_penalty,
     )
-    model = HmQwen35(
+
+
+def _build_model(args: argparse.Namespace) -> HmQwen35:
+    return HmQwen35(
         prefill_path=args.prefill_path,
         decode_path=args.decode_path,
         vision_path=args.vision_path,
+        lora=args.lora,
+        model_name=args.model_name,
+        model_size=args.model_size,
         embedding_path=args.embedding_path,
         tokenizer_path=args.tokenizer_dir,
         ndevice=args.ndevice,
@@ -382,37 +470,59 @@ def main():
         max_size_w=args.max_size_w,
         max_size_h=args.max_size_h,
         patch_size=args.patch_size,
-        sampling_params=sampling,
+        sampling_params=_build_sampling_params(args),
         perf=args.perf,
     )
 
-    def run_once(question: str, *, images, keep_history: bool):
-        print(f"\033[1;95m\nQ: {question}\nA: ", end="", flush=True)
-        for chunk in model.generate(
-            question,
-            images=images,
-            max_new_tokens=args.max_new_tokens,
-            keep_history=keep_history,
-            system_prompt=args.system_prompt,
-        ):
-            print(f"\033[1;95m{chunk}", end="", flush=True)
-        print()
-        if args.perf:
-            model.print_perf()
 
-    if not args.it:
-        run_once(args.question, images=args.image_path, keep_history=False)
-        return
+def _run_once(model: HmQwen35, args: argparse.Namespace, question: str, *, images, keep_history: bool) -> None:
+    print(f"\033[1;95m\nQ: {question}\nA: ", end="", flush=True)
+    for chunk in model.generate(
+        question,
+        images=images,
+        max_new_tokens=args.max_new_tokens,
+        keep_history=keep_history,
+        system_prompt=args.system_prompt,
+    ):
+        print(f"\033[1;95m{chunk}", end="", flush=True)
+    print()
+    if args.perf:
+        model.print_perf()
 
+
+def _run_non_interactive(model: HmQwen35, args: argparse.Namespace, supports_vision: bool) -> None:
+    _run_once(
+        model,
+        args,
+        args.question,
+        images=args.image_path if supports_vision else None,
+        keep_history=False,
+    )
+
+
+def _run_interactive(model: HmQwen35, args: argparse.Namespace, supports_vision: bool) -> None:
     keep_history = False
     while True:
         question = _read_question()
         if question is None or question.lower() in {"", "stop", "exit", "quit"}:
             break
-        images = _read_images(args.image_path)
-        run_once(question, images=images, keep_history=keep_history)
+        if question.lower() == "switch lora":
+            _switch_lora(model)
+            continue
+        images = _read_images(args.image_path) if supports_vision else None
+        _run_once(model, args, question, images=images, keep_history=keep_history)
         if args.history:
             keep_history = True
+
+
+def main():
+    args = _resolve_args(get_args().parse_args())
+    model = _build_model(args)
+    supports_vision = args.vision_path is not None
+    if not args.it:
+        _run_non_interactive(model, args, supports_vision)
+        return
+    _run_interactive(model, args, supports_vision)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,8 @@
 
 import os
 import argparse
+import shutil
+from pathlib import Path
 from hmatc.utils.utils import (
     first_not_none,
     hmatc_get_file,
@@ -29,6 +31,7 @@ from hmatc.utils.utils import (
 
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+LORA_DATASET_DIR = "3.5-35B-lora"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -121,8 +124,44 @@ def get_args() -> argparse.Namespace:
         default=False,
         help="whether it is an mtp model",
     )
+    parser.add_argument(
+        "--lora",
+        dest="lora",
+        action="store_true",
+        default=False,
+        help="whether to download LoRA raw files",
+    )
     args = parser.parse_args()
     return args
+
+
+def _move_lora_dataset_to_work_dirs(download_dir: str) -> None:
+    target = Path("work_dirs") / LORA_DATASET_DIR
+    candidates = [
+        Path(LORA_DATASET_DIR),
+        Path(download_dir) / LORA_DATASET_DIR,
+        Path(os.getenv("HOUMO_DATASETS_PATH", ".")) / LORA_DATASET_DIR,
+    ]
+    for source in candidates:
+        source = source.resolve()
+        if not source.is_dir() or source == target.resolve():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.move(str(source), str(target))
+        print(f"LoRA dataset moved to: {target}")
+        return
+
+
+def _get_resource_model_size(model_size: str, args: argparse.Namespace) -> str:
+    if args.mtp and args.lora:
+        raise ValueError("--mtp and --lora cannot be enabled at the same time")
+    if args.mtp:
+        return f"{model_size}-mtp"
+    if args.lora:
+        return f"{model_size}-lora"
+    return model_size
 
 
 if __name__ == "__main__":
@@ -151,7 +190,7 @@ if __name__ == "__main__":
         "model_type": "llm",
         "model_name": model_name,
         "model_info": {
-            "model_size": model_size if not args.mtp else f"{model_size}-mtp",
+            "model_size": _get_resource_model_size(model_size, args),
             "ncore": model_config.get("ncore", 2),
             "ndevice": ndevice,
             "context_len": context_length,
@@ -159,7 +198,10 @@ if __name__ == "__main__":
             "batch": batch,
             "quant_type": quant_type,
         },
-        "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
+        "raw_files": {
+            "raw_path": "3rdparty/wikitext-2-raw-v1.zip",
+            "other_files": [f"models/dataset/{LORA_DATASET_DIR}.zip"] if args.lora else [],
+        },
         "modelscope_repo": {"repo_ids": model_config.get("modelscope_repo", [])},
     }
 
@@ -172,3 +214,5 @@ if __name__ == "__main__":
     )
     if ret_dict.get("ret", False) is False:
         exit(1)
+    if args.file_type == "raw" and args.lora:
+        _move_lora_dataset_to_work_dirs(args.download_dir)

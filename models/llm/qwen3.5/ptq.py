@@ -104,6 +104,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_size_h", type=int, default=None, help="ViT input height, set this param to override config.yaml")
     parser.add_argument("--max_size_w", type=int, default=None, help="ViT input width, set this param to override config.yaml")
     parser.add_argument("--mtp", dest="mtp", action="store_true", default=False, help="enable mtp optimization")
+    parser.add_argument("--lora", dest="lora", action="store_true", default=False, help="enable lora workflow")
     args = parser.parse_args()
 
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
@@ -114,7 +115,9 @@ def parse_args() -> argparse.Namespace:
     args.model_dir = os.path.abspath(first_not_none(args.model_dir, get_default_model_dir(model_config)))
     if args.quant_config_path is None:
         workflow_config = model_config.get("workflow_config", "")
-        if args.mtp and workflow_config:
+        if args.lora and workflow_config:
+            workflow_config = workflow_config.removesuffix("_full.yaml") + "_lora.yaml"
+        elif args.mtp and workflow_config:
             workflow_config = workflow_config.removesuffix(".yaml") + "_mtp.yaml"
         args.quant_config_path = os.path.join(find_configs_merak_dir(), workflow_config)
     if not os.path.isfile(args.quant_config_path):
@@ -183,7 +186,7 @@ def main() -> None:
         )
 
     if args.quick_test:
-        from xhmodel_merak.xh_llm.models.qwen3_5.workflow_runtime import (
+        from xhmodel_merak.xh_llm.models.qwen3_5.hmonnx_validation import (
             print_quick_test_result,
             quick_test_hmonnx,
         )

@@ -33,12 +33,17 @@ from ..perf import PerfTracker
 class Qwen35Module(HoumoModule):
     """Qwen3.5 HMM graphs, cache bindings, and stage execution."""
 
+    @staticmethod
+    def _is_lora_input(name: str) -> bool:
+        return "lora_bundle_piplined_te" in name or "lora_bundle_pipelined_te" in name
+
     def __init__(
         self,
         prefill_path,
         decode_path,
         *,
         vision_path=None,
+        lora_path=None,
         ndevice: int = 1,
         perf: PerfTracker,
     ):
@@ -48,6 +53,7 @@ class Qwen35Module(HoumoModule):
             prefill_path,
             decode_path,
             vision_path=vision_path,
+            lora_path=lora_path,
             ndevice=ndevice,
         )
 
@@ -57,6 +63,7 @@ class Qwen35Module(HoumoModule):
         decode_path,
         *,
         vision_path=None,
+        lora_path=None,
         ndevice: int = 1,
     ) -> None:
         with self.perf.scope("llm.init"):
@@ -104,6 +111,10 @@ class Qwen35Module(HoumoModule):
             self.context_max_length = int(
                 self.decode.get_input_info(self.decode.get_input_name(7)).shape[2]
             )
+            self.lora_input_names = [self.prefill.get_input_name(index) for index in range(self.prefill.get_num_inputs())
+                if self._is_lora_input(self.prefill.get_input_name(index))]
+            self.lora_path = Path(lora_path).expanduser().resolve() if lora_path is not None else None
+
             self._bind_caches()
             self.clear_session()
             self._set_input(
@@ -112,10 +123,12 @@ class Qwen35Module(HoumoModule):
                 np.array([1], dtype=np.int32),
             )
 
+            self.activate_switch_lora()
+
     def _bind_caches(self) -> None:
         for index in range(self.prefill.get_num_inputs()):
             name = self.prefill.get_input_name(index)
-            if "model_layers" in name:
+            if "model_layers" in name or self._is_lora_input(name):
                 self.decode.set_dev_input(name, self.prefill.get_dev_input(name))
             elif "conv_cache" in name:
                 output = name.replace("past_conv_cache_", "conv_cache_out_")
@@ -136,6 +149,10 @@ class Qwen35Module(HoumoModule):
     def _input_shape(model, name: str) -> tuple[int, ...]:
         return tuple(int(value) for value in model.get_input_info(name).shape)
 
+    @staticmethod
+    def _input_dtype(model, name: str) -> np.dtype:
+        return np.dtype(model.get_input_info(name).dtype)
+    
     def _set_input(self, model, name: str, value) -> None:
         value = (
             value.detach().cpu().numpy()
@@ -150,6 +167,32 @@ class Qwen35Module(HoumoModule):
                 )
             value = value.reshape(shape)
         model.set_input(name, value)
+
+    def activate_switch_lora(self) -> None:
+        if not self.lora_input_names:
+            return
+        if self.lora_path is None:
+            for name in self.lora_input_names:
+                zeros = np.zeros(self._input_shape(self.prefill, name), dtype=self._input_dtype(self.prefill, name))
+                self._set_input(self.prefill, name, zeros)
+        else:
+            for name in self.lora_input_names:
+                lora_weight = np.load(self.lora_path / f"{name}.npy")
+                if lora_weight.shape != self._input_shape(self.prefill, name) or lora_weight.dtype != self._input_dtype(self.prefill, name):
+                    raise RuntimeError(
+                        f"lora weight {name!r} expects {self._input_shape(self.prefill, name)} "
+                        f"with dtype {self._input_dtype(self.prefill, name)}, got "
+                        f"{lora_weight.shape} with dtype {lora_weight.dtype}"
+                    )
+                self._set_input(self.prefill, name, lora_weight)
+
+    def reset_lora(self, lora_path) -> None:
+        if lora_path is not None:
+            lora_path = Path(lora_path).expanduser().resolve()
+        if lora_path != self.lora_path:
+            self.lora_path = lora_path
+            self.activate_switch_lora()
+            self.clear_session()
 
     def clear_session(self) -> None:
         for index in range(self.prefill.get_num_inputs()):

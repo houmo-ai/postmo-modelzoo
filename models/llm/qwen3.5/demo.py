@@ -146,6 +146,13 @@ def get_args() -> argparse.Namespace:
         help="houmo vision model path (.hmm)",
     )
     parser.add_argument(
+        "--lora",
+        dest="lora",
+        action="store_true",
+        default=False,
+        help="enable LoRA mode and auto-discover LoRA weights",
+    )
+    parser.add_argument(
         "--ndevice",
         dest="ndevice",
         type=int,
@@ -701,6 +708,9 @@ class HmQwen:
         tokenizer_dir,
         ndevice=1,
         vision_path=None,
+        lora=False,
+        model_name: str | None = None,
+        model_size: str | None = None,
     ):
         self.perf_tracker = InferencePerformanceTracker()
         self.ndevice = ndevice
@@ -745,7 +755,7 @@ class HmQwen:
 
         for i in range(self.prefill.get_num_inputs()):
             input_name = self.prefill.get_input_name(i)
-            if "model_layers" in input_name:
+            if "model_layers" in input_name or self._is_lora_input(input_name):
                 cache = self.prefill.get_dev_input(input_name)
                 self.decode.set_dev_input(input_name, cache)
             if "conv_cache" in input_name:
@@ -764,6 +774,16 @@ class HmQwen:
                 self.decode.set_dev_output(output_name, cache)
 
         self.clear_cache()
+
+        self.lora_input_names = [
+            self.prefill.get_input_name(i)
+            for i in range(self.prefill.get_num_inputs())
+            if self._is_lora_input(self.prefill.get_input_name(i))
+        ]
+        self.lora_path = None
+        if lora:
+            self.lora_path = self._discover_lora_path(model_name, model_size)
+            self.activate_switch_lora()
 
         # set decode input
         current_length_input_1 = np.array([1]).astype("int32")
@@ -831,6 +851,94 @@ class HmQwen:
 
         # Start inference statistics from a clean slate for the first request.
         self.perf_tracker.reset_perf_time()
+
+    @staticmethod
+    def _is_lora_input(name: str) -> bool:
+        return "lora_bundle_piplined_te" in name or "lora_bundle_pipelined_te" in name
+
+    @staticmethod
+    def _discover_lora_path(model_name: str | None, model_size: str | None):
+        if model_name is None or model_size is None:
+            return None
+        model_prefix = f"{model_name}-{model_size}"
+        output_dir = Path("output") / HOUMO_TARGET
+        candidates = sorted(
+            path
+            for path in output_dir.glob(f"**/{model_prefix}_*_prefill_lora_input")
+            if path.is_dir()
+        )
+        if not candidates:
+            candidates = sorted(
+                path
+                for path in output_dir.glob(f"**/{model_prefix}_prefill_lora_input")
+                if path.is_dir()
+            )
+        logger.info("Found %d LoRA input directories for %s", len(candidates), model_prefix)
+        if not candidates:
+            logger.warning("LoRA mode requested, but no LoRA input directory was found")
+            return None
+        lora_path = candidates[0].resolve()
+        logger.info("Selected LoRA input directory: %s", lora_path)
+        return lora_path
+
+    def get_model_input_dtype(self, runtime_model, input_name: str) -> np.dtype:
+        return np.dtype(runtime_model.get_input_info(input_name).dtype)
+
+    def activate_switch_lora(self) -> None:
+        if not self.lora_input_names:
+            return
+        if self.lora_path is None:
+            for name in self.lora_input_names:
+                zeros = np.zeros(
+                    self.get_model_input_shape(self.prefill, name),
+                    dtype=self.get_model_input_dtype(self.prefill, name),
+                )
+                self.set_model_input(self.prefill, name, zeros)
+            return
+        for name in self.lora_input_names:
+            lora_weight = np.load(Path(self.lora_path) / f"{name}.npy")
+            expected_shape = self.get_model_input_shape(self.prefill, name)
+            expected_dtype = self.get_model_input_dtype(self.prefill, name)
+            if lora_weight.shape != expected_shape or lora_weight.dtype != expected_dtype:
+                raise RuntimeError(
+                    f"lora weight {name!r} expects {expected_shape} "
+                    f"with dtype {expected_dtype}, got "
+                    f"{lora_weight.shape} with dtype {lora_weight.dtype}"
+                )
+            self.set_model_input(self.prefill, name, lora_weight)
+
+    def reset_lora(self, lora_path) -> None:
+        if lora_path is not None:
+            lora_path = Path(lora_path).expanduser().resolve()
+        if lora_path != self.lora_path:
+            self.lora_path = lora_path
+            self.activate_switch_lora()
+            self.clear_cache()
+            logger.info("Switching to LoRa will clear some cache memory. Please be aware of this!")
+
+    def interactive_switch_lora(self) -> None:
+        if not self.lora_input_names:
+            logger.warning("This model does not support LoRA import")
+            return
+        while True:
+            try:
+                lora_path = input("Please input LoRA path (or 'base'): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return
+            if not lora_path:
+                return
+            if lora_path.lower() == "base":
+                self.reset_lora(None)
+                logger.info("Successfully switched LoRA: base")
+                return
+            lora_path = Path(lora_path).expanduser().resolve()
+            if not lora_path.is_dir():
+                logger.warning("LoRA path does not exist, please input again: %s", lora_path)
+                continue
+            self.reset_lora(lora_path)
+            logger.info("Successfully switched LoRA: %s", self.lora_path)
+            return
 
     def create_linear_attn_mask(
         self, fill_length: int, new_cache_length: int
@@ -1501,6 +1609,9 @@ if __name__ == "__main__":
         args.tokenizer_dir,
         args.ndevice,
         vision_path=args.vision_path if (is_vision or args.it) else None,
+        lora=args.lora,
+        model_name=args.model_name,
+        model_size=args.model_size,
     )
     if args.it:
         from prompt_toolkit import prompt
@@ -1509,7 +1620,12 @@ if __name__ == "__main__":
             current_image_paths = args.image_path if is_vision else None
             if args.it:
                 try:
-                    question = prompt("Input your instruction here: ").strip()
+                    while True:
+                        question = prompt("Input your instruction here: ").strip()
+                        if question.lower() == "switch lora":
+                            hmqwen.interactive_switch_lora()
+                            continue
+                        break
                     if question.lower() in ("stop", "exit", "quit", ""):
                         break
                     if not question:

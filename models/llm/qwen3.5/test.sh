@@ -19,6 +19,11 @@ LOAD_MODE=""
 
 parse_args "$@"
 
+if [ "${LORA}" = "true" ] && { [ "${MODEL_NAME}" != "qwen3.6" ] || [ "${MODEL_SIZE}" != "35b-a3b" ]; }; then
+    echo "Error: LoRA mode is only provided for qwen3.6-35b-a3b." >&2
+    exit 1
+fi
+
 case "${MODEL_NAME}:${MODEL_SIZE}" in
     qwen3.5:0.8b)
         WORKFLOW_MODEL_DIR="Qwen3.5-0.8B"
@@ -76,23 +81,32 @@ if should_run_step "quant"; then
         if [ -n "${QUANT_TYPE}" ]; then
             GET_MODEL_ARGS+=(--quant_type "${QUANT_TYPE}")
         fi
+        if [ "${LORA}" = "true" ]; then
+            GET_MODEL_ARGS+=(--lora)
+        fi
         python3 get_model.py "${GET_MODEL_ARGS[@]}"
     fi
     echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
-    if [ "${MTP}" = "true" ]; then
-        python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --mtp
-    else
-        python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    PTQ_ARGS=(--model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
+    if [ "${LORA}" = "true" ]; then
+        PTQ_ARGS+=(--lora)
     fi
+    if [ "${MTP}" = "true" ]; then
+        PTQ_ARGS+=(--mtp)
+    fi
+    python3 ptq.py "${PTQ_ARGS[@]}"
 fi
 
 if should_run_step "build"; then
     echo "Start model compilation (${MODEL_NAME}-${MODEL_SIZE})."
-    if [ "${MTP}" = "true" ]; then
-        python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --mtp
-    else
-        python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    BUILD_ARGS=(--model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
+    if [ "${LORA}" = "true" ]; then
+        BUILD_ARGS+=(--lora)
     fi
+    if [ "${MTP}" = "true" ]; then
+        BUILD_ARGS+=(--mtp)
+    fi
+    python3 build.py "${BUILD_ARGS[@]}"
 fi
 
 if should_run_step "demo"; then
@@ -101,6 +115,9 @@ if should_run_step "demo"; then
         GET_MODEL_ARGS=(--type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
         if [ "${MTP}" = "true" ]; then
             GET_MODEL_ARGS+=(--mtp)
+        fi
+        if [ "${LORA}" = "true" ]; then
+            GET_MODEL_ARGS+=(--lora)
         fi
         if [ -n "${QUANT_TYPE}" ]; then
             GET_MODEL_ARGS+=(--quant_type "${QUANT_TYPE}")
@@ -138,37 +155,44 @@ if should_run_step "demo"; then
             --model_name "${MODEL_NAME}"
             --model_size "${MODEL_SIZE}"
         )
+        if [ "${LORA}" = "true" ]; then
+            demo_args+=(--lora)
+        fi
         demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
         python3 demo.py "${demo_args[@]}"
         python3 python/demo.py "${demo_args[@]}"
-        python3 python/demo_prefix_caching.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        if [ "${LORA}" = "true" ]; then
+            echo "Skip prefix caching, cpp demo, and llm_perf in LoRA mode."
+        else
+            python3 python/demo_prefix_caching.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
-        VISUAL_MODEL_PATH="$(find_visual_model_path)"
-        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
-        echo "Execute cpp demo."
-        cd cpp && ./build_linux.sh && cd ..
-        if [[ "${NDEVICE}" -eq 1 ]]; then
-            ./bin/demo --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-                --visual "${VISUAL_MODEL_PATH}" \
-                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
-                --prompt "介绍下图片" --image "${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg" \
-                --tokenizer "${WORKFLOW_MODEL_DIR}"
-        fi
-        if command -v llm_perf &>/dev/null; then
-            echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
-            devices_param=$(get_devices_param "${NDEVICE}")
-            if [[ "${NDEVICE}" -gt 1 ]]; then
-                model_suffix="hmms"
-            else
-                model_suffix="hmm"
+            VISUAL_MODEL_PATH="$(find_visual_model_path)"
+            python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+            echo "Execute cpp demo."
+            cd cpp && ./build_linux.sh && cd ..
+            if [[ "${NDEVICE}" -eq 1 ]]; then
+                ./bin/demo --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
+                    --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
+                    --visual "${VISUAL_MODEL_PATH}" \
+                    --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
+                    --prompt "介绍下图片" --image "${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg" \
+                    --tokenizer "${WORKFLOW_MODEL_DIR}"
             fi
-            llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
-                --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 ${LOAD_MODE} \
-                --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
-                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
-                --visual "${VISUAL_MODEL_PATH}" \
-                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+            if command -v llm_perf &>/dev/null; then
+                echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
+                devices_param=$(get_devices_param "${NDEVICE}")
+                if [[ "${NDEVICE}" -gt 1 ]]; then
+                    model_suffix="hmms"
+                else
+                    model_suffix="hmm"
+                fi
+                llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
+                    --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 ${LOAD_MODE} \
+                    --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+                    --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+                    --visual "${VISUAL_MODEL_PATH}" \
+                    --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+            fi
         fi
     fi
 fi

@@ -19,6 +19,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import os
+import shutil
 import numpy as np
 import time
 import multiprocessing
@@ -40,10 +41,43 @@ assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 HOUMO_CORE_NUM = os.getenv("HOUMO_CORE_NUM", 2)
 GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+DECODE_DIR_PATTERN = "*decode*"
 
 
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
+
+
+def find_lora_dirs(model_dir: str) -> list[str]:
+    lora_root = os.path.join(model_dir, "lora")
+    if not os.path.isdir(lora_root):
+        raise FileNotFoundError(f"LoRA directory not found: {lora_root}")
+
+    lora_dirs = sorted(
+        path
+        for path in glob.glob(os.path.join(lora_root, "*"))
+        if os.path.isdir(path)
+    )
+    if not lora_dirs:
+        raise FileNotFoundError(f"No LoRA adapter directory found under: {lora_root}")
+
+    for lora_dir in lora_dirs:
+        adapter_name = os.path.basename(lora_dir)
+        prefill_dir = os.path.join(lora_dir, "prefill")
+        decode_dirs = sorted(
+            path
+            for path in glob.glob(os.path.join(lora_dir, DECODE_DIR_PATTERN))
+            if os.path.isdir(path)
+        )
+        if not os.path.isdir(prefill_dir):
+            raise FileNotFoundError(
+                f"LoRA adapter {adapter_name} prefill directory not found: {prefill_dir}"
+            )
+        if not decode_dirs:
+            raise FileNotFoundError(
+                f'No LoRA adapter {adapter_name} subdirectory containing "decode" found under: {lora_dir}'
+            )
+    return lora_dirs
 
 
 def cosine_distance(data1, data2):
@@ -100,6 +134,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
     parser.add_argument("--enable_xh2_stable_output", dest="enable_xh2_stable_output", action="store_true", default=False, help="enable stable output")
     parser.add_argument("--mtp", dest="mtp", action="store_true", default=False, help="enable mtp optimization")
+    parser.add_argument("--lora", dest="lora", action="store_true", default=False, help="enable lora mode")
     # fmt: on
 
     args = parser.parse_args()
@@ -249,7 +284,7 @@ def discover_model_dirs(model_dir: str, include_mtp: bool = False) -> ModelDirs:
 
     decode_dirs = sorted(
         os.path.abspath(path)
-        for path in glob.glob(os.path.join(model_dir, "*decode*"))
+        for path in glob.glob(os.path.join(model_dir, DECODE_DIR_PATTERN))
         if os.path.isdir(path)
         and not any(key in os.path.basename(path) for key in ["mtp", "draft"])
     )
@@ -258,12 +293,7 @@ def discover_model_dirs(model_dir: str, include_mtp: bool = False) -> ModelDirs:
             f'No non-MTP subdirectory containing "decode" found under: {model_dir}'
         )
 
-    visual_dirs = sorted(
-        os.path.abspath(path)
-        for path in glob.glob(os.path.join(model_dir, "vis*"))
-        if os.path.isdir(path)
-        and any(key in os.path.basename(path) for key in ["vision", "visual"])
-    )
+    visual_dirs = discover_visual_dirs(model_dir)
 
     mtp_draft_prefill = None
     mtp_draft_decode = None
@@ -282,6 +312,160 @@ def discover_model_dirs(model_dir: str, include_mtp: bool = False) -> ModelDirs:
         mtp_draft_prefill=mtp_draft_prefill,
         mtp_draft_decode=mtp_draft_decode,
     )
+
+
+def discover_lora_model_dirs(model_dir: str) -> ModelDirs:
+    lora_dirs = find_lora_dirs(model_dir)
+    if len(lora_dirs) > 1:
+        raise RuntimeError(
+            f"Expected one LoRA adapter directory under {os.path.join(model_dir, 'lora')}, found: {lora_dirs}"
+        )
+    lora_dir = lora_dirs[0]
+    decode_dirs = sorted(
+        os.path.abspath(path)
+        for path in glob.glob(os.path.join(lora_dir, DECODE_DIR_PATTERN))
+        if os.path.isdir(path)
+    )
+    visual_dirs = discover_visual_dirs(model_dir)
+    return ModelDirs(
+        prefill=os.path.abspath(os.path.join(lora_dir, "prefill")),
+        decode=decode_dirs[0],
+        visual=visual_dirs,
+    )
+
+
+def discover_visual_dirs(model_dir: str) -> list[str]:
+    return sorted(
+        os.path.abspath(path)
+        for path in glob.glob(os.path.join(model_dir, "vis*"))
+        if os.path.isdir(path)
+        and any(key in os.path.basename(path) for key in ["vision", "visual"])
+    )
+
+
+def prepare_lora_build_dirs(model_dir: str) -> tuple[list[str], list[tuple[str, str]]]:
+    lora_dirs = find_lora_dirs(model_dir)
+    if len(lora_dirs) <= 1:
+        return lora_dirs, []
+
+    lora_root = os.path.join(model_dir, "lora")
+    backup_dirs = []
+    for lora_dir in lora_dirs:
+        backup_dir = os.path.join(model_dir, os.path.basename(lora_dir))
+        if os.path.exists(backup_dir):
+            raise FileExistsError(f"LoRA backup directory already exists: {backup_dir}")
+        shutil.move(lora_dir, backup_dir)
+        backup_dirs.append((backup_dir, lora_dir))
+
+    os.makedirs(lora_root, exist_ok=True)
+    return [backup_dir for backup_dir, _ in backup_dirs], backup_dirs
+
+
+def restore_lora_build_dirs(backup_dirs: list[tuple[str, str]]) -> None:
+    for backup_dir, lora_dir in backup_dirs:
+        if os.path.exists(lora_dir):
+            shutil.move(lora_dir, backup_dir)
+    for backup_dir, lora_dir in backup_dirs:
+        if os.path.exists(backup_dir):
+            os.makedirs(os.path.dirname(lora_dir), exist_ok=True)
+            shutil.move(backup_dir, lora_dir)
+
+
+def rename_lora_input_dirs(
+    output_dir: str, model_name: str, model_size: str, adapter_name: str
+) -> None:
+    adapter_suffix = sanitize_name(adapter_name)
+    for stage in ["prefill", "decode"]:
+        source_dir = os.path.join(output_dir, f"{model_name}-{model_size}_{stage}_lora_input")
+        if not os.path.exists(source_dir):
+            continue
+        target_dir = os.path.join(
+            output_dir, f"{model_name}-{model_size}_{adapter_suffix}_{stage}_lora_input"
+        )
+        if os.path.exists(target_dir):
+            shutil.rmtree(target_dir)
+        shutil.move(source_dir, target_dir)
+
+
+def enable_lora_build_params(build_tasks: list[dict]) -> None:
+    for build_kwargs in build_tasks:
+        if build_kwargs["hmm_name"].endswith(("_prefill", "_decode")):
+            build_kwargs["enable_bundle_lora_param"] = True
+
+
+def append_mtp_build_tasks(
+    build_tasks: list[dict],
+    model_dirs: ModelDirs,
+    model_name: str,
+    model_size: str,
+    llm_flash_attention: int,
+    ndevice: int,
+    context_length: int,
+) -> None:
+    build_tasks.extend(
+        [
+            {
+                "is_prefill": True,
+                "hmonnx": find_hmonnx_file(model_dirs.mtp_draft_prefill),
+                "hmm_name": f"{model_name}-{model_size}_prefill_mtp",
+                "flash_attn": llm_flash_attention,
+                "context_length": context_length,
+                "ndevice": ndevice,
+            },
+            {
+                "hmonnx": find_hmonnx_file(model_dirs.mtp_draft_decode),
+                "hmm_name": f"{model_name}-{model_size}_decode_mtp",
+                "flash_attn": llm_flash_attention,
+                "context_length": context_length,
+                "ndevice": ndevice,
+            },
+        ]
+    )
+
+
+def build_lora_adapters(
+    lora_build_dirs: list[str],
+    lora_backup_dirs: list[tuple[str, str]],
+    model_dir: str,
+    output_dir: str,
+    model_name: str,
+    model_size: str,
+    run_build,
+) -> ModelDirs:
+    if not lora_backup_dirs:
+        model_dirs = run_build()
+        adapter_name = os.path.basename(lora_build_dirs[0])
+        rename_lora_input_dirs(output_dir, model_name, model_size, adapter_name)
+        return model_dirs
+
+    try:
+        return build_backed_up_lora_adapters(
+            lora_build_dirs, model_dir, output_dir, model_name, model_size, run_build
+        )
+    finally:
+        restore_lora_build_dirs(lora_backup_dirs)
+
+
+def build_backed_up_lora_adapters(
+    lora_build_dirs: list[str],
+    model_dir: str,
+    output_dir: str,
+    model_name: str,
+    model_size: str,
+    run_build,
+) -> ModelDirs:
+    model_dirs = None
+    for lora_build_dir in lora_build_dirs:
+        adapter_name = os.path.basename(lora_build_dir)
+        active_lora_dir = os.path.join(model_dir, "lora", adapter_name)
+        print(f"\n===> LoRA adapter build start: {lora_build_dir}")
+        shutil.move(lora_build_dir, active_lora_dir)
+        try:
+            model_dirs = run_build()
+        finally:
+            rename_lora_input_dirs(output_dir, model_name, model_size, adapter_name)
+            shutil.move(active_lora_dir, lora_build_dir)
+    return model_dirs
 
 
 def _get_visual_model_name(model_name: str, model_size: str, visual_dir: str) -> str:
@@ -306,83 +490,108 @@ if __name__ == "__main__":
     llm_flash_attention, vit_flash_attention = args.flash_attention
     profile = {}
 
-    model_dirs = discover_model_dirs(model_dir, include_mtp=args.mtp)
+    model_dirs = None
 
     if args.stage == "build" or args.stage == "all":
         assert (
             get_platform() == "x86_64"
         ), f"Only supported for compilation on the x86_64 platform."
 
-        build_tasks = []
-
-        for visual_dir in model_dirs.visual:
-            build_tasks.append(
-                {
+        def build_visual() -> None:
+            for visual_dir in discover_visual_dirs(model_dir):
+                build_kwargs = {
                     "hmonnx": find_hmonnx_file(visual_dir),
                     "hmm_name": _get_visual_model_name(
                         model_name, model_size, visual_dir
                     ),
                     "flash_attn": vit_flash_attention,
                 }
+                print(f'\n===> {build_kwargs["hmm_name"]} build start...')
+                Xh2Exec.build_from_hmonnx(
+                    output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs
+                )
+
+        def run_build() -> ModelDirs:
+            current_model_dirs = (
+                discover_lora_model_dirs(model_dir)
+                if args.lora
+                else discover_model_dirs(model_dir, include_mtp=args.mtp)
             )
+            build_tasks = []
 
-        build_tasks.extend(
-            [
-                {
-                    "is_prefill": True,
-                    "hmonnx": find_hmonnx_file(model_dirs.prefill),
-                    "hmm_name": f"{model_name}-{model_size}_prefill",
-                    "flash_attn": llm_flash_attention,
-                    "context_length": args.context_length,
-                    "prefill_length": args.prefill_length,
-                    "ndevice": ndevice,
-                    "enable_common_subgraph": (
-                        args.enable_common_subgraph if not args.mtp else False
-                    ),
-                    "enable_xh2_stable_output": args.enable_xh2_stable_output,
-                    "llm_opt": True,
-                },
-                {
-                    "hmonnx": find_hmonnx_file(model_dirs.decode),
-                    "hmm_name": f"{model_name}-{model_size}_decode",
-                    "llm_batch": args.batch if not args.mtp else 1,
-                    "flash_attn": llm_flash_attention,
-                    "context_length": args.context_length,
-                    "ndevice": ndevice,
-                    "enable_xh2_stable_output": args.enable_xh2_stable_output,
-                    "llm_opt": True,
-                },
-            ]
-        )
-
-        if args.mtp:
             build_tasks.extend(
                 [
                     {
                         "is_prefill": True,
-                        "hmonnx": find_hmonnx_file(model_dirs.mtp_draft_prefill),
-                        "hmm_name": f"{model_name}-{model_size}_prefill_mtp",
+                        "hmonnx": find_hmonnx_file(current_model_dirs.prefill),
+                        "hmm_name": f"{model_name}-{model_size}_prefill",
                         "flash_attn": llm_flash_attention,
                         "context_length": args.context_length,
+                        "prefill_length": args.prefill_length,
                         "ndevice": ndevice,
+                        "enable_common_subgraph": (
+                            args.enable_common_subgraph if not args.mtp else False
+                        ),
+                        "enable_xh2_stable_output": args.enable_xh2_stable_output,
+                        "llm_opt": True,
                     },
                     {
-                        "hmonnx": find_hmonnx_file(model_dirs.mtp_draft_decode),
-                        "hmm_name": f"{model_name}-{model_size}_decode_mtp",
+                        "hmonnx": find_hmonnx_file(current_model_dirs.decode),
+                        "hmm_name": f"{model_name}-{model_size}_decode",
+                        "llm_batch": args.batch if not args.mtp else 1,
                         "flash_attn": llm_flash_attention,
                         "context_length": args.context_length,
                         "ndevice": ndevice,
+                        "enable_xh2_stable_output": args.enable_xh2_stable_output,
+                        "llm_opt": True,
                     },
                 ]
             )
 
-        for build_kwargs in build_tasks:
-            print(f'\n===> {build_kwargs["hmm_name"]} build start...')
-            Xh2Exec.build_from_hmonnx(
-                output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs
+            if args.lora:
+                enable_lora_build_params(build_tasks)
+
+            if args.mtp and not args.lora:
+                append_mtp_build_tasks(
+                    build_tasks,
+                    current_model_dirs,
+                    model_name,
+                    model_size,
+                    llm_flash_attention,
+                    ndevice,
+                    args.context_length,
+                )
+
+            for build_kwargs in build_tasks:
+                print(f'\n===> {build_kwargs["hmm_name"]} build start...')
+                Xh2Exec.build_from_hmonnx(
+                    output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs
+                )
+            return current_model_dirs
+
+        build_visual()
+
+        if args.lora:
+            lora_build_dirs, lora_backup_dirs = prepare_lora_build_dirs(model_dir)
+            model_dirs = build_lora_adapters(
+                lora_build_dirs,
+                lora_backup_dirs,
+                model_dir,
+                output_dir,
+                model_name,
+                model_size,
+                run_build,
             )
+        else:
+            model_dirs = run_build()
 
     if args.stage == "test" or args.stage == "all":
+        if model_dirs is None:
+            model_dirs = (
+                discover_lora_model_dirs(model_dir)
+                if args.lora
+                else discover_model_dirs(model_dir, include_mtp=args.mtp)
+            )
         test_tasks = [
             (f"{model_name}-{model_size}_prefill", model_dirs.prefill),
             (f"{model_name}-{model_size}_decode", model_dirs.decode),
