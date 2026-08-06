@@ -593,6 +593,18 @@ vlm_qwen3-vl:
         args: all
   test:
     - vlm_qwen3-vl_test
+vlm_minicpm-v-4.6:
+  include:
+    - models/vlm/minicpm-v-4.6
+  exclude:
+    - models/vlm/minicpm-v-4.6/README.MD
+  example_case:
+    - vlm_minicpm-v-4.6_test:
+        test_type: models_tests
+        script: minicpm_v_4dot6
+        args: all
+  test:
+    - vlm_minicpm-v-4.6_test
 vlm_gemma4:
   include:
     - models/vlm/gemma4

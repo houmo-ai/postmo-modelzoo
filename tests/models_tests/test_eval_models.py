@@ -26,7 +26,6 @@ import pytest
 
 from .test_models_utils import execute_eval_flow
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -1,0 +1,62 @@
+{
+    "obsolete": false,
+    "model_dir": "models/vlm/minicpm-v-4.6",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64", "aarch64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["hmm"],
+            "download_dir": ["cached_models"],
+            "extract_dir": ["cached_models/hmm_xh2_v4_6_256k"],
+            "model_name": ["minicpm"],
+            "model_size": ["v-4.6"],
+            "context_length": ["256k"],
+            "prefill_length": ["256"],
+            "batch": ["1"],
+            "ncore": ["2"],
+            "ndevice": ["1"],
+            "quant_type": ["w8a8h1_sefp"],
+            "source_type": [null]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "model_name": ["minicpm"],
+            "model_size": ["v-4.6"],
+            "tokenizer-dir": ["cached_models/MiniCPM-V-4.6"],
+            "embedding-path": [
+                "cached_results/hmm_xh2_v4_6_256k/hmquant/quant_embedding.pt"
+            ],
+            "prefill-path": [
+                "cached_results/hmm_xh2_v4_6_256k/minicpm-v-4.6_prefill.hmm"
+            ],
+            "decode-path": [
+                "cached_results/hmm_xh2_v4_6_256k/minicpm-v-4.6_decode.hmm"
+            ],
+            "vit-path": [
+                "cached_results/hmm_xh2_v4_6_256k/minicpm-v-4.6_visual_16x.hmm"
+            ],
+            "downsample-mode": ["16x"],
+            "ndevice": ["1"],
+            "batch": ["1"],
+            "max-new-tokens": ["32"],
+            "perf": [false]
+        }
+    },
+    "test_sh_params": [
+        []
+    ],
+    "enable_demo_test": true
+}
