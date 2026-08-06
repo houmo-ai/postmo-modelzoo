@@ -223,6 +223,7 @@ https://opensource.org/licenses/MIT
 Usage in this project:
 The "json" library is used at the following path:
     3rdparty/nlohmann/json.hpp
+    hmatc/3rdparty/nlohmann/include/nlohmann/json.hpp
 
 The JSON for Modern C++ library (also known as nlohmann/json) is licensed
 under the MIT License, which permits use, copying, modification, merging,

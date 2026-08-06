@@ -118,16 +118,18 @@ class HmonnxInfer(BaseInfer, ABC):
         outputs = self.engine.run(in_datas)
         self.time_span += (time.time() - t_start) * 1000
         if len(self.output_names) == 1:
+            data = outputs
             if dequant:
-                data = outputs.to(torch.float32)
+                data = data.to(torch.float32)
             if to_numpy:
                 data = data.detach().cpu().numpy()
             outputs = {self.output_names[0]: data}
             return outputs
         out_datas = dict()
         for idx, name in enumerate(self.output_names):
+            data = outputs[idx]
             if dequant:
-                data = outputs[idx].to(torch.float32)
+                data = data.to(torch.float32)
             if to_numpy:
                 data = data.detach().cpu().numpy()
             out_datas[name] = data

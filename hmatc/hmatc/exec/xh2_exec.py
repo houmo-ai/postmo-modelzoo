@@ -31,9 +31,6 @@ from datetime import datetime
 from ..base.base_exec import BaseExec
 from ..dataloaders.factory import create_dataloader
 from ..dataloaders.loaders import validate_sample
-from ..infer.onnx_infer import OnnxInfer
-from ..infer.xh2_infer import Xh2Infer
-from ..infer.hmonnx_infer import HmonnxInfer
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
 from ..utils.bfp import cast_fp_data_to_act_hmfp_data
@@ -518,6 +515,7 @@ class Xh2Exec(BaseExec):
 
         try:
             import tcim_lite
+            from ..infer.xh2_infer import Xh2Infer
         except ModuleNotFoundError:
             logger.warning("tcim_lite not found, skipping golden check.")
             exit(0)
@@ -662,6 +660,10 @@ class Xh2Exec(BaseExec):
 
         # Load models
         logger.info("Loading models:")
+        from ..infer.onnx_infer import OnnxInfer
+        from ..infer.hmonnx_infer import HmonnxInfer
+        from ..infer.xh2_infer import Xh2Infer
+
         onnx_infer = OnnxInfer()
         onnx_infer.load(self.model_path)
         logger.info(f"  onnx: {self.model_path}")
@@ -857,6 +859,8 @@ class Xh2Exec(BaseExec):
             logger.fatal(f"Not found golden data directory: {golden_dir}")
 
         try:
+            from ..infer.xh2_infer import Xh2Infer
+
             xh2 = Xh2Infer()
             xh2.load(hmm, device_id=device_id)
         except Exception as e:
@@ -1020,6 +1024,8 @@ class Xh2Exec(BaseExec):
         try:
             if enable_layers:
                 hmonnx = BaseExec.add_node_output_as_graph_output(hmonnx, target)
+
+            from ..infer.hmonnx_infer import HmonnxInfer
 
             model = HmonnxInfer()
             model.load(hmonnx)

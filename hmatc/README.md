@@ -124,53 +124,58 @@ save_dir:
 
 # 模型信息
 model:
-  model_name: gemma4
-  model_size: e2b
-  modelscope_repo: ["google/gemma-4-E2B"]
-  model_dir: 
+  model_name: gemma4   # 必选，描述模型系列
+  model_size: e2b      # 必选，描述模型参数规模
+  model_dir:           # 必选，描述模型路径
+  model_type:          # 可选，描述模型类型 是否已被量化，支持raw、quantized，缺省则自动判断
+  modelscope_repo: ["google/gemma-4-E2B-it"]   # 可选，描述模型来源
 
 # 量化信息
 quant:
-  prefill_chunk_length: 256
-  context_length: 2048
-  bits: 4
-  method: gptq/autoround
-  skip_gptq: false
-  quant_type:
-    prefill: w8a8h1_sefp
-    decode: w8a8h1_sefp
-    visual: w8a8h1_sefp
-    audio: w8a8h1_sefp
-  only_visual: false  # 可选，默认false
-  only_audio: false # 可选，默认false
+  # method缺省时默认为gptq；gptq/autoround精确选择对应的内置workflow
+  # method: null时不执行新的GPTQModel量化，仅执行HMQuant导出：
+  #   优先选择显式注册的默认workflow；若不存在，则按gptq、autoround顺序选择已有workflow
+  method: gptq
+  bits: 4  # 可选，仅覆写所选workflow的GPTQModel量化bit数；缺省时使用workflow原值，暂支持4、5、6、7、8
+  prefill_chunk_length: 256  # 可选，描述导出的prefill模型的输入序列长度，默认256
+  context_length: 2048  # 可选，描述导出llm的上下文长度，默认2048
   
-
 # 编译信息
 build:
-  # 对所有hmonnx生效
-  flash_attention: 2  # 可选, 默认2
+  # 顶层字段作为所有已发现组件的默认配置；组件级显式值 > 顶层显式值 > HMATC默认值
+  flash_attention: 2  # 可选，默认2
   llm_opt: true  # 可选，默认true
-  enable_common_subgraph: false  #可选，默认false
+  enable_common_subgraph: false  # 可选，默认false
   ncore: 2  # 可选，默认2
   ndevice: 1  # 可选，默认1
   cpp_backend: v2  # 可选，默认v2
-  all_logits: false   # 可选, 默认false
-  batch: 1   # 可选，默认1
-  device_kernel_split: 1  # 可选， 默认1
-  prefill_chunk_length: 320  # 可选，默认由hmonnx决定
-  context_length: 262144  # 可选，默认由hmonnx决定
-  # 子模型可复写
-  prefill:
-    is_llm_prefill: true  # 可选，默认true
-    prefill_chunk_length: 320  # 可选，默认由hmonnx决定
-    context_length: 262144  # 可选，默认由hmonnx决定
-  decode:
-    is_llm_decode: true  # 可选，默认true
-    batch: 1
-    context_length: 262144  # 可选，默认由hmonnx决定
-  visual:
-    batch: 1
-    ncore: 1
+  all_logits: false  # 可选，默认false
+  batch: 1  # 可选，默认1；decode组件必须为1
+  device_kernel_split: 1  # 可选，默认1
+  prefill_chunk_length: 320  # 可选，默认256；仅对prefill生效，且不能大于context_length
+  context_length: 262144  # 可选，默认2048；仅对prefill和decode生效
+
+  # HMATC会扫描hmquant/下包含HMONNX的直接子目录，默认编译所有发现的组件
+  # components只配置需要局部覆盖或跳过编译的组件；组件名必须与hmquant/的直接子目录名一致
+  # type可选，支持hmonnx、prefill、decode，通常由每个HMONNX自动识别：
+  #   无KV Cache为hmonnx；有KV Cache且唯一静态rank-3输入的序列长度>1为prefill，等于1为decode
+  #   有KV Cache但无法确定唯一静态序列长度时，必须显式配置type: prefill或type: decode
+  #   显式type与图中可明确识别出的类型冲突时会报错
+  components:
+    prefill:
+      prefill_chunk_length: 320  # type可省略，由HMONNX自动识别
+    decode:
+      batch: 1  # decode batch必须等于1；type通常可省略
+    visual:
+      enable_build: true  # 仅支持组件级配置，默认true；false时跳过编译
+      enable_common_subgraph: true
+      batch: 1
+      ncore: 1
+
+  # 滑窗prefill当前不支持修改prefill_chunk_length：HMATC会warning并传None，
+  # effective_build.yaml中该组件的prefill_chunk_length记录为null
+  # 本次发现、继承、覆盖、自动识别及跳过后的实际配置保存到<save_dir>/<target>/effective_build.yaml
+  # enable_build=false的组件也会记录在其中，其hmm为null
 ```
 
 ## ONNX 配置文件

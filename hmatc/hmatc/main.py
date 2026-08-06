@@ -103,22 +103,18 @@ def main():
         from .lm_eval import run_lm_eval
 
         return run_lm_eval(args)
-
     if current_command == "quant" and args.enable_layernorm2rmsnorm:
         logger.info("ENABLE_LAYERNORM2RMSNORM = 1")
         os.environ["ENABLE_LAYERNORM2RMSNORM"] = "1"
-
     # Generate config
     if request.kind == "gen.onnx":
         generate_default_config(args.onnx, args.output)
         logger.info(f"Generate default config done, and save to {args.output}")
         return
-
     # Process batch model benchmark
     if current_command == "benchmark":
         run_benchmark(args.config, args.device_id)
         return
-
     # Directly specify model for perf can skip config file
     if request.kind == "perf.model":
         BaseExec.model_perf(
@@ -190,7 +186,6 @@ def main():
             device_id=args.device_id,
         )
         return
-
     # Generate golden
     if request.kind == "golden.hmonnx":
         from .exec.xh2_exec import Xh2Exec as Exec
@@ -202,12 +197,24 @@ def main():
             enable_layers=args.layers,
         )
         return
-
+    # Config
     target = args.target
     cfg_path = args.config
     if not os.path.exists(cfg_path):
         logger.fatal("Config file not found")
     cfg = read_yaml_to_dict(cfg_path)
+    if cfg is None:
+        logger.fatal("Config file is empty")
+    cfg_version = cfg.get("version", 1)
+    if cfg_version not in [1, 2]:
+        logger.fatal("Unsupported config version")
+    # Large model
+    if cfg_version == 2:
+        from .lm_runner import lm_main
+
+        lm_main(args, cfg)
+        return
+    # ONNX
     if not check_cfg(cfg):
         logger.fatal("Config file error")
     cfg["_config_dir"] = os.path.dirname(os.path.abspath(cfg_path))
