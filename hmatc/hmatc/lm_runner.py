@@ -35,10 +35,11 @@ from .utils import logger
 class WorkflowSpec:
     path: str
     override_fields: tuple[str, ...] = ()
+    speculative_model_paths: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
-# These fields are workflow parameters. quant.method is intentionally excluded
-# because it selects the workflow instead of modifying the selected workflow.
+# These fields are workflow parameters. Profile fields select a complete workflow
+# and are intentionally excluded from the workflow parameter override list.
 COMMON_OVERRIDE_FIELDS = (
     "bits",
     "prefill_chunk_length",
@@ -47,27 +48,120 @@ COMMON_OVERRIDE_FIELDS = (
     "quant_type.visual",
 )
 
-# Explicit Python None entries are resolved before this named-method fallback.
 DEFAULT_METHOD_ORDER = ("gptq", "autoround")
+DEFAULT_SPECULATIVE_DECODE = "none"
+DEFAULT_ATTENTION = "default"
+SPECULATIVE_DECODE_MODES = ("none", "mtp", "dflash")
+ATTENTION_MODES = ("default", "flash_attention", "page_attention")
 
-# Each key is exactly (model_name, model_size, quant_method). Registry paths are
-# complete paths relative to the xh2modelzoo root discovered at runtime.
+GEMMA4_MTP_MODEL_PATHS = (
+    (
+        "draft_model_dir",
+        ("export", "model", "mtp_config", "assistant_hf_model"),
+    ),
+    (
+        "target_model_dir",
+        ("export", "model", "mtp_config", "target_hf_model"),
+    ),
+)
+QWEN_DFLASH_MODEL_PATHS = (
+    ("draft_model_dir", ("export", "model", "dflash_config", "hf_model")),
+)
+
+WORKFLOW_ROOT = "configs_merak/workflows/xh2a"
+LLM_WORKFLOW_ROOT = f"{WORKFLOW_ROOT}/llm_models"
+
+
+# Profiles are registered only when a complete workflow exists in xh2modelzoo.
+# The local key is exactly (quant_method, speculative_decode, attention).
 # fmt: off
-WORKFLOW_CFGS = {
-    ("gemma4",             "e2b",              "gptq"):         WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/e2b/gemma4_e2b_full.yaml", COMMON_OVERRIDE_FIELDS),
-    ("gemma4",             "e2b",              "autoround"):    WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/e2b/gemma4_e2b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
-    ("gemma4",             "e4b",              "gptq"):         WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/e4b/gemma4_e4b_full.yaml", COMMON_OVERRIDE_FIELDS),
-    ("gemma4",             "e4b",              "autoround"):    WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/e4b/gemma4_e4b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
-    ("gemma4",             "26b-a4b",          "gptq"):         WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/26b-a4b/gemma4_26b_a4b_full.yaml", COMMON_OVERRIDE_FIELDS),
-    ("gemma4",             "26b-a4b",          "autoround"):    WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/26b-a4b/gemma4_26b_a4b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
-    ("gemma4",             "31b",              "gptq"):         WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/31b/gemma4_31b_full.yaml", COMMON_OVERRIDE_FIELDS),
-    ("gemma4",             "31b",              "autoround"):    WorkflowSpec("configs_merak/workflows/xh2a/llm_models/gemma4_series/31b/gemma4_31b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
-    ("qwen3.5",            "0.8b",             "autoround"):    WorkflowSpec("configs_merak/workflows/xh2a/llm_models/qwen3_5/0.8b/qwen3_5_0_8b_full.yaml", COMMON_OVERRIDE_FIELDS),
-    ("qwen3.5",            "0.8b",             "gptq"):         WorkflowSpec("configs_merak/workflows/xh2a/llm_models/qwen3_5/0.8b/qwen3_5_0_8b_full_gptq.yaml", COMMON_OVERRIDE_FIELDS),
-    ("qwen3.6",            "27b",              "autoround"):    WorkflowSpec("configs_merak/workflows/xh2a/llm_models/qwen3_5/27b/qwen3_6_27b_full.yaml", COMMON_OVERRIDE_FIELDS),
-    ("qwen3.6",            "27b",              "gptq"):         WorkflowSpec("configs_merak/workflows/xh2a/llm_models/qwen3_5/27b/qwen3_6_27b_full_gptq.yaml", COMMON_OVERRIDE_FIELDS),
-    ("qwen3-tts",          "0.6b-customvoice", None):           WorkflowSpec("configs_merak/workflows/xh2a/other_models/qwen3_tts/0_6b_customvoice/qwen3_tts_12hz_0_6b_customvoice.yaml"),
-    ("mineru2.5-pro-2604", "1.2b",             None):           WorkflowSpec("configs_merak/workflows/xh2a/llm_models/mineru2_5/mineru2_5_pro_xh2a_4k.yaml"),
+MODEL_WORKFLOW_REGISTRY = {
+    "gemma4": {
+        "12b-unified": {
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/12b_unified/gemma4_12b_unified_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/12b_unified/gemma4_12b_unified_autoround.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/12b_unified/gemma4_12b_unified_full_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/12b_unified/gemma4_12b_unified_full_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("gptq", "mtp", "page_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/12b_unified/gemma4_12b_unified_full_mtp_page_attention.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+        },
+        "e2b": {
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e2b/gemma4_e2b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e2b/gemma4_e2b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e2b/gemma4_e2b_full_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e2b/gemma4_e2b_autoround_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e2b/gemma4_e2b_full_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("autoround", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e2b/gemma4_e2b_autoround_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("gptq", "mtp", "page_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e2b/gemma4_e2b_full_mtp_page_attention.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+        },
+        "e4b": {
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e4b/gemma4_e4b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e4b/gemma4_e4b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e4b/gemma4_e4b_full_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e4b/gemma4_e4b_autoround_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e4b/gemma4_e4b_full_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("autoround", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e4b/gemma4_e4b_autoround_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("gptq", "mtp", "page_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/e4b/gemma4_e4b_full_mtp_page_attention.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+        },
+        "26b-a4b": {
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/26b_a4b/gemma4_26b_a4b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/26b_a4b/gemma4_26b_a4b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/26b_a4b/gemma4_26b_a4b_full_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/26b_a4b/gemma4_26b_a4b_autoround_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/26b_a4b/gemma4_26b_a4b_full_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("autoround", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/26b_a4b/gemma4_26b_a4b_autoround_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("gptq", "mtp", "page_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/26b_a4b/gemma4_26b_a4b_full_mtp_page_attention.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+        },
+        "31b": {
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/31b/gemma4_31b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/31b/gemma4_31b_autoround.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/31b/gemma4_31b_full_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "none", "flash_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/31b/gemma4_31b_autoround_flash_attention.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/31b/gemma4_31b_full_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("autoround", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/31b/gemma4_31b_autoround_mtp.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+            ("gptq", "mtp", "page_attention"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/gemma4_series/31b/gemma4_31b_full_mtp_page_attention.yaml", COMMON_OVERRIDE_FIELDS, GEMMA4_MTP_MODEL_PATHS),
+        },
+    },
+    "qwen3.5": {
+        "0.8b": {
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/0.8b/qwen3_5_0_8b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/0.8b/qwen3_5_0_8b_full_gptq.yaml", COMMON_OVERRIDE_FIELDS),
+        },
+        "2b": {
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/2b/qwen3_5_2b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/2b/qwen3_5_2b_full_gptq.yaml", COMMON_OVERRIDE_FIELDS),
+        },
+        "4b": {
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/4b/qwen3_5_4b_full.yaml", COMMON_OVERRIDE_FIELDS),
+        },
+        "9b": {
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/9b/qwen3_5_9b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/9b/qwen3_5_9b_full_gptq.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/9b/qwen3_5_9b_full_mtp.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/9b/qwen3_5_9b_full_mtp_gptq.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "dflash", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/9b/qwen3_5_9b_full_dflash.yaml", COMMON_OVERRIDE_FIELDS, QWEN_DFLASH_MODEL_PATHS),
+            ("gptq", "dflash", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/9b/qwen3_5_9b_full_dflash_gptq.yaml", COMMON_OVERRIDE_FIELDS, QWEN_DFLASH_MODEL_PATHS),
+        },
+    },
+    "qwen3.6": {
+        "27b": {
+            ("autoround", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/27b/qwen3_6_27b_full.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/27b/qwen3_6_27b_full_gptq.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/27b/qwen3_6_27b_full_mtp.yaml", COMMON_OVERRIDE_FIELDS),
+            ("gptq", "mtp", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/27b/qwen3_6_27b_full_mtp_gptq.yaml", COMMON_OVERRIDE_FIELDS),
+            ("autoround", "dflash", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/27b/qwen3_6_27b_full_dflash.yaml", COMMON_OVERRIDE_FIELDS, QWEN_DFLASH_MODEL_PATHS),
+            ("gptq", "dflash", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/qwen3_5/27b/qwen3_6_27b_full_dflash_gptq.yaml", COMMON_OVERRIDE_FIELDS, QWEN_DFLASH_MODEL_PATHS),
+        },
+    },
+    "qwen3-tts": {
+        "0.6b-customvoice": {
+            (None, "none", "default"): WorkflowSpec(f"{WORKFLOW_ROOT}/other_models/qwen3_tts/0_6b_customvoice/qwen3_tts_12hz_0_6b_customvoice.yaml"),
+        },
+    },
+    "mineru2.5-pro-2604": {
+        "1.2b": {
+            (None, "none", "default"): WorkflowSpec(f"{LLM_WORKFLOW_ROOT}/mineru2_5/mineru2_5_pro_xh2a_4k.yaml"),
+        },
+    },
 }
 # fmt: on
 
@@ -100,7 +194,6 @@ BUILD_POSITIVE_INTEGER_FIELDS = {
     "batch",
     "device_kernel_split",
     "prefill_chunk_length",
-    "context_length",
 }
 
 
@@ -108,8 +201,17 @@ class XH2LmRunner(object):
     def __init__(self, cfg: dict):
         target = cfg.get("target") or os.environ.get("HOUMO_TARGET", "xh2")
         self.target = target
-        save_dir = cfg.get("save_dir") or "./output"
+        save_dir = (
+            os.environ.get("HMATC_SAVE_DIR")
+            or cfg.get("save_dir")
+            or "./output"
+        )
+        if not isinstance(save_dir, str) or not save_dir.strip():
+            logger.fatal("save_dir must be a non-empty string")
         self.save_dir = os.path.join(save_dir, target)
+        self.build_output_dir = (
+            os.environ.get("HMATC_BUILD_OUTPUT_DIR") or self.save_dir
+        )
         os.makedirs(self.save_dir, exist_ok=True)
         self.model_cfg = cfg.get("model")
         if not isinstance(self.model_cfg, dict):
@@ -185,10 +287,24 @@ class XH2LmRunner(object):
                     "quant.method must be one of: null, gptq, autoround; "
                     f"got {requested_method!r}"
                 )
+        speculative_decode = self.normalize_profile_value(
+            self.quant_cfg.get("speculative_decode"),
+            "quant.speculative_decode",
+            DEFAULT_SPECULATIVE_DECODE,
+            SPECULATIVE_DECODE_MODES,
+        )
+        attention = self.normalize_profile_value(
+            self.quant_cfg.get("attention"),
+            "quant.attention",
+            DEFAULT_ATTENTION,
+            ATTENTION_MODES,
+        )
         logger.info(
             f"Quantization stage started: model={self.model_name!r}, "
             f"size={self.model_size!r}, model_type={self.model_type!r}, "
-            f"method={requested_method!r}, input={self.model_dir!r}, "
+            f"method={requested_method!r}, "
+            f"speculative_decode={speculative_decode!r}, "
+            f"attention={attention!r}, input={self.model_dir!r}, "
             f"output={self.save_dir!r}"
         )
 
@@ -197,6 +313,8 @@ class XH2LmRunner(object):
                 self.model_name,
                 self.model_size,
                 requested_method,
+                speculative_decode,
+                attention,
             )
         except ValueError as exc:
             logger.fatal(str(exc))
@@ -205,7 +323,9 @@ class XH2LmRunner(object):
         logger.info(
             "Quantization workflow selected: "
             f"requested_method={requested_method!r}, "
-            f"selected_method={selected_method!r}, workflow={workflow_path!r}"
+            f"selected_method={selected_method!r}, "
+            f"speculative_decode={speculative_decode!r}, "
+            f"attention={attention!r}, workflow={workflow_path!r}"
         )
         try:
             with open(workflow_path, encoding="utf-8") as file:
@@ -219,6 +339,10 @@ class XH2LmRunner(object):
         self.apply_workflow_overrides(
             effective_workflow,
             workflow_spec.override_fields,
+        )
+        self.apply_speculative_model_overrides(
+            effective_workflow,
+            workflow_spec.speculative_model_paths,
         )
 
         # Runtime handling depends on the input artifact, not only the selected
@@ -405,10 +529,13 @@ class XH2LmRunner(object):
         return workflow_path
 
     def apply_workflow_overrides(self, workflow, override_fields):
-        # method is accepted by the user schema but is consumed during registry
-        # selection. Only fields declared by WorkflowSpec may modify the workflow.
+        # Profile fields are accepted by the user schema but consumed during
+        # registry selection or by the dedicated speculative-model helper.
         supported_fields = {
             "method",
+            "speculative_decode",
+            "attention",
+            "speculative_model",
             "bits",
             "prefill_chunk_length",
             "context_length",
@@ -515,6 +642,68 @@ class XH2LmRunner(object):
         parent[path[-1]] = value
 
     @staticmethod
+    def normalize_profile_value(value, config_name, default, supported):
+        if value is None:
+            return default
+        if not isinstance(value, str):
+            logger.fatal(f"{config_name} must be null or a string")
+        normalized = value.strip().lower()
+        if normalized not in supported:
+            supported_values = ", ".join(supported)
+            logger.fatal(f"{config_name} must be one of: {supported_values}")
+        return normalized
+
+    @staticmethod
+    def normalize_model_directory(value, config_name):
+        if not isinstance(value, str) or not value.strip():
+            logger.fatal(f"{config_name} must be a non-empty string")
+        path = os.path.abspath(os.path.expanduser(value.strip()))
+        if not os.path.isdir(path):
+            logger.fatal(f"{config_name} must be an existing directory: {path}")
+        return path
+
+    def apply_speculative_model_overrides(self, workflow, path_mappings):
+        configured_speculative_model = self.quant_cfg.get("speculative_model")
+        if configured_speculative_model is not None and not isinstance(
+            configured_speculative_model, dict
+        ):
+            logger.fatal("quant.speculative_model must be a mapping")
+
+        if not path_mappings:
+            if configured_speculative_model is not None:
+                logger.fatal(
+                    "Selected workflow profile does not support "
+                    "quant.speculative_model"
+                )
+            return
+
+        speculative_model = configured_speculative_model or {}
+        mapping_by_field = dict(path_mappings)
+        unsupported_fields = sorted(set(speculative_model) - set(mapping_by_field))
+        if unsupported_fields:
+            logger.fatal(
+                "Unsupported quant.speculative_model fields: " f"{unsupported_fields}"
+            )
+
+        for field_name, workflow_path in path_mappings:
+            config_name = f"quant.speculative_model.{field_name}"
+            parent = self.get_existing_workflow_parent(
+                workflow,
+                workflow_path,
+                config_name,
+            )
+            current_value = parent[workflow_path[-1]]
+            if field_name in speculative_model:
+                parent[workflow_path[-1]] = self.normalize_model_directory(
+                    speculative_model[field_name],
+                    config_name,
+                )
+            elif current_value is None or (
+                isinstance(current_value, str) and not current_value.strip()
+            ):
+                logger.fatal(f"{config_name} is required")
+
+    @staticmethod
     def get_device():
         try:
             import torch
@@ -549,56 +738,99 @@ class XH2LmRunner(object):
         return "raw"
 
     @staticmethod
-    def get_workflow_cfg(model_name, model_size, method):
-        # Named methods require an exact registry match. Explicit null first
-        # resolves a Python None entry; only when it is absent do we select a
-        # named base workflow in stable order. Raw null execution later replaces
-        # that base workflow's quant section with None.
+    def get_workflow_cfg(
+        model_name,
+        model_size,
+        method,
+        speculative_decode=DEFAULT_SPECULATIVE_DECODE,
+        attention=DEFAULT_ATTENTION,
+    ):
+        try:
+            profiles = MODEL_WORKFLOW_REGISTRY[model_name][model_size]
+        except KeyError as exc:
+            raise ValueError(
+                XH2LmRunner.get_unsupported_workflow_message(
+                    model_name,
+                    model_size,
+                    method,
+                    speculative_decode,
+                    attention,
+                )
+            ) from exc
+
         if method is not None:
-            key = (model_name, model_size, method)
-            try:
-                return method, WORKFLOW_CFGS[key]
-            except KeyError as exc:
-                raise ValueError(
-                    XH2LmRunner.get_unsupported_workflow_message(
-                        model_name,
-                        model_size,
-                        method,
-                    )
-                ) from exc
+            profile = (method, speculative_decode, attention)
+            if profile in profiles:
+                return method, profiles[profile]
+        else:
+            default_profile = (None, speculative_decode, attention)
+            if default_profile in profiles:
+                return None, profiles[default_profile]
 
-        default_key = (model_name, model_size, None)
-        if default_key in WORKFLOW_CFGS:
-            return None, WORKFLOW_CFGS[default_key]
-
-        for fallback_method in DEFAULT_METHOD_ORDER:
-            fallback_key = (model_name, model_size, fallback_method)
-            if fallback_key in WORKFLOW_CFGS:
-                return fallback_method, WORKFLOW_CFGS[fallback_key]
+            for fallback_method in DEFAULT_METHOD_ORDER:
+                fallback_profile = (
+                    fallback_method,
+                    speculative_decode,
+                    attention,
+                )
+                if fallback_profile in profiles:
+                    return fallback_method, profiles[fallback_profile]
 
         raise ValueError(
             XH2LmRunner.get_unsupported_workflow_message(
                 model_name,
                 model_size,
                 method,
+                speculative_decode,
+                attention,
             )
         )
 
     @staticmethod
-    def get_unsupported_workflow_message(model_name, model_size, method):
-        supported = sorted(
-            WORKFLOW_CFGS,
-            key=lambda item: (
-                item[0],
-                item[1],
-                "" if item[2] is None else item[2],
+    def get_unsupported_workflow_message(
+        model_name,
+        model_size,
+        method,
+        speculative_decode=DEFAULT_SPECULATIVE_DECODE,
+        attention=DEFAULT_ATTENTION,
+    ):
+        model_registry = MODEL_WORKFLOW_REGISTRY.get(model_name)
+        if model_registry is None:
+            return (
+                f"Unsupported model_name={model_name!r}. "
+                f"Supported model names: {sorted(MODEL_WORKFLOW_REGISTRY)}"
+            )
+
+        profiles = model_registry.get(model_size)
+        if profiles is None:
+            return (
+                f"Unsupported model_size={model_size!r} for "
+                f"model_name={model_name!r}. "
+                f"Supported model sizes: {sorted(model_registry)}"
+            )
+
+        supported_profiles = sorted(
+            profiles,
+            key=lambda profile: (
+                "" if profile[0] is None else profile[0],
+                profile[1],
+                profile[2],
             ),
         )
+        supported_lines = "\n".join(
+            "  method="
+            f"{profile_method!r}, speculative_decode={profile_speculative!r}, "
+            f"attention={profile_attention!r}"
+            for profile_method, profile_speculative, profile_attention in (
+                supported_profiles
+            )
+        )
         return (
-            "No workflow is registered for "
-            f"model_name={model_name!r}, "
-            f"model_size={model_size!r}, method={method!r}. "
-            f"Supported combinations: {supported}"
+            f"Unsupported workflow profile for model {model_name}/{model_size}:\n"
+            f"  method={method!r}\n"
+            f"  speculative_decode={speculative_decode!r}\n"
+            f"  attention={attention!r}\n\n"
+            f"Supported profiles:\n{supported_lines}"
         )
 
     def discover_build_components(self):
@@ -755,6 +987,13 @@ class XH2LmRunner(object):
                     f"build component {component_name!r} field {field} "
                     "must be a positive integer"
                 )
+        context_length = config["context_length"]
+        if config["type"] in {"prefill", "decode"} and context_length is not None:
+            if type(context_length) is not int or context_length <= 0:
+                logger.fatal(
+                    f"build component {component_name!r} field context_length "
+                    "must be null or a positive integer"
+                )
         if config["ndevice"] not in (1, 2, 4):
             logger.fatal(
                 f"build component {component_name!r} ndevice must be " "one of: 1, 2, 4"
@@ -769,13 +1008,6 @@ class XH2LmRunner(object):
             )
         config["cpp_backend"] = config["cpp_backend"].strip()
 
-        if config["type"] == "prefill" and (
-            config["prefill_chunk_length"] > config["context_length"]
-        ):
-            logger.fatal(
-                f"build component {component_name!r} prefill_chunk_length "
-                "must not exceed context_length"
-            )
         if config["type"] == "decode" and config["batch"] != 1:
             logger.fatal(
                 f"build component {component_name!r} is decode, so batch "
@@ -923,11 +1155,12 @@ class XH2LmRunner(object):
                 f"Failed to import XH2 build support; please install tcim: {exc}"
             )
 
+        os.makedirs(self.build_output_dir, exist_ok=True)
         hmquant_dir = os.path.join(self.save_dir, "hmquant")
         logger.info(
             f"Build stage started: model={self.model_name!r}, "
             f"size={self.model_size!r}, target={self.target!r}, "
-            f"input={hmquant_dir!r}, output={self.save_dir!r}"
+            f"input={hmquant_dir!r}, output={self.build_output_dir!r}"
         )
         components = self.discover_build_components()
         logger.info(
@@ -987,7 +1220,10 @@ class XH2LmRunner(object):
                 else:
                     prefill_length = config["prefill_chunk_length"]
             hmm_name = f"{self.model_name}-{self.model_size}_{component_name}"
-            hmm_path = os.path.join(self.save_dir, f"{hmm_name}.hmm")
+            hmm_path = os.path.join(
+                self.build_output_dir,
+                f"{hmm_name}.hmm",
+            )
             resolved_components[component_name] = self.get_effective_component_config(
                 config,
                 hmonnx,
@@ -997,7 +1233,7 @@ class XH2LmRunner(object):
             build_calls[component_name] = {
                 "hmonnx": hmonnx,
                 "hmm_name": hmm_name,
-                "output": self.save_dir,
+                "output": self.build_output_dir,
                 "target": self.target,
                 **self.get_component_build_kwargs(config, prefill_length),
             }
@@ -1007,7 +1243,7 @@ class XH2LmRunner(object):
                 f"artifact={hmm_path!r}"
             )
         effective_build_path = os.path.join(
-            self.save_dir,
+            self.build_output_dir,
             "effective_build.yaml",
         )
         try:

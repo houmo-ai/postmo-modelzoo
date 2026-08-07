@@ -134,8 +134,15 @@ model:
 quant:
   # method缺省时默认为gptq；gptq/autoround精确选择对应的内置workflow
   # method: null时不执行新的GPTQModel量化，仅执行HMQuant导出：
-  #   优先选择显式注册的默认workflow；若不存在，则按gptq、autoround顺序选择已有workflow
+  #   仅在相同speculative_decode和attention profile内，优先选择显式null注册，
+  #   否则按gptq、autoround顺序选择已有workflow
   method: gptq
+  speculative_decode: none  # 可选，默认none；支持none、mtp、dflash
+  attention: default  # 可选，默认default；支持default、flash_attention、page_attention
+  # 可选，仅用于所选workflow显式声明的投机模型路径；用户提供的路径必须是已存在目录
+  # speculative_model:
+  #   draft_model_dir: /path/to/draft-or-assistant-model
+  #   target_model_dir: /path/to/target-model
   bits: 4  # 可选，仅覆写所选workflow的GPTQModel量化bit数；缺省时使用workflow原值，暂支持4、5、6、7、8
   prefill_chunk_length: 256  # 可选，描述导出的prefill模型的输入序列长度，默认256
   context_length: 2048  # 可选，描述导出llm的上下文长度，默认2048
@@ -152,8 +159,8 @@ build:
   all_logits: false  # 可选，默认false
   batch: 1  # 可选，默认1；decode组件必须为1
   device_kernel_split: 1  # 可选，默认1
-  prefill_chunk_length: 320  # 可选，默认256；仅对prefill生效，且不能大于context_length
-  context_length: 262144  # 可选，默认2048；仅对prefill和decode生效
+  prefill_chunk_length: 320  # 可选，默认256；仅对prefill生效，具体取值约束由编译器校验
+  context_length: null  # 可选，默认2048；仅对prefill和decode生效；null表示不修改原图context length
 
   # HMATC会扫描hmquant/下包含HMONNX的直接子目录，默认编译所有发现的组件
   # components只配置需要局部覆盖或跳过编译的组件；组件名必须与hmquant/的直接子目录名一致
@@ -164,18 +171,54 @@ build:
   components:
     prefill:
       prefill_chunk_length: 320  # type可省略，由HMONNX自动识别
+      # context_length: null  # 显式null表示该LLM组件不修改原图context length
     decode:
       batch: 1  # decode batch必须等于1；type通常可省略
+      # context_length: 131072  # 组件级值优先于顶层值
     visual:
       enable_build: true  # 仅支持组件级配置，默认true；false时跳过编译
       enable_common_subgraph: true
       batch: 1
       ncore: 1
 
+  # 顶层或组件级context_length配置为null时，仅对LLM的prefill/decode组件生效，传递None给编译器以保留原图context length；非LLM组件忽略该字段
+  # HMATC不预先比较prefill_chunk_length与context_length，相关约束由编译器校验
   # 滑窗prefill当前不支持修改prefill_chunk_length：HMATC会warning并传None，
   # effective_build.yaml中该组件的prefill_chunk_length记录为null
   # 本次发现、继承、覆盖、自动识别及跳过后的实际配置保存到<save_dir>/<target>/effective_build.yaml
   # enable_build=false的组件也会记录在其中，其hmm为null
+```
+
+`speculative_decode` 和 `attention` 用于选择完整的内置 workflow，只支持当前模型规格实际注册的稀疏组合。枚举值合法但组合未注册时会直接报错，不会退回其他投机模式或 attention profile。
+
+投机模型路径采用统一字段，但不同 profile 支持的字段不同：
+
+- Gemma4 MTP 使用 `draft_model_dir` 和 `target_model_dir`，分别覆写 assistant 和 target Hugging Face 模型目录；
+- Qwen3.5/Qwen3.6 DFlash 只使用 `draft_model_dir`，不接受 `target_model_dir`；
+- Qwen3.5/Qwen3.6 MTP workflow 当前没有外部模型路径字段，因此不接受 `speculative_model`；
+- workflow 中对应路径为 `null` 或空字符串时必须配置；workflow 已带非空路径时可沿用，也可用已存在的本地目录覆写。
+
+Gemma4 MTP + page attention 示例：
+
+```yaml
+quant:
+  method: gptq
+  speculative_decode: mtp
+  attention: page_attention
+  speculative_model:
+    draft_model_dir: /models/gemma-4-assistant
+    target_model_dir: /models/gemma-4-target
+```
+
+Qwen3.5 DFlash 示例：
+
+```yaml
+quant:
+  method: gptq
+  speculative_decode: dflash
+  attention: default
+  speculative_model:
+    draft_model_dir: /models/Qwen3.5-9B-DFlash
 ```
 
 ## ONNX 配置文件
