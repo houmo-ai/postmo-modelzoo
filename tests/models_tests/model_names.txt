@@ -35,6 +35,7 @@ qwen3_tts
 qwen3_vl
 qwen3_vl_embedding
 qwen3dot5
+qwen3dot5_tool_test
 resnet50
 sam2
 sdxl
