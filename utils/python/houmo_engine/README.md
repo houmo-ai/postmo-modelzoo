@@ -14,7 +14,8 @@ houmo_engine/
 ├── process/    # 前处理、阶段输入构造和用户输出后处理
 ├── module/     # Runtime 图加载、执行和设备 cache 管理
 ├── perf/       # 统一性能统计和报告
-└── sampling/   # 确定性 Sampling 和 logits 处理
+├── sampling/   # 确定性 Sampling 和 logits 处理
+└── utils/      # TCIM Tensor 等共享工具
 ```
 
 ## 当前支持模型
@@ -196,6 +197,22 @@ from houmo_engine import Qwen3AsrEngine
 from houmo_engine import HoumoEngine, HoumoModule, ModelProcess
 from houmo_engine.core import GenerationState, Stage, StageInputs, StageOutputs
 ```
+
+TCIM Tensor ROI 工具从 `houmo_engine.utils` 导入：
+
+```python
+from houmo_engine.utils import copy_tensor_roi
+
+copy_tensor_roi(
+    src_tensor,
+    dst_tensor,
+    src_start=[0, 0, 100, 0],
+    dst_start=[0, 1, 200, 0],
+    shape=[1, 1, 32, 256],
+)
+```
+
+该函数支持 H2H、H2D、D2H 和 D2D ROI 复制。同一个 Tensor 对象内复制时会自动克隆源 ROI，以保证重叠区域复制的数据稳定性。可通过 `help(copy_tensor_roi)` 查看坐标规则、图示、参数和异常说明。
 
 仅执行 `import houmo_engine` 不会加载模型图或访问 NPU。
 

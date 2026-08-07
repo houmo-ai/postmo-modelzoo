@@ -493,6 +493,18 @@ llm_qwen3.5:
         args: all
   test:
     - llm_qwen3.5_test
+llm_qwen3.5_tool_test:
+  include:
+    - models/llm/qwen3.5
+  exclude:
+    - models/llm/qwen3.5/README.MD
+  example_case:
+    - llm_qwen3.5_tool_test:
+        test_type: models_tests
+        script: qwen3dot5_tool_test
+        args: all
+  test:
+    - llm_qwen3.5_tool_test
 llm_qwen2.5:
   include:
     - models/llm/qwen2.5
@@ -778,7 +790,7 @@ llm_engine:
     - asr_qwen3-asr_test
     - asr_glm-asr_test
     - asr_whisper_test
-    - llm_qwen3.5_test
+    - llm_qwen3.5_tool_test
 
 #####################################################
 # hmatc
@@ -938,7 +950,7 @@ llm_perf:
   test:
     - asr_qwen3-asr_test
     - tts_qwen3_tts_test
-    - llm_qwen3.5_test
+    - llm_qwen3.5_tool_test
 hmeval_examples_llm:
   include:
     - hmeval

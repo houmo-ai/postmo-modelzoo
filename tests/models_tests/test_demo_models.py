@@ -359,6 +359,15 @@ def test_llm_qwen3dot5_demo(setup_logging) -> None:
     _demo_func("qwen3.5", setup_logging)
 
 
+@pytest.mark.qwen3dot5_tool_test
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.demo
+def test_llm_qwen3dot5_tool_test_demo(setup_logging) -> None:
+    """test_llm_qwen3dot5_tool_test_demo"""
+    _demo_func("qwen3.5_tool_test", setup_logging)
+
+
 @pytest.mark.qwen3
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_24g

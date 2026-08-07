@@ -395,6 +395,16 @@ def test_llm_qwen3dot5_get_model(setup_logging) -> None:
     _get_model_func("qwen3.5", setup_logging)
 
 
+@pytest.mark.qwen3dot5_tool_test
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_llm_qwen3dot5_tool_test_get_model")
+def test_llm_qwen3dot5_tool_test_get_model(setup_logging) -> None:
+    """test_llm_qwen3dot5_tool_test_get_model"""
+    _get_model_func("qwen3.5_tool_test", setup_logging)
+
+
 @pytest.mark.qwen3
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_24g
