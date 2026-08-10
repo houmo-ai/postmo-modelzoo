@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -16,14 +17,6 @@ NDEVICE=1
 
 parse_args "$@"
 
-if [[ "${STEP}" == "all" ]]; then
-    # No local PTQ flow is available, so the complete supported flow uses HMMs.
-    STEP="demo"
-elif should_run_step "quant"; then
-    echo "Error: MiniCPM-V 4.6 does not support the quant step; use build, demo, or all." >&2
-    exit 1
-fi
-
 cd "${SCRIPT_DIR}"
 
 TEST_VENV_ACTIVE=0
@@ -38,26 +31,56 @@ fi
 
 check_step_python_packages || exit 1
 
-if should_run_step "build"; then
-    echo "Start model compilation."
+if should_run_step "quant"; then
+    if ! check_gpu require; then
+        exit 1
+    fi
 
-    python3 build.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --ndevice "${NDEVICE}"
+    if ! should_skip_download; then
+        echo "Download raw model (${MODEL_NAME}-${MODEL_SIZE})."
+        GET_MODEL_ARGS=(
+            --type raw
+            --model_name "${MODEL_NAME}"
+            --model_size "${MODEL_SIZE}"
+        )
+        python3 get_model.py "${GET_MODEL_ARGS[@]}"
+    fi
+    echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
+    PTQ_ARGS=(
+        --model-name "${MODEL_NAME}"
+        --model-size "${MODEL_SIZE}"
+    )
+    python3 ptq.py "${PTQ_ARGS[@]}"
 fi
 
-if should_run_step "demo"; then
-    if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
-        echo "Download pre-compiled model."
-
-        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
-    fi
-    echo "Execute python demo."
-    demo_args=(
+if should_run_step "build"; then
+    echo "Start model compilation (${MODEL_NAME}-${MODEL_SIZE})."
+    BUILD_ARGS=(
         --model_name "${MODEL_NAME}"
         --model_size "${MODEL_SIZE}"
         --ndevice "${NDEVICE}"
     )
-    demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
-    python3 demo.py "${demo_args[@]}"
+    python3 build.py "${BUILD_ARGS[@]}"
+fi
+
+if should_run_step "demo"; then
+    if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
+        echo "Download pre-compiled model (${MODEL_NAME}-${MODEL_SIZE})."
+        GET_MODEL_ARGS=(
+            --type hmm
+            --model_name "${MODEL_NAME}"
+            --model_size "${MODEL_SIZE}"
+        )
+        python3 get_model.py "${GET_MODEL_ARGS[@]}"
+    fi
+    echo "Execute Python demo (${MODEL_NAME}-${MODEL_SIZE})."
+    DEMO_ARGS=(
+        --model_name "${MODEL_NAME}"
+        --model_size "${MODEL_SIZE}"
+        --ndevice "${NDEVICE}"
+    )
+    DEMO_ARGS+=("${SYSTEM_PROMPT_ARGS[@]}")
+    python3 demo.py "${DEMO_ARGS[@]}"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

@@ -13,4 +13,4 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      workflow_config: "workflows/xh2a/llm_models/minicpm/v4.6/minicpm_v4.6_full.yaml"
+      workflow_config: "workflows/xh2a/llm_models/minicpm_v_4_6/0_8b/minicpm_v_4_6_xh2a_w8a8.yaml"
