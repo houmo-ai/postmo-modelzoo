@@ -111,6 +111,18 @@ def _remove_empty_artifact_dirs(llm_artifact_dir: Path, output_dir: Path) -> Non
         artifact_parent.rmdir()
 
 
+def _move_vision_hmonnx_to_parent(output_dir: Path) -> None:
+    for vision_name in ("vision_4x", "vision_16x"):
+        vision_dir = output_dir / vision_name
+        hmonnx_dir = vision_dir / "hmonnx"
+        if not hmonnx_dir.is_dir():
+            raise FileNotFoundError(f"Vision HMONNX directory not found: {hmonnx_dir}")
+
+        for source in list(hmonnx_dir.iterdir()):
+            _move_to_output(source, vision_dir)
+        hmonnx_dir.rmdir()
+
+
 def move_llm_artifacts_to_output_root(meta_path: Path) -> None:
     meta_info = _read_json(meta_path)
 
@@ -136,6 +148,7 @@ def move_llm_artifacts_to_output_root(meta_path: Path) -> None:
     for source in list(llm_artifact_dir.iterdir()):
         _move_to_output(source, output_dir)
     _remove_empty_artifact_dirs(llm_artifact_dir, output_dir)
+    _move_vision_hmonnx_to_parent(output_dir)
 
     moved_metadata_path = output_dir / llm_metadata_path.name
     _write_json(moved_metadata_path, llm_metadata)
@@ -180,7 +193,7 @@ def export_hmonnx(
     if dump_golden:
         golden_dir = workflow.dump_golden(
             export_result=export_result,
-            device=device,
+            device="cpu",
         )
         print(f"golden_dir: {golden_dir}")
     meta_path = Path(export_result.work_dir) / "export_meta_info.json"
