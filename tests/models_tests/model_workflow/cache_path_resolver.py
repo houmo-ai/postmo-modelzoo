@@ -131,7 +131,13 @@ def cache_root_directory(
 
 
 def get_model_case_artifact_id(case: ParameterCase) -> str | None:
-    """Return the stable artifact directory name produced by a get-model case."""
+    """Return the cache case id produced by a get-model case.
+
+    A configured output may point below the case directory, for example
+    ``cached_results/hmm_xh2_256k/xh2``.  The stable id is still the first path
+    segment below the recognized cache root.  Paths outside the cache roots
+    retain the legacy final-directory fallback.
+    """
     file_type = str(case.values.get("type", ""))
     keys = (
         ("download_dir", "model_dir")
@@ -147,6 +153,9 @@ def get_model_case_artifact_id(case: ParameterCase) -> str | None:
     for key in keys:
         value = case.values.get(key)
         if isinstance(value, str) and value:
+            reference = cache_case_reference(value)
+            if reference is not None:
+                return reference[1]
             return Path(value).name
     return None
 

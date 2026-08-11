@@ -71,6 +71,7 @@ pytest -q tests/unit_tests/models/test_compare_flow.py
 | `models/test_flow_architecture.py` | 测试 flow registry/policy seam、模块依赖方向、共享参数 renderer、quant/compile 拆分、pytest 入口签名、显式导出以及禁止恢复 legacy 执行模式。 |
 | `models/test_get_model_flow.py` | 测试 LLM release get_model case 过滤、HMM manifest 发布、CV workspace side-effect 生命周期和 LLM side-effect 恢复。 |
 | `models/test_hmatc_flow_support.py` | 测试 separate workspace 持久化/恢复、默认与多组件 HMATC config、inference bundle manifest 复用、legacy adoption 和配置变化重建。 |
+| `models/test_hmatc_v2_flow.py` | 测试显式 HMATC v2 schema、YAML 深度合并和只读源配置、递归 cache 路径、quant/build artifact 发布与复用、按 config 选择 raw get_model、build 环境变量和 `.pt`/`hf_config` sidecar 复制。 |
 | `models/test_metric_validation.py` | 测试默认/custom perf 指标提取、lower-is-better 延迟、HMATC QPS 聚合、eval 部分数据集系数，以及 compile/compare 阈值。 |
 | `models/test_model_config_repository.py` | 测试全部模型 JSON 加载、active flow handler 注册、固定 backend policy、模型阈值覆盖、必需参数 section 和禁止 JSON 控制代码侧 perf 规则。 |
 | `models/test_parameter_matrix.py` | 测试参数矩阵列长度、命令行参数渲染、`cached_models`/`cached_results` 路径替换和 cache case reference 解析。 |

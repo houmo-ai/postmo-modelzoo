@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -43,6 +44,7 @@ from ..model_workflow.artifact_workspace import (
     snapshot_workspace_files,
 )
 from ..model_workflow.cache_path_resolver import (
+    cache_case_reference,
     get_model_case_artifact_id,
     resolve_case_paths,
 )
@@ -79,6 +81,7 @@ class GetModelFlowHandler:
     family: ModelFamily
     file_types: frozenset[str] | None = None
     case_ids: frozenset[str] | None = None
+    config_paths: frozenset[str] | None = None
 
     def run(self, request: FlowRequest, services) -> FlowResult:
         """Execute the get model flow handler and return its structured result."""
@@ -117,6 +120,11 @@ class GetModelFlowHandler:
             for case in matrix.cases
             if (self.file_types is None or str(case.values.get("type")) in self.file_types)
             and (self.case_ids is None or self.case_artifact_id(case) in self.case_ids)
+            and (
+                self.config_paths is None
+                or self._normalized_config_path(case.values.get("config"))
+                in self.config_paths
+            )
             and self._release_case_allowed(case, release=context.release)
         )
 
@@ -183,6 +191,8 @@ class GetModelFlowHandler:
         """Run one get-model command and publish its produced artifact."""
         context = request.context
         workspace_snapshot = snapshot_workspace_files(workspace)
+        case_id = self.case_artifact_id(case)
+        case = self._with_demo_output(request, case, case_id)
         resolved_case = resolve_case_paths(
             case, context.model_cache_dir, context.result_cache_dir
         )
@@ -198,7 +208,7 @@ class GetModelFlowHandler:
                 timeout_seconds=GET_MODEL_COMMAND_TIMEOUT_SECONDS,
             ),
             diagnostic_fields=context.diagnostic.for_case(
-                self.case_artifact_id(case) or case.index, phase="get-model"
+                case_id or case.index, phase="get-model"
             ).as_mapping(),
         )
         if not result.succeeded:
@@ -215,11 +225,82 @@ class GetModelFlowHandler:
                 request, resolved_case, file_type, workspace, persist
             )
             self._publish_artifact(
-                request, services, resolved_case, directory=artifact_directory
+                request,
+                services,
+                resolved_case,
+                directory=artifact_directory,
+                case_id=case_id,
             )
         except ArtifactValidationError as error:
             return result, error.message
         return result, None
+
+    def _with_demo_output(
+        self,
+        request: FlowRequest,
+        case: ParameterCase,
+        case_id: str | None,
+    ) -> ParameterCase:
+        """Route an implicit download to its same-name JSON demo directory."""
+        context = request.context
+        if context.diagnostic.flow == ModelFlow.GET_MODEL or case_id is None:
+            return case
+        paths = self._demo_case_paths(request, case_id)
+        if not paths:
+            return case
+        output = Path(os.path.commonpath(tuple(str(path) for path in paths)))
+        if len(paths) == 1 and output.suffix:
+            output = output.parent
+        values = dict(case.values)
+        keys = (
+            "extract_dir",
+            "quant_model_dir",
+            "build_model_dir",
+            "model_dir",
+            "download_dir",
+        )
+        key = next((name for name in keys if values.get(name)), "extract_dir")
+        values[key] = str(output)
+        return ParameterCase(case.index, values)
+
+    @staticmethod
+    def _demo_case_paths(request: FlowRequest, case_id: str) -> set[Path]:
+        """Return resolved demo paths belonging to one result-cache case."""
+        backend = request.context.diagnostic.backend
+        sections = (
+            request.config.backend_section(name, backend) or {}
+            for name in ("demo_params", "demo_multibatch_params")
+        )
+        values = (
+            value
+            for section in sections
+            for column in section.values()
+            if isinstance(column, list)
+            for value in column
+        )
+        return {
+            GetModelFlowHandler._resolve_demo_case_path(request, value)
+            for value in values
+            if GetModelFlowHandler._references_case(value, case_id)
+        }
+
+    @staticmethod
+    def _references_case(value, case_id: str) -> bool:
+        """Return whether one demo parameter references the requested cache case."""
+        if not isinstance(value, str):
+            return False
+        reference = cache_case_reference(value)
+        return reference is not None and reference[1] == case_id
+
+    @staticmethod
+    def _resolve_demo_case_path(request: FlowRequest, value: str) -> Path:
+        """Resolve one cache-backed demo parameter into an absolute path."""
+        resolved = resolve_case_paths(
+            ParameterCase(0, {"path": value}),
+            request.context.model_cache_dir,
+            request.context.result_cache_dir,
+        )
+        return Path(resolved.values["path"])
 
     def _release_case_allowed(self, case: ParameterCase, *, release: bool) -> bool:
         """Return whether a download case satisfies release source policy."""
@@ -245,6 +326,13 @@ class GetModelFlowHandler:
         """Build the stable artifact identifier for a download case."""
         return get_model_case_artifact_id(case)
 
+    @staticmethod
+    def _normalized_config_path(value) -> str | None:
+        """Normalize an optional model-relative config path for case selection."""
+        if not isinstance(value, str) or not value:
+            return None
+        return Path(value).as_posix().removeprefix("./")
+
     def _publish_artifact(
         self,
         request: FlowRequest,
@@ -252,6 +340,7 @@ class GetModelFlowHandler:
         case: ParameterCase,
         *,
         directory: Path | None = None,
+        case_id: str | None = None,
     ) -> None:
         """Publish artifact with ownership and manifest metadata."""
         file_type = str(case.values.get("type", ""))
@@ -290,7 +379,7 @@ class GetModelFlowHandler:
                 )
             required_files = build_required_file_roles(directory, representative_files, prefix="file")
 
-        case_id = directory.name or f"case-{case.index}"
+        case_id = case_id or directory.name or f"case-{case.index}"
         fingerprint = calculate_config_fingerprint(
             {
                 "model": request.config.model_name,

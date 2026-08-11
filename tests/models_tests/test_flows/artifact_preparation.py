@@ -30,7 +30,7 @@ import logging
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 import yaml
 
@@ -39,13 +39,11 @@ from ...tests_utils.runtime_context import TCaseType
 from ..model_workflow.artifact_cache_store import ArtifactType, copy_cache_contents
 from ..model_workflow.artifact_file_scanner import (
     find_nonempty_artifact_files,
-    find_nonempty_hmm_files,
 )
 from ..model_workflow.artifact_workspace import restore_workspace_outputs
 from ..model_workflow.backend_flow_policies import FamilyFlowPolicy
 from ..model_workflow.cache_path_resolver import (
     MODEL_CACHE_ROOT,
-    RESULT_CACHE_ROOT,
     cache_case_reference,
     cache_root_directory,
     get_model_case_artifact_id,
@@ -175,13 +173,96 @@ class ArtifactPreparer:
             policy=policy,
         )
 
+    def prepare_hmatc_v2_raw_models(
+        self,
+        request: FlowRequest,
+        services,
+        cases,
+    ) -> PreparationReport:
+        """Download and validate raw get-model cases referenced by HMATC v2 overrides.
+
+        Always invoke ``get_model.py`` for the selected v2 configs.  ModelScope
+        handles its own download cache, while running the command again ensures
+        that a non-empty destination left by an older case is never mistaken for
+        the raw model declared by the current configuration.
+        """
+        references = tuple(self._hmatc_v2_model_cache_directories(request, cases))
+        if not references:
+            return PreparationReport(message="HMATC v2 has no raw model cache references")
+
+        from .get_model_flow import GetModelFlowHandler
+
+        selected_configs = frozenset(case.config for case in cases)
+        result = GetModelFlowHandler(
+            request.config.family,
+            file_types=frozenset({"raw"}),
+            config_paths=selected_configs,
+        ).run(request, services)
+        report = self._report_from_flow(result)
+        failures = list(report.failures)
+        if result.disposition == FlowDisposition.SKIPPED:
+            failures.append(result.message or "HMATC v2 raw get_model was skipped")
+        unresolved = tuple(path for path in references if not self._hmatc_v2_cache_reference_exists(path))
+        if unresolved:
+            failures.append(
+                "HMATC v2 raw model paths are missing after get_model: " + ", ".join(str(path) for path in unresolved)
+            )
+        return PreparationReport(
+            commands=report.commands,
+            failures=tuple(failures),
+            disposition=report.disposition,
+            message=report.message,
+        )
+
+    @staticmethod
+    def _hmatc_v2_model_cache_directories(
+        request: FlowRequest,
+        cases,
+    ) -> Iterable[Path]:
+        """Yield unique cached_models directories from nested v2 overrides."""
+        seen: set[Path] = set()
+        for case in cases:
+            for value in ArtifactPreparer._nested_strings(case.override):
+                parts = Path(value.replace("\\", "/")).parts
+                if MODEL_CACHE_ROOT not in parts:
+                    continue
+                resolved = Path(
+                    resolve_cached_path(
+                        value,
+                        model_cache_dir=request.context.model_cache_dir,
+                        result_cache_dir=request.context.result_cache_dir,
+                    )
+                )
+                if resolved not in seen:
+                    seen.add(resolved)
+                    yield resolved
+
+    @staticmethod
+    def _hmatc_v2_cache_reference_exists(path: Path) -> bool:
+        """Return whether a nested v2 cache reference is a usable file or directory."""
+        try:
+            if path.is_file():
+                return path.stat().st_size > 0
+        except OSError:
+            return False
+        return bool(find_nonempty_artifact_files(path, limit=1))
+
+    @staticmethod
+    def _nested_strings(value: Any) -> Iterable[str]:
+        """Yield strings recursively from a JSON-like value."""
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, Mapping):
+            for nested in value.values():
+                yield from ArtifactPreparer._nested_strings(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                yield from ArtifactPreparer._nested_strings(nested)
+
     def backfill_referenced_demo_artifacts(self, request: FlowRequest, services) -> list[Path]:
         """Download referenced HMM directories not produced by compile cases."""
         from .get_model_flow import GetModelFlowHandler
-        from .inference_flow_support import (
-            mirror_downloaded_hmms,
-            unproduced_demo_artifact_refs,
-        )
+        from .inference_flow_support import unproduced_demo_artifact_refs
 
         backend = request.context.diagnostic.backend
         references = unproduced_demo_artifact_refs(request, backend)
@@ -233,12 +314,6 @@ class ArtifactPreparer:
         failures = self._flow_failures(result)
         if failures:
             logger.warning("Failed to prepare demo artifact directories: %s", "; ".join(failures))
-        mappings = {case_id: case_id for case_id, root in missing.items() if root == RESULT_CACHE_ROOT}
-        if mappings:
-            try:
-                mirror_downloaded_hmms(request, services, mappings)
-            except (ModelTestError, CommandExecutionError) as error:
-                logger.warning("Failed to mirror demo artifact directories: %s", error)
         return [
             cache_root_directory(
                 root,
@@ -349,10 +424,7 @@ class ArtifactPreparer:
             restore_reusable_hmatc_inference_artifact,
             run_hmatc_inference_preparation,
         )
-        from .inference_flow_support import (
-            mirror_local_compile_outputs,
-            validate_python_compiled_artifacts,
-        )
+        from .inference_flow_support import validate_python_compiled_artifacts
 
         context = request.context
         if context.test_type == TCaseType.SEPARATE_INFER:
@@ -376,7 +448,6 @@ class ArtifactPreparer:
             services,
             policy,
             CompileFlowHandler,
-            mirror_local_compile_outputs,
             validate_python_compiled_artifacts,
         )
 
@@ -784,19 +855,16 @@ class ArtifactPreparer:
         commands, failures = run_preparation(request, services, workspace)
         return PreparationReport(raw.commands + tuple(commands), raw.failures + tuple(failures))
 
-    def _prepare_python_artifacts(self, request, services, policy, compile_handler, mirror_outputs, validate):
+    def _prepare_python_artifacts(self, request, services, policy, compile_handler, validate):
         """Reuse, compile, or download Python-generated inference artifacts."""
         backend = request.context.diagnostic.backend
         artifact_failures = validate(request, services)
         if request.config.backend_section("compile_params", backend) is not None and not artifact_failures:
-            mirror_outputs(request, services)
             self.backfill_referenced_demo_artifacts(request, services)
             return PreparationReport(message="compiled artifacts already exist")
         compile_result = compile_handler(policy).run(request, services)
         commands = list(compile_result.commands)
         compile_failures = list(self._flow_failures(compile_result))
-        if not compile_failures:
-            mirror_outputs(request, services)
         self.backfill_referenced_demo_artifacts(request, services)
         artifact_failures = validate(request, services)
         failures = []
@@ -811,35 +879,19 @@ class ArtifactPreparer:
         return PreparationReport(tuple(commands), tuple(failures))
 
     def _download_release_hmms(self, request: FlowRequest, services) -> PreparationReport:
-        """Download only missing release HMMs and mirror them into result cases.
-
-        Separate-infer may be run after a no-infer preparation or after a
-        previous get-model step.  The destination directory is therefore the
-        source of truth: a case with at least one non-empty HMM must not be
-        downloaded again.  ``release_hmm_case_mappings`` already limits the
-        remaining cases to those that have a matching get_model declaration.
-        """
+        """Download release HMM cases whose ids are referenced by demo JSON."""
         from .get_model_flow import GetModelFlowHandler
-        from .inference_flow_support import (
-            mirror_downloaded_hmms,
-            release_hmm_case_mappings,
-        )
+        from .inference_flow_support import release_hmm_case_ids
 
         prepare_context = replace(request.context, test_type=TCaseType.DEFAULT)
-        mappings = {
-            destination_id: source_id
-            for destination_id, source_id in release_hmm_case_mappings(request).items()
-            if not find_nonempty_hmm_files(request.context.result_cache_dir / destination_id)
-        }
-        if not mappings:
-            return PreparationReport(message="release HMM artifacts already exist")
-        case_ids = {source_id for source_id in mappings.values() if source_id}
+        case_ids = release_hmm_case_ids(request)
+        if not case_ids:
+            return PreparationReport(message="no matching release HMM cases")
         result = GetModelFlowHandler(
             request.config.family,
             frozenset({"hmm"}),
-            frozenset(case_ids) if case_ids else None,
+            case_ids,
         ).run(FlowRequest(prepare_context, request.config), services)
-        mirror_downloaded_hmms(request, services, mappings)
         return self._report_from_flow(result)
 
     @staticmethod
@@ -895,6 +947,16 @@ def ensure_inference_artifacts(
     )
 
 
+def prepare_hmatc_v2_raw_models(
+    request: FlowRequest,
+    services,
+    cases,
+) -> PreparationReport:
+    """Use the configured artifact preparer for HMATC v2 raw references."""
+    preparer = getattr(services, "artifact_preparer", ArtifactPreparer())
+    return preparer.prepare_hmatc_v2_raw_models(request, services, cases)
+
+
 __all__ = [
     "ArtifactNeed",
     "ArtifactPreparer",
@@ -902,4 +964,5 @@ __all__ = [
     "PreparationReport",
     "ensure_artifacts",
     "ensure_inference_artifacts",
+    "prepare_hmatc_v2_raw_models",
 ]

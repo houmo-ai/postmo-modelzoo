@@ -43,16 +43,10 @@ from tests.models_tests.model_workflow.flow_contracts import (
     ModelFamily,
     ModelFlow,
 )
-from tests.models_tests.model_workflow.model_config_repository import (
-    ModelConfig,
-    ModelConfigRepository,
-)
+from tests.models_tests.model_workflow.model_config_repository import ModelConfig
 from tests.models_tests.test_flows.compile_flow import (
     CompileFlowHandler,
     _artifact_owned_root,
-)
-from tests.models_tests.test_flows.inference_flow_support import (
-    mirror_local_compile_outputs,
 )
 from tests.tests_utils.runtime_context import (
     TCaseType,
@@ -63,10 +57,6 @@ from tests.tests_utils.workspace import (
 from types import (
     SimpleNamespace,
 )
-from ._flow_contract_support import (
-    CONFIG_DIR,
-)
-
 pytestmark = pytest.mark.unit
 
 
@@ -197,48 +187,6 @@ def test_python_compile_output_can_be_owned_by_model_cache(tmp_path: Path) -> No
         (staging / "model.hmm").write_bytes(b"hmm")
         writer.commit()
     assert (destination / "model.hmm").read_bytes() == b"hmm"
-
-
-def test_model_cache_compile_output_is_mirrored_for_demo(tmp_path: Path) -> None:
-    config = ModelConfigRepository(CONFIG_DIR).load("qwen3-tts")
-    model_cache = tmp_path / "models"
-    source = model_cache / "hmm_xh2_1.7b_customvoice_2k"
-    source.mkdir(parents=True)
-    (source / "model.hmm").write_bytes(b"hmm")
-    (source / "hmquant").mkdir()
-    (source / "hmquant" / "quant_embedding_code_predictor.pt").write_bytes(b"embedding")
-    context = SimpleNamespace(
-        model_cache_dir=model_cache,
-        result_cache_dir=tmp_path / "results",
-        diagnostic=DiagnosticContext(
-            "compile-mirror",
-            "qwen3-tts",
-            ModelFamily.LLM,
-            "xh2",
-            ModelFlow.DEMO,
-        ),
-    )
-    mirror_local_compile_outputs(
-        SimpleNamespace(config=config, context=context),
-        SimpleNamespace(artifact_cache=ArtifactCache()),
-    )
-    destination = context.result_cache_dir / source.name
-    assert (destination / "model.hmm").read_bytes() == b"hmm"
-    assert (
-        destination / "hmquant" / "quant_embedding_code_predictor.pt"
-    ).read_bytes() == b"embedding"
-    inspection = ArtifactCache().inspect(
-        destination,
-        ArtifactRequirement(
-            ArtifactType.COMPILED_MODEL,
-            "qwen3-tts",
-            "xh2",
-            source.name,
-        ),
-    )
-    assert inspection.status == CacheStatus.VALID
-    assert inspection.manifest is not None
-    assert inspection.manifest.producer_flow == ModelFlow.COMPILE.value
 
 
 def test_python_compile_missing_input_is_a_failure(tmp_path: Path) -> None:

@@ -51,6 +51,10 @@ from tests.models_tests.model_workflow.flow_contracts import (
 from tests.models_tests.model_workflow.model_config_repository import (
     ModelConfig,
 )
+from tests.models_tests.model_workflow.cache_path_resolver import (
+    get_model_case_artifact_id,
+)
+from tests.models_tests.model_workflow.parameter_matrix import ParameterCase
 from tests.models_tests.test_flows.get_model_flow import (
     GetModelFlowHandler,
 )
@@ -65,6 +69,66 @@ from types import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+def test_get_model_case_id_uses_the_cache_case_directory() -> None:
+    case = ParameterCase(
+        0,
+        {
+            "type": "hmm",
+            "extract_dir": "cached_results/hmm_xh2_256k/xh2",
+        },
+    )
+
+    assert get_model_case_artifact_id(case) == "hmm_xh2_256k"
+
+
+def test_implicit_hmm_download_uses_same_case_demo_directory(tmp_path: Path) -> None:
+    config = ModelConfig(
+        model_name="demo",
+        path=tmp_path / "model_cfg_demo.json",
+        family=ModelFamily.LLM,
+        model_dir=Path("models/llm/demo"),
+        obsolete=False,
+        dependencies={},
+        support_platform=("x86_64",),
+        support_backend=("xh2",),
+        support_flow={"xh2": ("get_model", "demo")},
+        raw={
+            "get_model_params": {
+                "xh2": {
+                    "type": ["hmm"],
+                    "extract_dir": ["cached_models/hmm_xh2_256k"],
+                }
+            },
+            "demo_params": {
+                "xh2": {
+                    "script": ["demo.py"],
+                    "model_dir": ["cached_results/hmm_xh2_256k/xh2"],
+                }
+            },
+        },
+    )
+    context = SimpleNamespace(
+        diagnostic=SimpleNamespace(backend="xh2", flow=ModelFlow.DEMO),
+        model_cache_dir=tmp_path / "models",
+        result_cache_dir=tmp_path / "results",
+    )
+    handler = GetModelFlowHandler(ModelFamily.LLM)
+    case = ParameterCase(
+        0,
+        {"type": "hmm", "extract_dir": "cached_models/hmm_xh2_256k"},
+    )
+
+    routed = handler._with_demo_output(
+        FlowRequest(context=context, config=config),
+        case,
+        "hmm_xh2_256k",
+    )
+
+    assert routed.values["extract_dir"] == str(
+        context.result_cache_dir / "hmm_xh2_256k" / "xh2"
+    )
 
 
 def test_llm_get_model_flow_filters_release_cases_and_publishes_hmm(

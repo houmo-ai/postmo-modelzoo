@@ -206,6 +206,7 @@ model_cfg_template_llm.json
 | `support_core_num` | object | backend 到 core 数量列表或 null；用于 aarch64 demo 设备检查。 |
 | `support_flow` | object | backend 到 flow 列表；合法值为七类 flow 和附加的 `demo_multibatch`。 |
 | `support_hmatc` | object/null | 兼容性能力描述，可列 `hmquant/hmbuild/hmdemo/hmcompare/hmeval/hmperf`；不决定 runner。 |
+| `hmatc_flow_version` | `1` / `2` | HMATC quant/build 测试协议版本；缺省为 v1。使用行式 `config + override + ENV_*` 时必须显式配置 `2`。 |
 | `validation` | object | 可选 backend 阈值覆盖；支持 `compile_cosine_threshold` 和 `compare_cosine_threshold`，值在 `[0,1]`。 |
 | `perf_metrics` | object | backend/platform 对应的性能基线；声明 perf 时必须能解析出非空数字指标。 |
 | `eval_threshold` | object/null | eval 指标名到 HM/ONNX 最低比例；声明 eval 时必须为对象。 |
@@ -255,7 +256,7 @@ quant 可额外配置依赖：
 
 requirements 搜索和安装顺序见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
-### 5.4 HMATC 参数
+### 5.4 HMATC v1 参数
 
 quant/demo/compare/eval/perf 使用共享结构：
 
@@ -291,7 +292,64 @@ HMATC build 按 backend 配置，少一层 `params`：
 
 `required` 和 `optional` 会合并为一个参数矩阵，所有列表列长度必须一致。框架会补充 `hmatc <subcommand> --target <backend>`，并跳过 `target`、`onnx` 等由 handler 内部处理的字段。
 
-### 5.5 参数矩阵规则
+### 5.5 HMATC v2 参数
+
+HMATC v2 是独立的 quant/build 协议，模型 JSON 必须显式声明：
+
+```json
+"hmatc_flow_version": 2
+```
+
+quant 使用行式 case：
+
+```json
+"hmquant_params": [
+  {
+    "config": "./configs/model.yml",
+    "override": {
+      "save_dir": "cached_results/hmquant_xh2_case",
+      "model": {
+        "model_dir": "cached_models/model-resource"
+      }
+    }
+  }
+]
+```
+
+build 同样使用行式 case，并通过 `ENV_*` 声明子进程环境：
+
+```json
+"hmbuild_params": [
+  {
+    "config": "./configs/model.yml",
+    "ENV_HMATC_BUILD_OUTPUT_DIR": "cached_results/hmm_xh2_case",
+    "override": {
+      "save_dir": "cached_results/hmquant_xh2_case",
+      "build": {
+        "ndevice": 1
+      }
+    }
+  }
+]
+```
+
+规则如下：
+
+- `config` 是模型目录内的相对 `.yml/.yaml` 路径，禁止绝对路径和 `..`；
+- 原始 YAML 只读，框架把 `override` 深度合并后，在 artifact staging 的 `.imodelzoo_configs/` 中生成有效 YAML；
+- mapping 递归合并，scalar 替换，list 整体替换，`null` 明确写入；
+- 任意深度的 `cached_models/...` 和 `cached_results/...` 都会解析为当前测试的绝对 cache 路径；
+- quant 的 `override.save_dir` 是量化 artifact 目录；
+- build 的 `override.save_dir` 必须指向对应 quant artifact，`ENV_HMATC_BUILD_OUTPUT_DIR` 是 compiled artifact 目录；
+- build 不按数组下标关联 quant，而是按逻辑 quant artifact 路径关联，并校验 `config` 一致；
+- `ENV_*` 是 JSON 环境字段标记；框架移除 `ENV_` 前缀后注入当前 HMATC build 子进程。例如 `ENV_HMATC_BUILD_OUTPUT_DIR` 注入为 `HMATC_BUILD_OUTPUT_DIR`，且不进入 argv、YAML 或父进程环境；
+- build 成功后，从 quant `<backend>/hmquant` 递归复制 `.pt` 和整个 `hf_config` 到 compiled artifact；
+- v2 quant/build 只校验命令、通用失败标记、有效 YAML、manifest 和原子发布，不维护模型特定产物文件名；
+- v2 首版只支持 `hmquant + hmbuild + Python demo.py`，不接管 v1 的 hmdemo/compare/eval/perf。
+
+旧配置缺省使用 v1。框架不会根据 `hmquant_params` 是 object 还是 list 自动猜测版本；list case 未声明 `hmatc_flow_version: 2` 会在配置加载阶段失败。
+
+### 5.6 参数矩阵规则
 
 例如：
 
@@ -323,7 +381,7 @@ case 1: --model_dir <q2真实路径> --ncore 2 --fast
 
 ## 6. 高级流程
 
-### 6.1 HMATC inference bundle 和多 YAML
+### 6.1 HMATC v1 inference bundle 和多 YAML
 
 存在 `hmbuild_params` 的 demo/perf/eval/compare 会准备 HMATC inference bundle：
 
@@ -336,7 +394,19 @@ case 1: --model_dir <q2真实路径> --ncore 2 --fast
 
 当前框架仍采用 workspace-relative 的 `model_path/save_dir` 布局，并通过 cache 复制完成 separate 阶段恢复。这是当前框架实现约束，不代表 HMATC 工具本身不支持自定义输入和输出路径。
 
-### 6.2 `test.sh`
+### 6.2 HMATC v2 artifact 和 separate
+
+HMATC v2 不使用 v1 inference workspace bundle：
+
+1. quant/build 分别将产物原子发布到 JSON 声明的 `cached_results/<case>`；
+2. manifest 使用 `local_hmatc_v2_quant` 或 `local_hmatc_v2_build` 标识执行协议，并要求有效 YAML 存在；
+3. build 优先复用匹配 fingerprint 的 quant artifact，缺失时只补跑对应 quant case；
+4. no-infer 发布 `cached_results` artifact；
+5. infer 优先复用同步后的非空 compiled artifact；
+6. compiled artifact 目录缺失或为空时，才匹配 `get_model type=hmm` 下载；
+7. Python demo 继续通过普通 `demo_params` 使用绝对 compiled artifact 路径。
+
+### 6.3 `test.sh`
 
 `test.sh` 是 demo flow 中可选的端到端功能检查：
 
@@ -366,7 +436,7 @@ case 1: --model_dir <q2真实路径> --ncore 2 --fast
 
 空值或未配置时等价于执行一次无额外参数的 `bash test.sh`。
 
-### 6.3 compare、eval 和 perf 校验
+### 6.4 compare、eval 和 perf 校验
 
 compare 从输出中解析 `Cosine Distance` 表格。第一列必须为 `name`，且至少包含两个 `X vs Y` 指标列；框架不匹配固定的 `onnx/hmquant/hmonnx/hmm` 列名，而是校验所有 output 行和实际指标。缺表、列数不足、非数字或任意值低于阈值都会失败。默认阈值 xh1=`1.0`、xh2=`0.90`，可由 `validation` 覆盖。
 
@@ -453,6 +523,8 @@ pytest --log-cli-level=INFO -s \
 | `cached_models` 资源目录缺失 | demo 参数引用、匹配的 `get_model type=hmm` case，以及 get_model 是否实际生成目标目录。 |
 | HMATC 找不到 ONNX/YAML | raw artifact 是否缓存和恢复、infer 是否使用相同 cache、YAML 是否位于 workspace 内。 |
 | HMATC bundle 不复用 | YAML 内容/路径、backend、`model.save_dir`、fingerprint 和 required files 是否变化。 |
+| HMATC v2 配置被当作 v1 | JSON 是否显式设置 `hmatc_flow_version: 2`，quant/build section 是否为行式 list。 |
+| HMATC v2 build 找不到 quant | build `override.save_dir` 是否与某个 quant case 的逻辑 `save_dir` 完全一致，且两者 `config` 是否一致。 |
 | pytest 只显示 venv 日志 | 使用 `-s` 或 `--capture=tee-sys`，确认 `IMODELZOO_MIRROR_COMMAND_OUTPUT` 未关闭，再检查完整 case log。 |
 | 所有 xh2 compile case 被跳过 | 是否只有 `ncore=4`；需要时设置 `IMODELZOO_ALLOW_XH2_NCORE4=ON`。 |
 | eval 阈值比预期宽松 | 未设置 `HOUMO_FULL_DATASET` 时阈值会乘 `0.5`。 |

@@ -61,8 +61,9 @@ inference flow 不创建静态 dependency，由 handler 声明和准备 artifact
 | --- | --- |
 | `flow_contracts.py` | family、flow、disposition、请求、上下文、结果、命令、校验、诊断和结构化异常。 |
 | `backend_flow_policies.py` | flow 顺序/依赖、family/backend policy、阈值、release 下载规则、ncore 过滤和输出例外。 |
-| `model_config_repository.py` | 发现、读取、归一化和校验 JSON。 |
+| `model_config_repository.py` | 发现、读取和校验 JSON；根据 `hmatc_flow_version` 明确区分 HMATC v1/v2 schema。 |
 | `parameter_matrix.py` | 将列式配置转换为 `ParameterCase` 并渲染命令参数。 |
+| `hmatc_v2_config.py` | 解析 v2 行式 case，物化 override YAML，处理 nested cache 路径、case id 和 fingerprint。 |
 | `cache_path_resolver.py` | 替换 `cached_models/cached_results` 逻辑路径并提取 case 引用。 |
 | `artifact_cache_store.py` | artifact 类型、manifest、fingerprint、状态检查和原子 writer。 |
 | `artifact_file_scanner.py` | 扫描 ONNX、HMM/HMMS、普通文件和 required file role。 |
@@ -78,18 +79,47 @@ inference flow 不创建静态 dependency，由 handler 声明和准备 artifact
 | 文件 | 职责 |
 | --- | --- |
 | `flow_registry.py` | 注册 family + backend + flow handler，并组装 flow services。 |
-| `artifact_preparation.py` | 准备 raw、quant、compiled need；负责复用、上游 flow、release HMM 和 separate 恢复。 |
-| `get_model_flow.py` | 在隔离 workspace 执行 get_model，校验并发布 raw/quant/HMM 和 workspace side effects。 |
-| `quant_flow.py` | 应用 skip policy，准备 raw，再执行 HMATC quant 或 Python ptq。 |
-| `compile_flow.py` | 执行 HMATC quant/build 或 Python build，并发布 compiled artifact。 |
-| `hmatc_flow_support.py` | HMATC quant/demo/compare/eval/perf、config 解析和 inference bundle。 |
+| `artifact_preparation.py` | 准备 raw、quant、compiled need；调度上游 flow、release HMM、separate 恢复和 v2 nested raw 引用。 |
+| `get_model_flow.py` | 在隔离 workspace 执行 get_model；支持按 artifact id 或 config 路径筛选 case。 |
+| `quant_flow.py` | 按显式版本选择 HMATC v2 quant；否则执行原有 HMATC v1 或 Python ptq。 |
+| `compile_flow.py` | 按显式版本选择 HMATC v2 build；否则执行原有 v1 pipeline 或 Python build。 |
+| `hmatc_flow_support.py` | HMATC v1 quant/demo/compare/eval/perf、config 解析和 inference bundle。 |
+| `hmatc_v2_flow_support.py` | HMATC v2 quant/build、artifact 复用、环境变量、sidecar 和原子发布。 |
 | `inference_flow_support.py` | inference 共用 skip、结果封装、release HMM 匹配、镜像和 compiled 校验。 |
 | `demo_flow.py` | `test.sh` 和标准 demo 编排、multibatch、release policy 和失败诊断。 |
 | `compare_flow.py` | 解析 Cosine Distance 表格并按 backend 阈值校验。 |
 | `eval_flow.py` | 执行 ONNX/HM eval，提取指标并比较阈值。 |
 | `perf_flow.py` | 选择 HMATC/demo/custom runner 并调用性能指标校验。 |
 
-## 5. artifact 和 manifest
+## 5. HMATC v1/v2 边界
+
+`support_hmatc` 只描述能力，quant/build 协议由 JSON 顶层字段显式选择：
+
+```text
+hmatc_flow_version 缺失或为 1
+  -> HMATC v1
+  -> required/optional 参数矩阵
+  -> 同一 workspace quant + build
+  -> v1 inference bundle
+
+hmatc_flow_version == 2
+  -> HMATC v2
+  -> config + override + ENV_* 行式 case
+  -> 独立 quant/build cached_results artifact
+  -> Python demo.py
+```
+
+框架不根据 list/object、模型名或 family 推断版本。v1/v2 只共享命令执行、cache 路径、锁、manifest 和原子 writer 等基础设施，不共享 case parser、workspace 和产物校验语义。
+
+v2 build 通过 `override.save_dir` 关联 quant artifact，校验 config 一致；有效时复用，缺失时只补跑匹配的 quant case。JSON 中 `ENV_*` 是环境字段标记，注入子进程前移除前缀，例如：
+
+```text
+ENV_HMATC_BUILD_OUTPUT_DIR -> HMATC_BUILD_OUTPUT_DIR
+```
+
+有效 YAML 直接生成到 artifact staging 的 `.imodelzoo_configs/`，原始 YAML 保持只读。build 后只从 quant `<backend>/hmquant` 复制 `.pt` 和 `hf_config`。
+
+## 6. artifact 和 manifest
 
 artifact 目录可包含类型和 case 对应的 manifest：
 
@@ -109,13 +139,15 @@ cache 检查区分 valid、legacy、missing 和 invalid。复用要求 identity�
 
 `AtomicArtifactWriter` 使用 staging 目录生成新 artifact，校验成功后再替换正式目录。替换期间保留受框架标记的 backup；异常不会直接破坏旧的有效 artifact，后续运行可以恢复中断的替换。
 
-## 6. workspace 和 separate 恢复
+HMATC v2 使用 `local_hmatc_v2_quant`/`local_hmatc_v2_build` 标识来源，manifest 只要求框架生成的有效 YAML，不枚举模型特定 HMM、ONNX 或组件文件。build fingerprint 包含上游 quant fingerprint。
+
+## 7. workspace 和 separate 恢复
 
 flow 在模型源码目录旁创建带 `.imodelzoo-workspace` sentinel 的临时 workspace。清理前同时验证 sentinel 和允许根目录，避免删除非框架目录。
 
 get_model 作为上游调用时，`artifact_workspace.py` 比较执行前后快照，将新增或修改文件按相对路径保存到 `cached_models`。SEPARATE_INFER 将目录树恢复到新 workspace，并排除 lock 和 manifest 协调文件。
 
-HMATC inference bundle 从 quant/build 参数引用的多个 YAML 推导。当前要求：
+HMATC v1 inference bundle 从 quant/build 参数引用的多个 YAML 推导。当前要求：
 
 - YAML 位于 workspace；
 - `model.save_dir` 非空、相同且为 workspace-relative；
@@ -123,7 +155,9 @@ HMATC inference bundle 从 quant/build 参数引用的多个 YAML 推导。当�
 
 YAML 内容、相对路径、backend 和命令参与 fingerprint。当前的 copy/restore 方式是框架实现约束，不代表 HMATC 工具不支持绝对 `model_path/save_dir`。
 
-## 7. Python 环境策略
+HMATC v2 不使用该 bundle。no-infer 直接发布 quant/build `cached_results`；infer 优先复用同步后的非空 compiled artifact，目录缺失或为空时才回退到匹配的 `get_model type=hmm`。v2 raw 准备递归扫描 override 中的 `cached_models`，并按 config 路径选择 raw get_model case。
+
+## 8. Python 环境策略
 
 模型侧环境适配层最终复用 `tests/tests_utils/python_environment.py`。quant requirements 顺序为：
 
@@ -134,10 +168,13 @@ YAML 内容、相对路径、backend 和命令参与 fingerprint。当前的 cop
 
 缺失的 requirements 文件会被忽略，不会传给模型脚本。模型测试侧保留的是依赖选择策略，共享层负责 virtualenv 创建、复用、激活和安装命令。
 
-## 8. 维护约束
+## 9. 维护约束
 
 - 不手工修改自动生成的 `test_*_models.py` 和 `model_names.txt`；
-- runner 选择由参数 section 决定，不由 `support_hmatc` 决定；
+- `support_hmatc` 不选择 runner；HMATC quant/build 只按 `hmatc_flow_version` 分派；
+- 不根据 JSON 容器类型、模型名或 family 自动推断 v1/v2；
+- v2 YAML、artifact 和 sidecar 逻辑不得进入 v1 `hmatc_flow_support.py`；
+- v1 inference bundle 不处理 v2 case；v2 首版不接管 hmdemo/compare/eval/perf；
 - 通用 policy、失败词例外和指标解析不要下沉成任意 JSON DSL；
 - 新增通用能力前先检查 `tests/tests_utils` 是否已有实现；
 - flow handler 返回结构化结果，不在内部直接调用 pytest pass/fail；

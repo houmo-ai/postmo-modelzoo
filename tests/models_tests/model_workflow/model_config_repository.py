@@ -75,6 +75,31 @@ class ModelConfig:
         """
         return self.raw.get(name, default)
 
+    @property
+    def hmatc_flow_version(self) -> int:
+        """Return the explicitly selected HMATC flow protocol version."""
+        value = self.raw.get("hmatc_flow_version", 1)
+        if type(value) is not int or value not in (1, 2):
+            raise ConfigError(f"hmatc_flow_version must be 1 or 2 in {self.path}, got {value!r}")
+        return int(value)
+
+    @property
+    def uses_hmatc_v2(self) -> bool:
+        """Return whether this model explicitly selects the HMATC v2 flow."""
+        return self.hmatc_flow_version == 2
+
+    def hmatc_v2_cases(self, name: str):
+        """Parse one HMATC v2 case-list section."""
+        if not self.uses_hmatc_v2:
+            raise ConfigError(f"{name} requires hmatc_flow_version=2 in {self.path}")
+        from .hmatc_v2_config import parse_hmatc_v2_cases
+
+        return parse_hmatc_v2_cases(self, name)
+
+    def has_hmatc_v2_cases(self, name: str) -> bool:
+        """Return whether a non-empty HMATC v2 case-list exists."""
+        return self.uses_hmatc_v2 and isinstance(self.raw.get(name), list) and bool(self.raw.get(name))
+
     def section(self, name: str) -> Mapping[str, Any] | None:
         """Return an optional raw configuration section."""
         value = self.raw.get(name)
@@ -408,6 +433,9 @@ class ModelConfigRepository:
     @staticmethod
     def _validate_hmatc_sections(config: ModelConfig) -> None:
         """Validate HMATC sections and raise a structured error when invalid."""
+        if config.uses_hmatc_v2:
+            ModelConfigRepository._validate_hmatc_v2_sections(config)
+            return
         for section_name in (
             "hmquant_params",
             "hmdemo_params",
@@ -417,6 +445,28 @@ class ModelConfigRepository:
         ):
             ModelConfigRepository._validate_hmatc_section(config, section_name)
         ModelConfigRepository._validate_hmatc_build_sections(config)
+
+    @staticmethod
+    def _validate_hmatc_v2_sections(config: ModelConfig) -> None:
+        """Validate the independent HMATC v2 quant/build schema."""
+        unsupported = tuple(
+            name
+            for name in (
+                "hmdemo_params",
+                "hmcompare_params",
+                "hmeval_params",
+                "hmperf_params",
+            )
+            if config.raw.get(name) is not None
+        )
+        if unsupported:
+            raise ConfigError(
+                "hmatc_flow_version=2 supports only hmquant_params and "
+                f"hmbuild_params, found {unsupported} in {config.path}"
+            )
+        for section_name in ("hmquant_params", "hmbuild_params"):
+            if section_name in config.raw:
+                config.hmatc_v2_cases(section_name)
 
     @staticmethod
     def _validate_hmatc_section(config: ModelConfig, section_name: str) -> None:
@@ -490,11 +540,15 @@ class ModelConfigRepository:
     def _flow_requirements(config: ModelConfig, backend: str) -> dict[str, bool]:
         """Return whether each flow has a usable parameter section."""
         hmbuild = config.raw.get("hmbuild_params")
+        v2_quant = config.has_hmatc_v2_cases("hmquant_params")
+        v2_build = config.has_hmatc_v2_cases("hmbuild_params")
         return {
             ModelFlow.GET_MODEL.value: config.backend_section("get_model_params", backend) is not None,
-            ModelFlow.QUANT.value: isinstance(config.raw.get("hmquant_params"), Mapping)
+            ModelFlow.QUANT.value: v2_quant
+            or isinstance(config.raw.get("hmquant_params"), Mapping)
             or config.backend_section("quant_params", backend) is not None,
-            ModelFlow.COMPILE.value: (isinstance(hmbuild, Mapping) and isinstance(hmbuild.get(backend), Mapping))
+            ModelFlow.COMPILE.value: v2_build
+            or (isinstance(hmbuild, Mapping) and isinstance(hmbuild.get(backend), Mapping))
             or config.backend_section("compile_params", backend) is not None,
             ModelFlow.DEMO.value: isinstance(config.raw.get("hmdemo_params"), Mapping)
             or config.backend_section("demo_params", backend) is not None,

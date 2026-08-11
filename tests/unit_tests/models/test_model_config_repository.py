@@ -62,6 +62,45 @@ def test_all_model_configs_load() -> None:
     assert any(not config.obsolete for config in configs)
 
 
+def test_hmatc_versions_are_explicit_and_legacy_configs_remain_v1() -> None:
+    repository = ModelConfigRepository(CONFIG_DIR)
+    configs = tuple(repository.iter_configs(include_obsolete=True))
+    gemma4 = next(config for config in configs if config.model_name == "gemma4")
+    assert gemma4.hmatc_flow_version == 2
+    assert gemma4.uses_hmatc_v2
+    assert len(gemma4.hmatc_v2_cases("hmquant_params")) == 5
+    assert len(gemma4.hmatc_v2_cases("hmbuild_params")) == 5
+
+    legacy_hmatc = [
+        config
+        for config in configs
+        if config.model_name != "gemma4" and config.raw.get("support_hmatc")
+    ]
+    assert legacy_hmatc
+    assert all(config.hmatc_flow_version == 1 for config in legacy_hmatc)
+    assert all(not config.uses_hmatc_v2 for config in legacy_hmatc)
+
+
+def test_list_hmatc_cases_require_explicit_v2_version(tmp_path: Path) -> None:
+    config_dir = tmp_path / "configs"
+    config_dir.mkdir()
+    (config_dir / "model_cfg_invalid.json").write_text(
+        """{
+          "obsolete": false,
+          "model_dir": "models/llm/invalid",
+          "model_type": "llm",
+          "dependencies": {},
+          "support_platform": ["x86_64"],
+          "support_backend": ["xh2"],
+          "support_flow": {"xh2": ["quant"]},
+          "hmquant_params": [{"config": "config.yml", "override": {"save_dir": "cached_results/q"}}]
+        }""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="hmatc_flow_version is not 2"):
+        ModelConfigRepository(config_dir).load("invalid")
+
+
 def test_every_active_model_flow_has_a_registered_handler() -> None:
     repository = ModelConfigRepository(CONFIG_DIR)
     for config in repository.iter_configs():

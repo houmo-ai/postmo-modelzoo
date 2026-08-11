@@ -61,6 +61,7 @@ from ..model_workflow.backend_flow_policies import (
 from ..model_workflow.parameter_matrix import ParameterMatrix, render_case_options
 from .artifact_preparation import ArtifactNeed, ensure_artifacts
 from .hmatc_flow_support import run_hmatc_quant_cases
+from .hmatc_v2_flow_support import run_hmatc_v2_build_cases
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ __all__ = [
     "CompileFlowHandler",
     "publish_compiled_artifact",
     "run_hmatc_build_cases",
+    "run_hmatc_v2_build_cases",
 ]
 
 
@@ -152,7 +154,11 @@ class CompileFlowHandler:
         commands: list[CommandResult] = []
         failures: list[str] = []
         with services.workspace_manager.open(request.context.source_dir, phase="compile") as workspace:
-            if request.config.has_section("hmbuild_params"):
+            if request.config.uses_hmatc_v2:
+                build_phase = run_hmatc_v2_build_cases(
+                    request, services, workspace
+                )
+            elif request.config.has_section("hmbuild_params"):
                 preparation = ensure_artifacts(
                     request,
                     services,

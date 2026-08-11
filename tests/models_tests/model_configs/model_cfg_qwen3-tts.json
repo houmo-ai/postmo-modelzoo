@@ -77,7 +77,7 @@
             "output_dir": [
                 "cached_results/hmm_xh2_customvoice_2k",
                 "cached_results/hmm_xh2_base_2k",
-                "cached_models/hmm_xh2_1.7b_customvoice_2k"
+                "cached_results/hmm_xh2_1.7b_customvoice_2k"
             ],
             "model_name": ["qwen3-tts", "qwen3-tts", "qwen3-tts"],
             "model_size": ["0.6b-customvoice", "0.6b-base", "1.7b-customvoice"],

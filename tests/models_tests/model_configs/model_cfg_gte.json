@@ -26,10 +26,7 @@
         "xh2": {
             "type": ["raw", "hmm"],
             "download_dir": ["cached_models", "cached_models"],
-            "extract_dir": [
-                null,
-                "cached_models/hmm_xh2"
-            ],
+            "extract_dir": [null, "cached_models/hmm_xh2_2k"],
             "source_type": [null, null],
             "model_name": ["gte", "gte"],
             "model_size": ["1.5b", "1.5b"],

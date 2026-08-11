@@ -64,11 +64,13 @@ from ..model_workflow.parameter_matrix import (
 from ..model_workflow.python_environment import prepare_python_environment
 from .artifact_preparation import ArtifactNeed, ensure_artifacts
 from .hmatc_flow_support import run_hmatc_quant_cases
+from .hmatc_v2_flow_support import run_hmatc_v2_quant_cases
 
 __all__ = [
     "QuantFlowHandler",
     "copy_cache_contents",
     "run_hmatc_quant_cases",
+    "run_hmatc_v2_quant_cases",
 ]
 
 
@@ -97,30 +99,31 @@ class QuantFlowHandler:
         context.result_cache_dir.mkdir(parents=True, exist_ok=True)
 
         with services.workspace_manager.open(context.source_dir, phase="quant") as workspace:
-            preparation = ensure_artifacts(
-                request,
-                services,
-                (ArtifactNeed.raw_model(),),
-                workspace=workspace,
-                policy=self.policy,
-            )
-            command_results.extend(preparation.commands)
-            if preparation.failures:
-                return FlowResult(
-                    FlowDisposition.EXECUTED,
-                    "raw model preparation failed",
-                    commands=tuple(command_results),
-                    validation=ValidationResult(
-                        False,
-                        "raw model preparation failed",
-                        failures=preparation.failures,
-                    ),
-                )
-
-            if config.has_section("hmquant_params"):
-                phase = run_hmatc_quant_cases(request, services, workspace)
+            if config.uses_hmatc_v2:
+                phase = run_hmatc_v2_quant_cases(request, services, workspace)
             else:
-                phase = _run_python_quant(request, services, workspace)
+                preparation = ensure_artifacts(
+                    request,
+                    services,
+                    (ArtifactNeed.raw_model(),),
+                    workspace=workspace,
+                    policy=self.policy,
+                )
+                command_results.extend(preparation.commands)
+                if preparation.failures:
+                    return FlowResult(
+                        FlowDisposition.EXECUTED,
+                        "raw model preparation failed",
+                        commands=tuple(command_results),
+                        validation=ValidationResult(
+                            False,
+                            "raw model preparation failed",
+                            failures=preparation.failures,
+                        ),
+                    )
+                phase = self._run_legacy_or_python_quant(
+                    request, services, workspace
+                )
             command_results.extend(phase.commands)
             failures.extend(phase.failures)
 
@@ -135,6 +138,15 @@ class QuantFlowHandler:
             commands=tuple(command_results),
             validation=validation,
         )
+
+    @staticmethod
+    def _run_legacy_or_python_quant(request, services, workspace):
+        """Run the unchanged HMATC v1 or Python quant implementation."""
+        if request.config.has_section("hmquant_params"):
+            phase = run_hmatc_quant_cases(request, services, workspace)
+        else:
+            phase = _run_python_quant(request, services, workspace)
+        return phase
 
     def _skip_reason(self, request: FlowRequest) -> str | None:
         """Return why this flow should be skipped, or validate that it may run."""

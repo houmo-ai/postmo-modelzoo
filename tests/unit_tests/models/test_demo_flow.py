@@ -30,9 +30,6 @@ from pathlib import (
 )
 from tests.models_tests.model_workflow.artifact_cache_store import (
     ArtifactCache,
-    ArtifactRequirement,
-    ArtifactType,
-    CacheStatus,
 )
 from tests.models_tests.model_workflow.backend_flow_policies import (
     CV_FLOW_POLICY,
@@ -73,8 +70,7 @@ from tests.models_tests.test_flows.hmatc_flow_support import (
 from tests.models_tests.test_flows.inference_flow_support import (
     backfill_referenced_demo_artifacts,
     best_matching_download_case,
-    mirror_downloaded_hmms,
-    release_hmm_case_mappings,
+    release_hmm_case_ids,
     unproduced_demo_artifact_refs,
 )
 from tests.tests_utils.python_environment import (
@@ -98,7 +94,7 @@ from ._flow_contract_support import (
 pytestmark = pytest.mark.unit
 
 
-def test_release_hmm_mapping_supports_download_and_compile_directory_aliases() -> None:
+def test_release_hmm_selection_uses_matching_case_ids() -> None:
     config = ModelConfigRepository(CONFIG_DIR).load("gte")
     request = FlowRequest(
         config=config,
@@ -106,16 +102,16 @@ def test_release_hmm_mapping_supports_download_and_compile_directory_aliases() -
             diagnostic=SimpleNamespace(backend="xh2"), release=True
         ),
     )
-    assert release_hmm_case_mappings(request) == {"hmm_xh2_2k": "hmm_xh2"}
+    assert release_hmm_case_ids(request) == frozenset({"hmm_xh2_2k"})
 
 
-def test_release_hmm_mapping_rejects_ambiguous_download_cases() -> None:
+def test_hmm_download_selection_rejects_ambiguous_cases() -> None:
     compile_case = ParameterCase(0, {"output_dir": "cached_results/hmm_xh2"})
     source_cases = {
         "hmm_7b": ParameterCase(0, {"extract_dir": "cached_models/hmm_7b"}),
         "hmm_14b": ParameterCase(1, {"extract_dir": "cached_models/hmm_14b"}),
     }
-    with pytest.raises(ArtifactValidationError, match="Ambiguous release HMM mapping"):
+    with pytest.raises(ArtifactValidationError, match="Ambiguous HMM download mapping"):
         best_matching_download_case(compile_case, source_cases)
 
 
@@ -132,13 +128,13 @@ def test_demo_artifact_not_produced_by_compile_is_downloaded(
 ) -> None:
     config = _demo_artifact_config(tmp_path)
     request = _demo_artifact_request(config, tmp_path)
-    source = request.context.model_cache_dir / "hmm_xh2_aux"
-    source.mkdir(parents=True)
-    (source / "aux.hmm").write_bytes(b"aux")
     requested: list[frozenset[str]] = []
 
     def fake_run(self, download_request, services):
         requested.append(self.case_ids)
+        destination = download_request.context.result_cache_dir / "hmm_xh2_aux"
+        destination.mkdir(parents=True)
+        (destination / "aux.hmm").write_bytes(b"aux")
         return FlowResult(
             FlowDisposition.EXECUTED,
             "downloaded",
@@ -152,8 +148,7 @@ def test_demo_artifact_not_produced_by_compile_is_downloaded(
 
     assert requested == [frozenset({"hmm_xh2_aux"})]
     assert prepared == [request.context.result_cache_dir / "hmm_xh2_aux"]
-    mirrored = request.context.result_cache_dir / "hmm_xh2_aux"
-    assert (mirrored / "aux.hmm").read_bytes() == b"aux"
+    assert (prepared[0] / "aux.hmm").read_bytes() == b"aux"
 
 
 def test_existing_demo_artifact_directory_is_not_downloaded_again(
@@ -172,24 +167,16 @@ def test_existing_demo_artifact_directory_is_not_downloaded_again(
     assert backfill_referenced_demo_artifacts(request, SimpleNamespace()) == []
 
 
-def test_release_hmm_download_only_requests_empty_destinations(
+def test_release_hmm_download_requests_json_referenced_cases(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Separate infer must not redownload already prepared HMM directories."""
+    """Release preparation delegates caching to get_model for referenced cases."""
     config = _demo_artifact_config(tmp_path)
     request = _demo_artifact_request(config, tmp_path)
     existing = request.context.result_cache_dir / "hmm_xh2_main"
     existing.mkdir(parents=True)
     (existing / "main.hmm").write_bytes(b"hmm")
     requested: list[frozenset[str] | None] = []
-
-    monkeypatch.setattr(
-        "tests.models_tests.test_flows.inference_flow_support.release_hmm_case_mappings",
-        lambda request: {
-            "hmm_xh2_main": "hmm_xh2_main",
-            "hmm_xh2_aux": "hmm_xh2_aux",
-        },
-    )
 
     def fake_run(self, download_request, services):
         requested.append(self.case_ids)
@@ -204,7 +191,7 @@ def test_release_hmm_download_only_requests_empty_destinations(
         request, SimpleNamespace(artifact_cache=ArtifactCache())
     )
 
-    assert requested == [frozenset({"hmm_xh2_aux"})]
+    assert requested == [frozenset({"hmm_xh2_main", "hmm_xh2_aux"})]
     assert report.failures == ()
 
 
@@ -228,38 +215,6 @@ def test_demo_artifact_download_failure_does_not_fail_the_flow(
         request, SimpleNamespace(artifact_cache=ArtifactCache())
     )
     assert prepared == [request.context.result_cache_dir / "hmm_xh2_aux"]
-
-
-def test_mirrored_download_manifest_uses_consumer_case_id(tmp_path: Path) -> None:
-    config = ModelConfigRepository(CONFIG_DIR).load("gte")
-    model_cache = tmp_path / "models"
-    source = model_cache / "hmm_xh2"
-    source.mkdir(parents=True)
-    (source / "model.hmm").write_bytes(b"hmm")
-    context = SimpleNamespace(
-        model_cache_dir=model_cache,
-        result_cache_dir=tmp_path / "results",
-        diagnostic=SimpleNamespace(backend="xh2", run_id="mirror-test"),
-    )
-    request = FlowRequest(config=config, context=context)
-    services = SimpleNamespace(artifact_cache=ArtifactCache())
-    destination = context.result_cache_dir / "hmm_xh2_2k"
-    destination.mkdir(parents=True)
-    (destination / "stale.hmm").write_bytes(b"stale")
-    mirror_downloaded_hmms(request, services, {"hmm_xh2_2k": "hmm_xh2"})
-    inspection = ArtifactCache().inspect(
-        context.result_cache_dir / "hmm_xh2_2k",
-        ArtifactRequirement(
-            ArtifactType.COMPILED_MODEL,
-            "gte",
-            "xh2",
-            "hmm_xh2_2k",
-        ),
-    )
-    assert inspection.status == CacheStatus.VALID
-    assert inspection.manifest is not None
-    assert inspection.manifest.producer_flow == ModelFlow.GET_MODEL.value
-    assert not (destination / "stale.hmm").exists()
 
 
 def test_test_sh_params_keep_legacy_column_format() -> None:
