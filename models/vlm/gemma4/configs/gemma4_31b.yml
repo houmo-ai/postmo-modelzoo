@@ -1,0 +1,24 @@
+version: 2
+save_dir: output/31b
+
+model:
+  model_name: gemma4
+  model_size: 31b
+  model_dir: ./models/gemma-4-31B-it
+  modelscope_repo: ["google/gemma-4-31B-it"]
+
+quant:
+  method: gptq
+
+build:
+  flash_attention: 2
+  ndevice: 2
+  enable_common_subgraph: false
+  prefill_chunk_length: 320
+  context_length: 262144
+  components:
+    visual:
+      ndevice: 1
+      enable_common_subgraph: true
+    video_visual:
+      enable_build: false

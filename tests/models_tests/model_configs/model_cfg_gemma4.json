@@ -2,6 +2,7 @@
     "obsolete": false,
     "model_dir": "models/vlm/gemma4",
     "model_type": "llm",
+    "hmatc_flow_version": 2,
     "dependencies": {
         "ndevice": [2],
         "dev_mem": ["48g"]
@@ -14,7 +15,9 @@
     "support_flow": {
         "xh2": ["get_model", "quant", "compile", "demo"]
     },
-    "support_hmatc": null,
+    "support_hmatc": {
+        "xh2": ["hmquant", "hmbuild"]
+    },
     "perf_metrics": {
         "xh2": {
             "x86_64": {
@@ -26,8 +29,36 @@
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm", "hmm", "hmm", "hmm"],
+            "config": [
+                "./configs/gemma4_26b-a4b.yml",
+                "./configs/gemma4_26b-a4b-mtp.yml",
+                "./configs/gemma4_e2b.yml",
+                "./configs/gemma4_e4b.yml",
+                "./configs/gemma4_31b.yml",
+                "./configs/gemma4_26b-a4b.yml",
+                "./configs/gemma4_26b-a4b-mtp.yml",
+                "./configs/gemma4_e2b.yml",
+                "./configs/gemma4_e4b.yml",
+                "./configs/gemma4_31b.yml"
+            ],
+            "type": [
+                "raw",
+                "raw",
+                "raw",
+                "raw",
+                "raw",
+                "hmm",
+                "hmm",
+                "hmm",
+                "hmm",
+                "hmm"
+            ],
             "download_dir": [
+                "cached_models",
+                "cached_models",
+                "cached_models",
+                "cached_models",
+                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models",
@@ -36,110 +67,139 @@
             ],
             "extract_dir": [
                 null,
-                "cached_models/hmm_xh2_26b-a4b_256k",
-                "cached_models/hmm_xh2_e2b_128k",
-                "cached_models/hmm_xh2_e4b_128k",
-                "cached_models/hmm_xh2_31b_256k"
-            ],
-            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4", "gemma4"],
-            "model_size": ["26b-a4b", "26b-a4b", "e2b", "e4b", "31b"],
-            "context_length": [null, "256k", "128k", "128k", "256k"],
-            "ndevice": ["1", "1", "1", "1", "2"],
-            "prefill_length": [null, null, null, null, null],
-            "batch": [null, null, null, null, null],
-            "source_type": [null, null, null, null, null]
-        }
-    },
-    "quant_params": {
-        "xh2": {
-            "model": [
-                "cached_models/gemma-4-26B-A4B-it",
-                "cached_models/gemma-4-e2b-it",
-                "cached_models/gemma-4-e4b-it",
-                "cached_models/gemma-4-31B-it"
-            ],
-            "model-name": ["gemma4", "gemma4", "gemma4", "gemma4"],
-            "model-size": ["26b-a4b", "e2b", "e4b", "31b"],
-            "out-dir": [
-                "cached_results/hmquant_xh2_26b-a4b_2k",
-                "cached_results/hmquant_xh2_e2b_2k",
-                "cached_results/hmquant_xh2_e4b_2k",
-                "cached_results/hmquant_xh2_31b_2k"
-            ],
-            "context-length": ["2048", "2048", "2048", "2048"]
-        }
-    },
-    "compile_params": {
-        "xh2": {
-            "model_dir": [
-                "cached_results/hmquant_xh2_26b-a4b_2k",
-                "cached_results/hmquant_xh2_e2b_2k",
-                "cached_results/hmquant_xh2_e4b_2k",
-                "cached_results/hmquant_xh2_31b_2k"
-            ],
-            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4"],
-            "model_size": ["26b-a4b", "e2b", "e4b", "31b"],
-            "ncore": [null, null, null, null],
-            "batch": [null, null, null, null],
-            "ndevice": ["1", "1", "1", "2"],
-            "context_length": ["262144", "131072", "131072", "262144"],
-            "prefill_length": [null, null, null, null],
-            "output_dir": [
+                null,
+                null,
+                null,
+                null,
                 "cached_results/hmm_xh2_26b-a4b_256k",
+                "cached_results/hmm_xh2_26b-a4b-mtp_256k",
                 "cached_results/hmm_xh2_e2b_128k",
                 "cached_results/hmm_xh2_e4b_128k",
                 "cached_results/hmm_xh2_31b_256k"
             ]
         }
     },
+    "hmquant_params": [
+        {
+            "config": "./configs/gemma4_26b-a4b-mtp.yml",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_26b-a4b-mtp_256k",
+                "model": {
+                    "model_dir": "cached_models/gemma-4-26B-A4B-it"
+                },
+                "quant": {
+                    "speculative_model": {
+                        "draft_model_dir": "cached_models/gemma-4-26B-A4B-it-assistant",
+                        "target_model_dir": "cached_models/gemma-4-26B-A4B-it"
+                    }
+                }
+            }
+        },
+        {
+            "config": "./configs/gemma4_26b-a4b.yml",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_26b-a4b_256k",
+                "model": {
+                    "model_dir": "cached_models/gemma-4-26B-A4B-it"
+                }
+            }
+        },
+        {
+            "config": "./configs/gemma4_31b.yml",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_31b_256k",
+                "model": {
+                    "model_dir": "cached_models/gemma-4-31B-it"
+                }
+            }
+        },
+        {
+            "config": "./configs/gemma4_e2b.yml",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_e2b_128k",
+                "model": {
+                    "model_dir": "cached_models/gemma-4-E2B-it"
+                }
+            }
+        },
+        {
+            "config": "./configs/gemma4_e4b.yml",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_e4b_128k",
+                "model": {
+                    "model_dir": "cached_models/gemma-4-E4B-it"
+                }
+            }
+        }
+    ],
+    "hmbuild_params": [
+        {
+            "config": "./configs/gemma4_31b.yml",
+            "ENV_HMATC_BUILD_OUTPUT_DIR": "cached_results/hmm_xh2_31b_256k",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_31b_256k"
+            }
+        },
+        {
+            "config": "./configs/gemma4_26b-a4b.yml",
+            "ENV_HMATC_BUILD_OUTPUT_DIR": "cached_results/hmm_xh2_26b-a4b_256k",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_26b-a4b_256k"
+            }
+        },
+        {
+            "config": "./configs/gemma4_26b-a4b-mtp.yml",
+            "ENV_HMATC_BUILD_OUTPUT_DIR": "cached_results/hmm_xh2_26b-a4b-mtp_256k",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_26b-a4b-mtp_256k",
+                "build": {
+                    "flash_attention": 2,
+                    "ndevice": 1,
+                    "enable_common_subgraph": false,
+                    "prefill_chunk_length": 320,
+                    "context_length": 262144
+                }
+            }
+        },
+        {
+            "config": "./configs/gemma4_e2b.yml",
+            "ENV_HMATC_BUILD_OUTPUT_DIR": "cached_results/hmm_xh2_e2b_128k",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_e2b_128k"
+            }
+        },
+        {
+            "config": "./configs/gemma4_e4b.yml",
+            "ENV_HMATC_BUILD_OUTPUT_DIR": "cached_results/hmm_xh2_e4b_128k",
+            "override": {
+                "save_dir": "cached_results/hmquant_xh2_e4b_128k"
+            }
+        }
+    ],
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": [
-                "cached_results/hmm_xh2_26b-a4b_256k/hmquant/hf_config",
-                "cached_results/hmm_xh2_e2b_128k/hmquant/hf_config",
-                "cached_results/hmm_xh2_e4b_128k/hmquant/hf_config",
-                "cached_results/hmm_xh2_31b_256k/hmquant/hf_config"
+            "model": [
+                "cached_results/hmm_xh2_26b-a4b_256k/xh2",
+                "cached_results/hmm_xh2_26b-a4b-mtp_256k/xh2",
+                "cached_results/hmm_xh2_e2b_128k/xh2",
+                "cached_results/hmm_xh2_e4b_128k/xh2",
+                "cached_results/hmm_xh2_31b_256k/xh2"
             ],
-            "embedding_path": [
-                "cached_results/hmm_xh2_26b-a4b_256k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_e2b_128k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_e4b_128k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_31b_256k/hmquant/quant_embedding.pt"
-            ],
-            "vit_path": [
-                "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_visual.hmm",
-                "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_visual.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_visual.hmm",
-                "cached_results/hmm_xh2_31b_256k/gemma4-31b_visual.hmm"
-            ],
-            "prefill_path": [
-                "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_prefill.hmm",
-                "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_prefill.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_prefill.hmm",
-                "cached_results/hmm_xh2_31b_256k/gemma4-31b_prefill.hmm"
-            ],
-            "decode_path": [
-                "cached_results/hmm_xh2_26b-a4b_256k/gemma4-26b-a4b_decode.hmm",
-                "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_decode.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_decode.hmm",
-                "cached_results/hmm_xh2_31b_256k/gemma4-31b_decode.hmm"
-            ],
-            "audio_path": [
-                null,
-                "cached_results/hmm_xh2_e2b_128k/gemma4-e2b_audio.hmm",
-                "cached_results/hmm_xh2_e4b_128k/gemma4-e4b_audio.hmm",
-                null
-            ],
-            "plib_embedding_path": [
-                null,
-                "cached_results/hmm_xh2_e2b_128k/hmquant/per_layer_input_embedding.pt",
-                "cached_results/hmm_xh2_e4b_128k/hmquant/per_layer_input_embedding.pt",
-                null
-            ],
-            "model_name": ["gemma4", "gemma4", "gemma4", "gemma4"],
-            "model_size": ["26b-a4b", "e2b", "e4b", "31b"],
-            "ndevice": ["1", "1", "1", "2"]
+            "ndevice": ["1", "1", "1", "1", "2"]
         }
+    },
+    "test_sh_params": {
+        "xh2": [
+            [],
+            [
+                "-s",
+                "demo",
+                "-c",
+                "configs/gemma4_26b-a4b.yml",
+                "--model",
+                "output/26b-a4b/xh2"
+            ]
+        ]
     },
     "perf_params": "demo"
 }
