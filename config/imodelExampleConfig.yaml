@@ -1045,10 +1045,12 @@ all:
     # - detection_yolov5s_feature
     - detection_yolov5m_face_test
     - diffusion_z_image_turbo_test
+    - omni_qwen3_omni_test
     # - segmentation_yolov8m_seg_test
     # - llm_qwen3_test
     # - vlm_qwen3-vl_test
     - llm_gpt-oss_test
+    - llm_qwen3-next_test
     # - llm_qwen3.5_test
     # - llm_qwen3_30b_a3b_test
     # - vlm_gemma4_test
