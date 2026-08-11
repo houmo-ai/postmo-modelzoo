@@ -195,7 +195,9 @@
 ### 3.1 hmatc的编译和安装
 1. 确保已经安装上述的步骤完成了env.bat的自动环境变量设置。
 2. cd /d {path/of/examples}/hmatc
-3. python setup.py install或者python setup.py bdist_wheel后执行pip install dist/hmatc-xxx.whl
+3. python setup.py bdist_wheel (可选加参数--enable_smi_support，打开该选项，会对多卡ctc link进行检查)
+4. 如果已经安装了hmatc，首先执行pip uninstall -y hmatc进行卸载
+5. 执行pip install dist/hmatc-xxx.whl，安装刚刚编译的hmatc
 
 ### 3.2 样例的运行
 1. 进入models对应样例目录。

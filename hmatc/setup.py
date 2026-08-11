@@ -132,6 +132,18 @@ class BuildExtWithDLL(build_ext):
     after the build process completes.
     """
 
+    def _copy_dlls(self, dll_dir: str, pyd_dir: str) -> None:
+        if not os.path.exists(dll_dir):
+            print(f"[WARN] DLL directory not found: {dll_dir}")
+            return
+
+        for file in os.listdir(dll_dir):
+            if file.lower().endswith(".dll"):
+                src = os.path.join(dll_dir, file)
+                dst = os.path.join(pyd_dir, file)
+                print(f"[COPY] {src} -> {dst}")
+                shutil.copy(src, dst)
+
     def run(self):
         """
         Execute the build process and handle Windows DLL copying.
@@ -140,29 +152,26 @@ class BuildExtWithDLL(build_ext):
         build operations, then copies DLL files on Windows platforms to ensure
         proper runtime dependencies are available.
         """
+        if sys.platform == "win32":
+            self.force = True
+
         super().run()
 
         if sys.platform != "win32":
             return
 
-        dll_dir = os.path.join(TCIM_RUNTIME_PATH, "bin")
+        dll_dirs = [os.path.join(TCIM_RUNTIME_PATH, "bin")]
+        HOUMO_SDK_PATH = os.environ.get("HOUMO_SDK_PATH")
+        if HOUMO_SDK_PATH:
+            dll_dirs.append(os.path.join(HOUMO_SDK_PATH, "hal/lib"))
 
         for ext in self.extensions:
             pyd_path = self.get_ext_fullpath(ext.name)
             pyd_dir = os.path.dirname(pyd_path)
             print(f"[INFO] Copying DLLs to: {pyd_dir}")
 
-            if not os.path.exists(dll_dir):
-                print(f"[WARN] DLL directory not found: {dll_dir}")
-                continue
-
-            for file in os.listdir(dll_dir):
-                if file.lower().endswith(".dll"):
-                    src = os.path.join(dll_dir, file)
-                    dst = os.path.join(pyd_dir, file)
-                    print(f"[COPY] {src} -> {dst}")
-                    shutil.copy(src, dst)
-
+            for dll_dir in dll_dirs:
+                self._copy_dlls(dll_dir, pyd_dir)
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument(
@@ -171,10 +180,15 @@ parser.add_argument(
 args, remaining_argv = parser.parse_known_args()
 sys.argv = [sys.argv[0]] + remaining_argv
 
-if sys.platform == "linux" and args.enable_smi_support:
+if args.enable_smi_support:
     HOUMO_SDK_PATH = os.environ.get("HOUMO_SDK_PATH")
-    smi_libraries = ["hal_xh2a"]
-    smi_compile_args = ["-std=c++17", "-O2", "-w", "-D ENABLE_SMI"]
+    if sys.platform == "win32":
+        smi_libraries = ["libhal_xh2a"]
+        smi_compile_args = ["/std:c++17", "/O2", "/w"]
+    else:
+        smi_libraries = ["hal_xh2a"]
+        smi_compile_args = ["-std=c++17", "-O2", "-w"]
+
     smi_ext = Extension(
         name="hmatc.python.smi",
         sources=["hmatc/python/device_smi.cpp"],
@@ -186,6 +200,7 @@ if sys.platform == "linux" and args.enable_smi_support:
         library_dirs=[os.path.join(HOUMO_SDK_PATH, "hal/lib")],
         libraries=smi_libraries,
         language="c++",
+        define_macros=[("ENABLE_SMI", None)],
         extra_compile_args=smi_compile_args,
         extra_link_args=extra_link_args,
     )
