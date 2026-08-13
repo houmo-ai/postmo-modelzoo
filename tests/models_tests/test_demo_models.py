@@ -125,6 +125,15 @@ def test_asr_emotion2vec_demo(setup_logging) -> None:
     _demo_func("emotion2vec", setup_logging)
 
 
+@pytest.mark.funaudiochat
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_lalm_funaudiochat_demo(setup_logging) -> None:
+    """test_lalm_funaudiochat_demo"""
+    _demo_func("funaudiochat", setup_logging)
+
+
 @pytest.mark.gemma4
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_48g

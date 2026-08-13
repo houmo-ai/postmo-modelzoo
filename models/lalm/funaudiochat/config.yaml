@@ -1,0 +1,16 @@
+default_model_name: "funaudiochat"
+default_model_size: "8b"
+
+model_configs:
+  funaudiochat:
+    "8b":
+      modelscope_repo: ["FunAudioLLM/Fun-Audio-Chat-8B"]
+      model_name: "funaudiochat"
+      model_size: "8b"
+      ncore: 2
+      quant_type: "w8a8"
+      context_length: "256"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      workflow_config: "workflows/xh2a/llm_models/funaudiochat/8b/funaudiochat_8b_full.yaml"

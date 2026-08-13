@@ -52,7 +52,7 @@ def derive_metrics(report: PerfReport) -> dict[str, dict[str, float]]:
     derived: dict[str, dict[str, float]] = {}
 
     for root in roots:
-        if root not in {"llm", "llm_mtp", "asr", "tts"}:
+        if root not in {"llm", "llm_mtp", "asr", "tts", "lalm"}:
             continue
         metrics = _root_metrics(report, root)
         values: dict[str, float] = {}
@@ -65,6 +65,10 @@ def derive_metrics(report: PerfReport) -> dict[str, dict[str, float]]:
         if output_tokens is not None:
             values["output_tokens"] = output_tokens
 
+        speech_tokens = _positive_number(metrics.get("speech_tokens"))
+        if root == "lalm" and speech_tokens is not None:
+            values["speech_tokens"] = speech_tokens
+
         ttft_ms = _scope_ms(report, f"{root}.ttft")
         if ttft_ms is not None:
             values["ttft_ms"] = ttft_ms
@@ -72,6 +76,26 @@ def derive_metrics(report: PerfReport) -> dict[str, dict[str, float]]:
         e2e_ms = _scope_ms(report, f"{root}.e2e")
         if e2e_ms is not None:
             values["e2e_ms"] = e2e_ms
+
+        if root == "lalm":
+            s2t_e2e_ms = _scope_ms(report, "lalm.e2e_s2t")
+            s2s_e2e_ms = _scope_ms(report, "lalm.e2e_s2s")
+            token2wav_e2e_ms = _scope_ms(report, "lalm.e2e_token2wav")
+            if s2t_e2e_ms is not None:
+                values["e2e_ms"] = s2t_e2e_ms
+                if output_tokens is not None:
+                    values["e2e_tps"] = output_tokens * 1000 / s2t_e2e_ms
+            if s2s_e2e_ms is not None:
+                values["s2s_e2e_ms"] = s2s_e2e_ms
+                if output_tokens is not None:
+                    total_tokens = output_tokens + (speech_tokens or 0.0)
+                    values["s2s_e2e_tps"] = total_tokens * 1000 / s2s_e2e_ms
+            if token2wav_e2e_ms is not None:
+                values["token2wav_e2e_ms"] = token2wav_e2e_ms
+                output_audio_length_s = _positive_number(metrics.get("output_audio_length_s"))
+                if output_audio_length_s is not None:
+                    values["output_audio_length_s"] = output_audio_length_s
+                    values["token2wav_rtf"] = token2wav_e2e_ms / (output_audio_length_s * 1000)
 
         if root == "llm":
             if e2e_ms is not None and e2e_ms > 0 and output_tokens is not None:
@@ -119,6 +143,11 @@ def derive_metrics(report: PerfReport) -> dict[str, dict[str, float]]:
                     accepted_draft_tokens / speculative_rounds
                 )
 
+        decode_tokens = _positive_number(metrics.get("decode_tokens"))
+        decode_ms = _scope_ms(report, f"{root}.decode")
+        if root == "lalm" and decode_ms is not None and decode_tokens is not None:
+            values["tpot_ms"] = decode_ms / decode_tokens
+
         audio_length_s = _positive_number(metrics.get("audio_length_s"))
         if root == "asr" and audio_length_s is not None:
             values["audio_length_s"] = audio_length_s
@@ -160,10 +189,14 @@ def derive_speeds(report: PerfReport) -> dict[str, tuple[float, str]]:
         metrics = _root_metrics(report, root)
         amount = None
         unit = None
-        if root == "llm" and "prefill" in stage:
+        if (root == "llm" and "prefill" in stage) or (
+            root == "lalm" and stage == "prefill"
+        ):
             amount = _positive_number(metrics.get("input_tokens"))
             unit = "tokens/s"
-        elif root == "llm" and "decode" in stage:
+        elif (root == "llm" and "decode" in stage) or (
+            root == "lalm" and stage == "decode"
+        ):
             amount = _positive_number(metrics.get("decode_tokens"))
             unit = "tokens/s"
         elif root == "llm" and stage == "vision":

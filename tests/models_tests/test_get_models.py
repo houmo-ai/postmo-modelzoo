@@ -135,6 +135,16 @@ def test_asr_emotion2vec_get_model(setup_logging) -> None:
     _get_model_func("emotion2vec", setup_logging)
 
 
+@pytest.mark.funaudiochat
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_lalm_funaudiochat_get_model")
+def test_lalm_funaudiochat_get_model(setup_logging) -> None:
+    """test_lalm_funaudiochat_get_model"""
+    _get_model_func("funaudiochat", setup_logging)
+
+
 @pytest.mark.gemma4
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_48g

@@ -1,0 +1,46 @@
+{
+    "obsolete": false,
+    "model_dir": "models/lalm/funaudiochat",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["hmm"],
+            "download_dir": ["cached_models"],
+            "extract_dir": ["cached_models/funaudiochat_hmm"],
+            "source_type": [null],
+            "model_name": ["funaudiochat"],
+            "model_size": ["8b"],
+            "ndevice": ["1"]
+        }
+    },
+    "test_sh_params": [
+        []
+    ],
+    "enable_demo_test": true,
+    "demo_params": {
+        "xh2": {
+            "tokenizer_dir": ["cached_models/Fun-Audio-Chat-8B"],
+            "embedding_path": ["cached_models/funaudiochat_hmm/hmquant/quant_embedding.pt"],
+            "audio_embedding_path": ["cached_models/funaudiochat_hmm/hmquant/quant_audio_embedding.pt"],
+            "audio_encoder_path": ["cached_models/funaudiochat_hmm/funaudiochat-8b_audio_encoder.hmm"],
+            "prefill_path": ["cached_models/funaudiochat_hmm/funaudiochat-8b_prefill.hmm"],
+            "decode_path": ["cached_models/funaudiochat_hmm/funaudiochat-8b_decode.hmm"],
+            "ndevice": ["1"],
+            "stage": ["s2t"],
+            "perf": [true]
+        }
+    }
+}

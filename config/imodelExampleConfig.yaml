@@ -695,6 +695,22 @@ embedding_qwen3-vl-embedding:
     - embedding_qwen3-vl-embedding_test
 
 #####################################################
+# ====================== lalm ====================== #
+#####################################################
+lalm_funaudiochat:
+  include:
+    - models/lalm/funaudiochat
+  exclude:
+    - models/lalm/funaudiochat/README.MD
+  example_case:
+    - lalm_funaudiochat_test:
+        test_type: models_tests
+        script: funaudiochat
+        args: demo
+  test:
+    - lalm_funaudiochat_test
+
+#####################################################
 # ===================== omni ===================== #
 #####################################################
 omni_minicpmo:

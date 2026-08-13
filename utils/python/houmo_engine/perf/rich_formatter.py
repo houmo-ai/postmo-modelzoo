@@ -30,21 +30,28 @@ from io import StringIO
 from .stats import PerfReport
 
 _RICH_REQUIRED_MESSAGE = "Rich performance output requires the optional 'rich' package"
+_TOKENS_PER_SECOND = "tokens/s"
 
 _METRIC_LABELS = {
     "input_tokens": ("Input Tokens", ""),
     "output_tokens": ("Output Tokens", ""),
+    "speech_tokens": ("Speech Tokens", ""),
     "audio_length_s": ("Audio Length", "s"),
     "ttft_ms": ("TTFT (Time To First Token)", "ms"),
     "tpot_ms": ("TPOT (Time Per Output Token)", "ms/token"),
     "e2e_ms": ("E2E Latency (End-to-End)", "ms"),
-    "e2e_tps": ("E2E TPS (Throughput)", "tokens/s"),
+    "e2e_tps": ("E2E TPS (Throughput)", _TOKENS_PER_SECOND),
+    "s2s_e2e_ms": ("S2S E2E Latency", "ms"),
+    "s2s_e2e_tps": ("S2S E2E TPS", _TOKENS_PER_SECOND),
+    "token2wav_e2e_ms": ("Token2Wav Latency", "ms"),
+    "output_audio_length_s": ("Output Audio Length", "s"),
+    "token2wav_rtf": ("Token2Wav RTF", ""),
     "overall_rtf": ("Overall RTF (Real-Time Factor)", ""),
     "inference_rtf": ("Inference RTF (Real-Time Factor)", ""),
     "mtp_acceptance_rate": ("MTP Acceptance Rate", ""),
     "mtp_accepted_per_round": ("MTP Accepted Per Round", "tokens/round"),
     "decode_active_ms": ("Decode Active Time", "ms"),
-    "decode_active_tps": ("Decode Active Speed", "tokens/s"),
+    "decode_active_tps": ("Decode Active Speed", _TOKENS_PER_SECOND),
 }
 
 
@@ -78,7 +85,7 @@ def _path_sort_key(path: str) -> tuple:
 
 def _format_metric(name: str, value: float) -> str:
     label, unit = _METRIC_LABELS.get(name, (name, ""))
-    if name in {"input_tokens", "output_tokens"}:
+    if name in {"input_tokens", "output_tokens", "speech_tokens"}:
         rendered = str(int(value))
     elif name == "mtp_acceptance_rate":
         rendered = f"{value:.2%}"
@@ -117,6 +124,8 @@ def _render_timing_table(report: PerfReport, console, table_type, text_type) -> 
 
     ordered = sorted(report.scopes.items(), key=lambda item: _path_sort_key(item[0]))
     for path, stats in ordered:
+        if path.startswith("lalm.e2e_"):
+            continue
         speed = report.speeds.get(path)
         speed_text = f"{speed[0]:.2f} {speed[1]}" if speed else "-"
         table.add_row(
@@ -140,7 +149,15 @@ def _render_metrics_table(report: PerfReport, console, table_type) -> None:
             table.add_row(f"[{root}]", "")
         for name, value in metrics.items():
             label = _METRIC_LABELS.get(name, (name, ""))[0]
-            rendered = _format_metric(name, value).removeprefix(f"{label}: ")
+            if root == "lalm" and name == "output_tokens":
+                label = "Text Output Tokens"
+                rendered = str(int(value))
+            elif root == "lalm" and name == "s2s_e2e_tps":
+                text_tokens = int(metrics.get("output_tokens", 0))
+                speech_tokens = int(metrics.get("speech_tokens", 0))
+                rendered = f"{value:.2f} {_TOKENS_PER_SECOND} ({text_tokens} text + {speech_tokens} speech)"
+            else:
+                rendered = _format_metric(name, value).removeprefix(f"{label}: ")
             table.add_row(label, rendered)
     console.print(table)
 

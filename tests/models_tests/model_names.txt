@@ -8,6 +8,7 @@ deepseek_r1_qwen3_8b
 dinov3_base
 efficientnet
 emotion2vec
+funaudiochat
 gemma4
 glm_asr
 glm_ocr
