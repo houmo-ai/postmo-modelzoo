@@ -372,6 +372,18 @@ segmentation_sam2:
         script: ../models/segmentation/sam2/test.sh
   test:
     - segmentation_sam2_test
+segmentation_sam3:
+  include:
+    - models/segmentation/sam3
+  exclude:
+    - models/segmentation/sam3/README.MD
+  example_case:
+    - segmentation_sam3_test:
+        test_type: models_tests
+        script: sam3
+        args: all
+  test:
+    - segmentation_sam3_test
 
 #####################################################
 # ====================== ocr ====================== #

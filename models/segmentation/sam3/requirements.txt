@@ -1,0 +1,4 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==5.8.0
+torchao==0.17.0
+timm>=1.0.28

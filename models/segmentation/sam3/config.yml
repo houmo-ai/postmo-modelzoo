@@ -1,0 +1,16 @@
+default_model_name: "sam3"
+default_model_size: "0.8b"
+
+model_configs:
+  sam3:
+    "0.8b":
+      modelscope_repo: ["facebook/sam3"]
+      model_name: "sam3"
+      model_size: "0.8b"
+      ncore: 2
+      ndevice: 1
+      quant_type: "w8a8"
+      batch: 1
+      max_size_w: 1008
+      max_size_h: 1008
+      num_boxes: 16

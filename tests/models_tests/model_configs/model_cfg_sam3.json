@@ -1,0 +1,72 @@
+{
+    "obsolete": false,
+    "model_dir": "models/segmentation/sam3",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2"],
+            "source_type": [null, null],
+            "model_name": ["sam3", "sam3"],
+            "model_size": ["0.8b", "0.8b"],
+            "ncore": [2, 2],
+            "ndevice": [1, 1],
+            "batch": [1, 1],
+            "quant_type": ["w8a8", "w8a8"],
+            "max_size_w": [1008, 1008],
+            "max_size_h": [1008, 1008]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/sam3"],
+            "model_name": ["sam3"],
+            "model_size": ["0.8b"],
+            "out_dir": ["cached_results/hmquant_xh2"],
+            "quant_type": ["w8a8"],
+            "num_boxes": [16],
+            "max_size_w": [1008],
+            "max_size_h": [1008]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2"],
+            "model_name": ["sam3"],
+            "model_size": ["0.8b"],
+            "output_dir": ["cached_results/hmm_xh2"],
+            "ncore": [2],
+            "ndevice": [1],
+            "quant_type": ["w8a8"],
+            "max_size_w": [1008],
+            "max_size_h": [1008],
+            "stage": ["build"],
+            "flash_attention": [1]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "model_name": ["sam3"],
+            "model_size": ["0.8b"],
+            "model": ["cached_results/hmm_xh2/sam3_0.8b_1008x1008.hmm"],
+            "model_dir": ["cached_models/sam3"],
+            "image": ["../../../data/pic/sam3_test_image.jpg"],
+            "output": ["demo_hmm_result.png"],
+            "perf": ["false"]
+        }
+    }
+}

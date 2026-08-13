@@ -542,6 +542,19 @@ def test_segmentation_sam2_compile(setup_logging) -> None:
     _compile_func("sam2", setup_logging)
 
 
+@pytest.mark.sam3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_compile_models.py::test_segmentation_sam3_compile",
+    depends_on=["test_quant_models.py::test_segmentation_sam3_quant"],
+)
+def test_segmentation_sam3_compile(setup_logging) -> None:
+    """test_segmentation_sam3_compile"""
+    _compile_func("sam3", setup_logging)
+
+
 @pytest.mark.sdxl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

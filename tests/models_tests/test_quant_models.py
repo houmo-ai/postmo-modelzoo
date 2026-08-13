@@ -503,6 +503,19 @@ def test_segmentation_sam2_quant(setup_logging) -> None:
     _quant_func("sam2", setup_logging)
 
 
+@pytest.mark.sam3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_segmentation_sam3_quant",
+    depends_on=["test_get_models.py::test_segmentation_sam3_get_model"],
+)
+def test_segmentation_sam3_quant(setup_logging) -> None:
+    """test_segmentation_sam3_quant"""
+    _quant_func("sam3", setup_logging)
+
+
 @pytest.mark.sensevoice
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

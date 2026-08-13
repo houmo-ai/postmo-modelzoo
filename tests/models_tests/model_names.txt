@@ -39,6 +39,7 @@ qwen3dot5
 qwen3dot5_tool_test
 resnet50
 sam2
+sam3
 sdxl
 sensevoice
 siglip2

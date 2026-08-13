@@ -404,6 +404,15 @@ def test_segmentation_sam2_demo(setup_logging) -> None:
     _demo_func("sam2", setup_logging)
 
 
+@pytest.mark.sam3
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_segmentation_sam3_demo(setup_logging) -> None:
+    """test_segmentation_sam3_demo"""
+    _demo_func("sam3", setup_logging)
+
+
 @pytest.mark.sdxl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
