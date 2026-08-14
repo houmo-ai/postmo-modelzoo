@@ -192,6 +192,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen2.5-vl              | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
 | qwen3-vl                | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
 | gemma4                  | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| ornith1.0               | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 
 ## API 示例
 

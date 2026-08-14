@@ -1,0 +1,19 @@
+default_model_name: "ornith1.0"
+default_model_size: "35b"
+
+model_configs:
+  ornith1.0:
+    "35b":
+      modelscope_repo: ["deepreinforce-ai/Ornith-1.0-35B"]
+      model_name: "ornith1.0"
+      model_size: "35b"
+      ncore: 2
+      quant_type: "w4a8"
+      context_length: "256k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 448
+      max_size_h: 448
+      max_size_t: 2
+      workflow_config: "workflows/xh2a/llm_models/qwen3_5_moe/35b_a3b/ornith-1.0-35b_full.yaml"

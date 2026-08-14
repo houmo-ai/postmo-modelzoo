@@ -282,6 +282,19 @@ def test_backbone_mobilenetv2_quant(setup_logging) -> None:
     _quant_func("mobilenetv2", setup_logging)
 
 
+@pytest.mark.ornith1dot0
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_vlm_ornith1dot0_quant",
+    depends_on=["test_get_models.py::test_vlm_ornith1dot0_get_model"],
+)
+def test_vlm_ornith1dot0_quant(setup_logging) -> None:
+    """test_vlm_ornith1dot0_quant"""
+    _quant_func("ornith1.0", setup_logging)
+
+
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

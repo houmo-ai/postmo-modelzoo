@@ -654,6 +654,19 @@ vlm_gemma4:
   test:
     - vlm_gemma4_test
 
+vlm_ornith1.0:
+  include:
+    - models/vlm/ornith1.0
+  exclude:
+    - models/vlm/ornith1.0/README.md
+  example_case:
+    - vlm_ornith1.0_test:
+        test_type: models_tests
+        script: ornith1dot0
+        args: all
+  test:
+    - vlm_ornith1.0_test
+
 #####################################################
 # =================== embedding =================== #
 #####################################################

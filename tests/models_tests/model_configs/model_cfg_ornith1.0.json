@@ -1,0 +1,91 @@
+{
+    "obsolete": false,
+    "model_dir": "models/vlm/ornith1.0",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["24g"]
+    },
+    "support_platform": ["x86_64", "aarch64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "perf_metrics": {
+        "xh2": {
+            "x86_64": {
+                "prefill": 0,
+                "decode": 0,
+                "end2end": 0
+            }
+        }
+    },
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_35b_256k"],
+            "model_name": ["ornith1.0", "ornith1.0"],
+            "model_size": ["35b", "35b"],
+            "context_length": [null, "256k"],
+            "prefill_length": [null, 256],
+            "quant_type": [null, "w4a8"],
+            "ndevice": [null, 1],
+            "ncore": [null, 2],
+            "batch": [null, null],
+            "source_type": [null, null]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model_dir": ["cached_models/Ornith-1.0-35B"],
+            "model_name": ["ornith1.0"],
+            "model_size": ["35b"],
+            "out-dir": ["cached_results/hmquant_xh2_35b_4k"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_35b_4k"],
+            "model_name": ["ornith1.0"],
+            "model_size": ["35b"],
+            "ncore": [2],
+            "batch": [1],
+            "ndevice": [1],
+            "context_length": [262144],
+            "prefill_length": [256],
+            "output_dir": ["cached_results/hmm_xh2_35b_256k"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "tokenizer_dir": [
+                "cached_results/hmm_xh2_35b_256k/hmquant/hf_config"
+            ],
+            "embedding_path": [
+                "cached_results/hmm_xh2_35b_256k/hmquant/quant_embedding.pt"
+            ],
+            "visual_path": [
+                "cached_results/hmm_xh2_35b_256k/ornith1.0-35b_visual_448x448x2.hmm"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_35b_256k/ornith1.0-35b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_35b_256k/ornith1.0-35b_decode.hmm"
+            ],
+            "model_name": ["ornith1.0"],
+            "model_size": ["35b"],
+            "ndevice": [1],
+            "batch": [1],
+            "max_size_w": [448],
+            "max_size_h": [448],
+            "max_size_t": [2]
+        }
+    },
+    "perf_params": "demo"
+}

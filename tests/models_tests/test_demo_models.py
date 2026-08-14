@@ -233,6 +233,15 @@ def test_backbone_mobilenetv2_demo(setup_logging) -> None:
     _demo_func("mobilenetv2", setup_logging)
 
 
+@pytest.mark.ornith1dot0
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.demo
+def test_vlm_ornith1dot0_demo(setup_logging) -> None:
+    """test_vlm_ornith1dot0_demo"""
+    _demo_func("ornith1.0", setup_logging)
+
+
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

@@ -20,6 +20,7 @@ minicpm_v_4dot5
 minicpm_v_4dot6
 minicpmo
 mobilenetv2
+ornith1dot0
 paddleocr_vl
 ppocrv3_det
 ppocrv3_rec

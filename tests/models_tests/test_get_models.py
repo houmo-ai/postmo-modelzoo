@@ -255,6 +255,16 @@ def test_backbone_mobilenetv2_get_model(setup_logging) -> None:
     _get_model_func("mobilenetv2", setup_logging)
 
 
+@pytest.mark.ornith1dot0
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_vlm_ornith1dot0_get_model")
+def test_vlm_ornith1dot0_get_model(setup_logging) -> None:
+    """test_vlm_ornith1dot0_get_model"""
+    _get_model_func("ornith1.0", setup_logging)
+
+
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

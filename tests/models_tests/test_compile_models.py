@@ -308,6 +308,19 @@ def test_backbone_mobilenetv2_compile(setup_logging) -> None:
     _compile_func("mobilenetv2", setup_logging)
 
 
+@pytest.mark.ornith1dot0
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_compile_models.py::test_vlm_ornith1dot0_compile",
+    depends_on=["test_quant_models.py::test_vlm_ornith1dot0_quant"],
+)
+def test_vlm_ornith1dot0_compile(setup_logging) -> None:
+    """test_vlm_ornith1dot0_compile"""
+    _compile_func("ornith1.0", setup_logging)
+
+
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
