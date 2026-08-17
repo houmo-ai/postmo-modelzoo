@@ -629,6 +629,18 @@ vlm_minicpm-v-4.6:
         args: all
   test:
     - vlm_minicpm-v-4.6_test
+vlm_minicpm-v-4.5:
+  include:
+    - models/vlm/minicpm-v-4.5
+  exclude:
+    - models/vlm/minicpm-v-4.5/README.MD
+  example_case:
+    - vlm_minicpm-v-4.5_test:
+        test_type: models_tests
+        script: minicpm_v_4dot5
+        args: all
+  test:
+    - vlm_minicpm-v-4.5_test
 vlm_gemma4:
   include:
     - models/vlm/gemma4

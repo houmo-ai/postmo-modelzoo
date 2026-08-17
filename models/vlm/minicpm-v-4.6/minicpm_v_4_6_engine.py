@@ -1,6 +1,6 @@
 # Copyright (c) 2026 HOUMO AI
 #
-# File: minicpm_v_4_6.py
+# File: minicpm_v_4_6_engine.py
 # Description:
 #   MiniCPM-V 4.6 inference Engine implementation.
 #
@@ -20,11 +20,12 @@
 
 import numpy as np
 
-from ..core import HoumoEngine
-from ..core.types import GenerationState, Stage
-from ..module.minicpm_v_4_6 import MiniCPMV46Module
-from ..perf import PerfTracker
-from ..process.minicpm_v_4_6 import MiniCPMV46Process
+from houmo_engine import HoumoEngine
+from houmo_engine.core.types import GenerationState, Stage
+from houmo_engine.perf import PerfTracker
+
+from minicpm_v_4_6_module import MiniCPMV46Module
+from minicpm_v_4_6_process import MiniCPMV46Process
 
 E2E_METRIC = "llm.e2e"
 TTFT_METRIC = "llm.ttft"
@@ -218,3 +219,6 @@ class MiniCPMV46Engine(HoumoEngine):
                 self.perf.end(TTFT_METRIC)
             if e2e_active:
                 self.perf.end(E2E_METRIC)
+
+
+__all__ = ["MiniCPMV46Engine"]

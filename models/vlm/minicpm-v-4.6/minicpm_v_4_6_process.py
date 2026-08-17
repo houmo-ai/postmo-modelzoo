@@ -1,6 +1,6 @@
 # Copyright (c) 2026 HOUMO AI
 #
-# File: process.py
+# File: minicpm_v_4_6_process.py
 # Description:
 #   MiniCPM-V 4.6 input and output Process implementation.
 #
@@ -21,7 +21,6 @@
 import logging
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -45,27 +44,16 @@ transformers_utils.is_torchao_available = _torchao_unavailable
 
 from transformers import AutoProcessor
 
-from ...core import ModelProcess
-from ...core.types import GenerationState, StageInputs, StageOutputs
-from ...perf import PerfTracker
+from houmo_engine import ModelProcess
+from houmo_engine.core.types import GenerationState, StageInputs, StageOutputs
+from houmo_engine.perf import PerfTracker
 
+from minicpm_v_4_6_types import PreparedRequest
 
 IMAGE_TOKEN_ID = 248056
 PATCH_SIZE = 14
 TOKEN_CAPACITY = 1536
 POSITIONS_PER_SIDE = 70
-
-
-@dataclass
-class PreparedRequest:
-    input_ids: torch.Tensor
-    token_embeds: torch.Tensor
-    position_ids: torch.Tensor
-    vision_inputs: tuple[StageInputs, ...] = ()
-
-    @property
-    def uses_vision(self) -> bool:
-        return bool(self.vision_inputs)
 
 
 def _load_embedding(path, embedding_size: int) -> torch.Tensor:
@@ -412,3 +400,6 @@ class MiniCPMV46Process(ModelProcess):
         if delta:
             state.emitted_text = text
         return delta
+
+
+__all__ = ["MiniCPMV46ImagePreprocessor", "MiniCPMV46Process"]

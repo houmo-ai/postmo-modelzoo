@@ -16,6 +16,7 @@ gpt_oss
 gte
 lprnet
 mineru2dot5
+minicpm_v_4dot5
 minicpm_v_4dot6
 minicpmo
 mobilenetv2

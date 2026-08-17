@@ -48,7 +48,7 @@ def _timing_rows(report: PerfReport) -> list[tuple[str, ...]]:
     """Build formatted rows for scope timing statistics."""
     rows = []
     for path, stats in sorted(report.scopes.items(), key=lambda item: _path_sort_key(item[0])):
-        if path.startswith("lalm.e2e_"):
+        if path.endswith((".e2e", ".ttft")) or path.startswith("lalm.e2e_"):
             continue
         display_path = _display_path(path, report.scopes)
         minimum = stats.min_ms if stats.count else 0.0

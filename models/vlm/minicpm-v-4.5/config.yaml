@@ -1,0 +1,17 @@
+default_model_name: "minicpm"
+default_model_size: "v-4.5"
+
+model_configs:
+  minicpm:
+    "v-4.5":
+      modelscope_repo: ["OpenBMB/MiniCPM-V-4_5"]
+      model_name: "minicpm"
+      model_size: "v-4.5"
+      ncore: 2
+      quant_type: "w8a8h1_sefp"
+      context_length: "40k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      workflow_config: "workflows/xh2a/llm_models/minicpm_v_4_5/8b/minicpm_v_4_5_xh2a_w8a8.yaml"
+

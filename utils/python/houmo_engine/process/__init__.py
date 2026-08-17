@@ -18,14 +18,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from .minicpm_v_4_6 import MiniCPMV46Process
 from .qwen3_5 import Qwen35Process
 from .qwen3_6_mtp import Qwen36MtpProcess
 from .qwen3_asr import Qwen3AsrProcess
 from .qwen3_tts import Qwen3TtsProcess
 
 __all__ = [
-    "MiniCPMV46Process",
     "Qwen35Process",
     "Qwen36MtpProcess",
     "Qwen3AsrProcess",

@@ -230,6 +230,19 @@ def test_ocr_mineru2dot5_quant(setup_logging) -> None:
     _quant_func("mineru2.5", setup_logging)
 
 
+@pytest.mark.minicpm_v_4dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_vlm_minicpm_v_4dot5_quant",
+    depends_on=["test_get_models.py::test_vlm_minicpm_v_4dot5_get_model"],
+)
+def test_vlm_minicpm_v_4dot5_quant(setup_logging) -> None:
+    """test_vlm_minicpm_v_4dot5_quant"""
+    _quant_func("minicpm-v-4.5", setup_logging)
+
+
 @pytest.mark.minicpm_v_4dot6
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

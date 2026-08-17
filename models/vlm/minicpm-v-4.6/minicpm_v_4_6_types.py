@@ -1,8 +1,8 @@
 # Copyright (c) 2026 HOUMO AI
 #
-# File: __init__.py
+# File: minicpm_v_4_6_types.py
 # Description:
-#   MiniCPM-V 4.6 Process exports.
+#   MiniCPM-V 4.6 layer data contracts.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,26 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from .process import MiniCPMV46Process
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-__all__ = ["MiniCPMV46Process"]
+import torch
+
+from houmo_engine.core.types import StageInputs
+
+
+@dataclass
+class PreparedRequest:
+    """CPU-side request prepared for vision, prefill, and decode stages."""
+
+    input_ids: torch.Tensor
+    token_embeds: torch.Tensor
+    position_ids: torch.Tensor
+    vision_inputs: Sequence[StageInputs] = ()
+
+    @property
+    def uses_vision(self) -> bool:
+        return bool(self.vision_inputs)
+
+
+__all__ = ["PreparedRequest"]

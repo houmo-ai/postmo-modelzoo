@@ -81,6 +81,26 @@ if should_run_step "demo"; then
     )
     DEMO_ARGS+=("${SYSTEM_PROMPT_ARGS[@]}")
     python3 demo.py "${DEMO_ARGS[@]}"
+
+    python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" \
+        --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+    if command -v llm_perf &>/dev/null; then
+        echo "Execute performance cases (${MODEL_NAME}-${MODEL_SIZE})."
+        if [[ "${NDEVICE}" -gt 1 ]]; then
+            model_suffix="hmms"
+        else
+            model_suffix="hmm"
+        fi
+        devices_param=$(get_devices_param "${NDEVICE}")
+        for visual_profile in 4x 16x; do
+            llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
+                --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
+                --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+                --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_${visual_profile}.hmm" \
+                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+        done
+    fi
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

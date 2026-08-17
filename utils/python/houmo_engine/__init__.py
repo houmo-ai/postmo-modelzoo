@@ -30,7 +30,6 @@ __all__ = [
     "HoumoEngine",
     "HoumoModule",
     "ModelProcess",
-    "MiniCPMV46Engine",
     "Qwen35Engine",
     "Qwen36MtpEngine",
     "Qwen3AsrEngine",
@@ -39,10 +38,6 @@ __all__ = [
 
 
 def __getattr__(name):
-    if name == "MiniCPMV46Engine":
-        from .engine.minicpm_v_4_6 import MiniCPMV46Engine
-
-        return MiniCPMV46Engine
     if name == "Qwen35Engine":
         from .engine.qwen3_5 import Qwen35Engine
 

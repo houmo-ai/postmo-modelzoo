@@ -256,6 +256,19 @@ def test_ocr_mineru2dot5_compile(setup_logging) -> None:
     _compile_func("mineru2.5", setup_logging)
 
 
+@pytest.mark.minicpm_v_4dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_compile_models.py::test_vlm_minicpm_v_4dot5_compile",
+    depends_on=["test_quant_models.py::test_vlm_minicpm_v_4dot5_quant"],
+)
+def test_vlm_minicpm_v_4dot5_compile(setup_logging) -> None:
+    """test_vlm_minicpm_v_4dot5_compile"""
+    _compile_func("minicpm-v-4.5", setup_logging)
+
+
 @pytest.mark.minicpm_v_4dot6
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

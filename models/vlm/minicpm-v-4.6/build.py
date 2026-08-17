@@ -437,7 +437,7 @@ if __name__ == "__main__":
         # Build all visual models with resolution suffix
         for visual_dir in visual_dirs:
             folder_name = os.path.basename(visual_dir)
-            # Extract resolution suffix from folder name like "visual_448x448x2"
+            # Extract the profile suffix from folder names such as "vision_16x".
             if "_" in folder_name:
                 suffix = folder_name.split("_", 1)[1]
                 vit_model_name = f"{model_name}-{model_size}_visual_{suffix}"

@@ -52,6 +52,7 @@ def get_workflow_config_path(config_path: str, model_name: str, model_size: str)
     _, _, model_configs = get_model_configs(config_path)
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     workflow_config = model_config.get("workflow_config")
+    print(workflow_config)
     if not workflow_config:
         raise ValueError(f"workflow_config not found for {model_name}/{model_size} in {config_path}")
 
@@ -114,9 +115,11 @@ def _remove_empty_artifact_dirs(llm_artifact_dir: Path, output_dir: Path) -> Non
 def _move_vision_hmonnx_to_parent(output_dir: Path) -> None:
     for vision_name in ("vision_4x", "vision_16x"):
         vision_dir = output_dir / vision_name
+        if not vision_dir.is_dir():
+            continue
         hmonnx_dir = vision_dir / "hmonnx"
         if not hmonnx_dir.is_dir():
-            raise FileNotFoundError(f"Vision HMONNX directory not found: {hmonnx_dir}")
+            continue
 
         for source in list(hmonnx_dir.iterdir()):
             _move_to_output(source, vision_dir)
@@ -136,9 +139,7 @@ def move_llm_artifacts_to_output_root(meta_path: Path) -> None:
         raise ValueError(f"LLM artifact_dir not found in {meta_path}")
 
     llm_artifact_dir = output_dir / artifact_dir
-    llm_metadata_path = output_dir / llm_info.get(
-        "metadata", Path(artifact_dir) / "golden_meta_info.json"
-    )
+    llm_metadata_path = output_dir / llm_info.get("metadata", Path(artifact_dir) / "golden_meta_info.json")
     if not llm_metadata_path.is_file():
         raise FileNotFoundError(f"LLM metadata not found: {llm_metadata_path}")
     llm_metadata = _read_json(llm_metadata_path)

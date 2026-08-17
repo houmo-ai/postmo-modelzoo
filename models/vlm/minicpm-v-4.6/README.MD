@@ -1,6 +1,6 @@
 # MiniCPM-V 4.6
 
-本示例展示如何量化和编译 MiniCPM-V 4.6 模型，并通过 Houmo Python Engine 部署到后摩芯片设备上进行文本和图片理解推理。
+本示例展示如何将 MiniCPM-V 4.6 模型量化和编译，并通过 Houmo Python Engine 部署到后摩芯片设备上进行文本和图片理解推理。
 
 [TOC]
 
@@ -39,11 +39,11 @@ Python Demo 默认使用 `16x` 视觉下采样模式，也支持通过 `--downsa
 
 **量化硬件要求：**
 
-- `MiniCPM-V 4.6`: 需要 GPU，显存要求≥24GB
+- `MiniCPM-V 4.6`: 需要 GPU，显存最小 24GB
 
 **编译时 host 内存要求：**
 
-- `MiniCPM-V 4.6`: host内存≥128GB
+- `MiniCPM-V 4.6`: 需要空闲 host 内存最小 128GB
 
 ## 2 快速开始
 
@@ -68,7 +68,7 @@ pip3 install -r requirements.txt
 
 ### 2.2 获取模型和数据
 
-通过 `get_model.py` 下载模型资源。脚本默认从同目录的 `config.yaml` 读取模型名称、规格、设备数、上下文长度和编译配置。
+通过 `get_model.py` 下载模型，可通过参数选择下载原始模型或芯片模型。脚本默认从同目录的 `config.yaml` 读取模型名称、规格、设备数、上下文长度和编译配置。
 
 如果需要自行量化，可下载原始模型：
 
@@ -146,15 +146,14 @@ output/${HOUMO_TARGET}/hmquant/
 python3 build.py --model_name minicpm --model_size v-4.6 --ndevice 1
 ```
 
-默认输出目录为 `output/${HOUMO_TARGET}`。prefill 和 decode 输出名称为：
+默认输出目录为 `output/${HOUMO_TARGET}`，默认输出文件为：
 
 - `minicpm-v-4.6_prefill.hmm`
 - `minicpm-v-4.6_decode.hmm`
-
-视觉模型的输出名称由输入视觉目录名决定。默认量化流程会生成 `vision_4x` 和 `vision_16x`，对应输出为：
-
 - `minicpm-v-4.6_visual_4x.hmm`
 - `minicpm-v-4.6_visual_16x.hmm`
+
+视觉模型的输出名称由输入视觉目录名决定。默认量化流程会生成 `vision_4x` 和 `vision_16x`，因此会生成上述两个 visual 文件。当 `--ndevice` 大于 1 时，prefill 和 decode 的输出后缀为 `.hmms`。
 
 如需在编译后执行 golden comparison，可使用：
 
@@ -164,7 +163,23 @@ python3 build.py --model_name minicpm --model_size v-4.6 --stage all
 
 ### 2.5 演示
 
-`demo.py` 使用 `Demo -> MiniCPMV46Engine -> MiniCPMV46Process / MiniCPMV46Module` 分层框架执行推理，支持文本输入、单图输入和多图输入。
+`demo.py` 使用模型目录内自包含的 Houmo Python Engine 实现执行推理，支持文本输入、单图输入和多图输入。调用链为：
+
+```text
+demo.py
+  -> MiniCPMV46Engine
+     -> MiniCPMV46Process
+     -> MiniCPMV46Module
+```
+
+模型专属实现位于当前目录：
+
+- `minicpm_v_4_6_engine.py`：请求校验、推理阶段编排、采样和流式输出。
+- `minicpm_v_4_6_process.py`：文本与图片前处理、embedding、阶段输入构造和 detokenization。
+- `minicpm_v_4_6_module.py`：HMM 加载、Runtime 执行和设备 cache 管理。
+- `minicpm_v_4_6_types.py`：模型本地的跨层数据类型。
+
+公共 `utils/python/houmo_engine` 仅提供基础接口、公共层间类型和性能统计等通用能力。
 
 文本推理：
 
@@ -222,9 +237,12 @@ python3 demo.py --perf false
 
 ## 3 一键评估
 
-`test.sh` 默认执行 `demo` 步骤，并在未指定 `--skip_download` 时先下载预编译模型：
+以上步骤可以通过 `test.sh` 脚本执行。脚本默认执行 `demo` 步骤，并在未指定 `--skip_download` 时先下载预编译模型：
+
+运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录。`demo` 阶段使用该路径调用 `tools/llm_perf/convert_embed.py`。
 
 ```bash
+export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
 bash test.sh
 ```
 
@@ -282,8 +300,20 @@ bash test.sh -s all --skip_download
 
 - `quant`：检查 GPU，按需下载原始模型，并调用 `ptq.py` 生成量化 HMONNX 中间模型。
 - `build`：调用 `build.py` 编译 prefill、decode、vision 4x 和 vision 16x 模型。
-- `demo`：默认下载预编译模型后调用 `demo.py`；与其他步骤组合执行时直接使用本地构建产物。
+- `demo`：默认下载预编译模型后调用 `demo.py`；与其他步骤组合执行时直接使用本地构建产物。Python Demo 完成后，脚本将 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt` 转换为 `quant_embedding.bin`。
+- 如果环境中存在 `llm_perf`，`demo` 阶段会分别使用 `visual_4x.hmm` 和 `visual_16x.hmm` 执行两组性能测试；未安装 `llm_perf` 时跳过性能命令，但仍会生成 `quant_embedding.bin`。
 - `all`：依次执行 quant、build 和 demo。
+
+`llm_perf` 使用以下固定测试参数：
+
+- 输入长度：`256,1024,2048`
+- 输出长度：`256,256,256`
+- `batch=1`
+- `loop=1`
+- 视觉模型：`minicpm-v-4.6_visual_4x.hmm`、`minicpm-v-4.6_visual_16x.hmm`
+- embedding：`output/${HOUMO_TARGET}/hmquant/quant_embedding.bin`
+
+当 `--ndevice` 大于 1 时，性能测试使用 `.hmms` 格式的 prefill 和 decode 模型，并将设备编号展开为逗号分隔的 `--devices` 参数；视觉模型仍使用 `.hmm`。
 
 ## 4 参考结果
 
@@ -293,7 +323,7 @@ bash test.sh -s all --skip_download
 
 ### 4.2 性能结果
 
-暂无可提供的参考性能数据，待后续实测补充。
+`test.sh` 已接入 4x 和 16x 视觉模型的 `llm_perf` 测试。暂无可提供的参考性能数据，待后续实测补充。
 
 ## 5 免责声明
 

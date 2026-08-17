@@ -215,6 +215,16 @@ def test_ocr_mineru2dot5_get_model(setup_logging) -> None:
     _get_model_func("mineru2.5", setup_logging)
 
 
+@pytest.mark.minicpm_v_4dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_vlm_minicpm_v_4dot5_get_model")
+def test_vlm_minicpm_v_4dot5_get_model(setup_logging) -> None:
+    """test_vlm_minicpm_v_4dot5_get_model"""
+    _get_model_func("minicpm-v-4.5", setup_logging)
+
+
 @pytest.mark.minicpm_v_4dot6
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

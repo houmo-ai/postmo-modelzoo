@@ -1,6 +1,6 @@
 # Copyright (c) 2026 HOUMO AI
 #
-# File: minicpm_v_4_6.py
+# File: minicpm_v_4_6_module.py
 # Description:
 #   MiniCPM-V 4.6 runtime Module implementation.
 #
@@ -23,9 +23,9 @@ import torch
 import tcim_lite as tcim
 from hmatc.python.get_hm_devices import get_hm_devices
 
-from ..core import HoumoModule
-from ..core.types import Stage, StageInputs, StageOutputs
-from ..perf import PerfTracker
+from houmo_engine import HoumoModule
+from houmo_engine.core.types import Stage, StageInputs, StageOutputs
+from houmo_engine.perf import PerfTracker
 
 
 class MiniCPMV46Module(HoumoModule):
@@ -190,3 +190,6 @@ class MiniCPMV46Module(HoumoModule):
             tensors=(output,),
             metadata=self._stage_metadata.pop(stage, {}),
         )
+
+
+__all__ = ["MiniCPMV46Module"]

@@ -27,7 +27,7 @@ from pathlib import Path
 
 
 MODEL_DIR = Path(__file__).resolve().parent
-IMODELZOO_ROOT = Path(os.getenv("HOUMO_EXAMPLES_PATH", str(MODEL_DIR.parents[2])))
+IMODELZOO_ROOT = MODEL_DIR.parents[2]
 ENGINE_SRC = IMODELZOO_ROOT / "utils" / "python"
 sys.path.insert(0, str(ENGINE_SRC))
 
@@ -57,7 +57,7 @@ class HmMiniCPMV46:
         seed: int | None = None,
         perf: bool = False,
     ):
-        from houmo_engine import MiniCPMV46Engine
+        from minicpm_v_4_6_engine import MiniCPMV46Engine
 
         self.engine = MiniCPMV46Engine(
             prefill_path=prefill_path,

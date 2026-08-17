@@ -197,6 +197,15 @@ def test_ocr_mineru2dot5_demo(setup_logging) -> None:
     _demo_func("mineru2.5", setup_logging)
 
 
+@pytest.mark.minicpm_v_4dot5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.demo
+def test_vlm_minicpm_v_4dot5_demo(setup_logging) -> None:
+    """test_vlm_minicpm_v_4dot5_demo"""
+    _demo_func("minicpm-v-4.5", setup_logging)
+
+
 @pytest.mark.minicpm_v_4dot6
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
