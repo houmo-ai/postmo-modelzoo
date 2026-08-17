@@ -175,7 +175,9 @@ if __name__ == "__main__":
         },
         # wikitext-2 calibration set for the text-LLM PTQ (see ptq.py).
         "raw_files": {"raw_path": "3rdparty/wikitext-2-raw-v1.zip"},
-        "default_files": ["models/dataset/qwen3omni_sample_data.zip"],
+        "hmm_files": {
+            "other_files": ["models/dataset/qwen3omni_sample_data.zip"],
+        },
         "modelscope_repo": {"repo_ids": model_config.get("modelscope_repo", [])},
     }
 

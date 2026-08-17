@@ -4,3 +4,4 @@ compressed-tensors
 qwen_omni_utils
 optimum
 defuser
+torchao==0.17.0

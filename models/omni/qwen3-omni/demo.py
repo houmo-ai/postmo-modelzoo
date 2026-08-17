@@ -2215,6 +2215,9 @@ def get_args():
     p.add_argument("--talker_segment_gap_ms", dest="talker_segment_gap_ms",
                    type=int, default=120,
                    help="silence inserted between synthesized segments (ms)")
+    p.add_argument("--data_dir", dest="data_dir", type=str,
+                   default=str(DEFAULT_SAMPLE_DIR),
+                   help="directory containing sample data (cars.jpg, cough.wav, etc.)")
     args = p.parse_args()
     # fmt: on
 
@@ -2276,11 +2279,12 @@ def main():
         )
 
     example_mode = EXAMPLES_MODE[args.example_idx]
+    data_dir = Path(args.data_dir)
 
     if example_mode == "omni":
         # image + audio + text -> text + speech
-        image = str(DEFAULT_SAMPLE_DIR / "cars.jpg")
-        audio = str(DEFAULT_SAMPLE_DIR / "cough.wav")
+        image = str(data_dir / "cars.jpg")
+        audio = str(data_dir / "cough.wav")
         prompt = "结合图像和音频内容，用一句话简述你看到和听到了什么？"
         result = pipeline.run(
             image=image, audio=audio, prompt=prompt, speaker=DEFAULT_SPEAKER, system_prompt=args.system_prompt
@@ -2315,7 +2319,7 @@ def main():
             {
                 "role": "user",
                 "content": [
-                    {"type": "audio", "audio": str(DEFAULT_SAMPLE_DIR / "comment0.wav")}
+                    {"type": "audio", "audio": str(data_dir / "comment0.wav")}
                 ],
             },
         ]
@@ -2332,7 +2336,7 @@ def main():
             {
                 "role": "user",
                 "content": [
-                    {"type": "audio", "audio": str(DEFAULT_SAMPLE_DIR / "comment1.wav")}
+                    {"type": "audio", "audio": str(data_dir / "comment1.wav")}
                 ],
             }
         )
@@ -2343,7 +2347,7 @@ def main():
     elif example_mode == "vlm":
         # image + text -> text + speech. Speech generation stays on so the answer
         # is both described in text and spoken.
-        image = str(DEFAULT_SAMPLE_DIR / "2233.jpg")
+        image = str(data_dir / "2233.jpg")
         prompt = "请描述一下这张图片的内容。"
         result = pipeline.run(image=image, prompt=prompt, speaker=DEFAULT_SPEAKER, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "vlm_output.wav")
@@ -2354,21 +2358,21 @@ def main():
         # turns on sentence-segmented synthesis by flipping args.talker_segment,
         # which synthesizes the reply segment-by-segment (codec cache resets per
         # segment) and lets it stream out incrementally.
-        audio = str(DEFAULT_SAMPLE_DIR / "music.mp3")
+        audio = str(data_dir / "music.mp3")
         prompt = "描述这首乐曲的风格、节奏、力度和情感表达。指出所使用的乐器，并推测这首乐曲可能的创作背景。用尽量简洁的语言来描述。"
         result = pipeline.run(audio=audio, prompt=prompt, speaker=DEFAULT_SPEAKER, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "music_output.wav")
 
     elif example_mode == "asr":
         # Speech recognition: speech audio -> text only (no speech output).
-        audio = str(DEFAULT_SAMPLE_DIR / "asr_zh.wav")
+        audio = str(data_dir / "asr_zh.wav")
         prompt = "请将这段中文语音转换为纯文本。"
         result = pipeline.run(audio=audio, prompt=prompt, generate_audio=False, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "asr_output.wav")
 
     elif example_mode == "translate":
         # Speech translation: English speech audio -> Chinese text (no speech out).
-        audio = str(DEFAULT_SAMPLE_DIR / "asr_en.wav")
+        audio = str(data_dir / "asr_en.wav")
         prompt = "请听这段英文语音，并将其内容翻译成中文。"
         result = pipeline.run(audio=audio, prompt=prompt, generate_audio=False, system_prompt=args.system_prompt)
         _save_and_report(result, args.output_dir, "translate_output.wav")
