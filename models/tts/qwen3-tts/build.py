@@ -43,22 +43,6 @@ def get_default_parallel_jobs():
     return max(1, int(multiprocessing.cpu_count() * 0.75))
 
 
-def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    """Validates and adjusts FlashAttention parameter values."""
-    llm_val, other_val = flash_vals
-    if llm_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
-        )
-    if other_val not in [0, 1]:
-        raise ValueError(
-            f"Non-LLM FlashAttention values only support 0/1, current value:{other_val}"
-        )
-    if context_length < 2048:
-        llm_val = 0
-    return (llm_val, other_val)
-
-
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     parser = argparse.ArgumentParser()
@@ -77,30 +61,26 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="build output dir")
     parser.add_argument("--enable_stable_opt", dest="enable_stable_opt", action="store_true", default=False, help="enable stable output")
     parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
-    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention optimization switches: 1st=LLM prefill/decode (0/1/2), 2nd=non-LLM (0/1)")
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention modes for LLM and non-LLM; both support 0/1/2")
     parser.add_argument("--models", dest="models", nargs="+", type=str, default=None, help="specify which sub-models to build (default: all)")
     # fmt: on
 
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     args.context_length = first_not_none(
         args.context_length,
         parse_context_length(model_config.get("context_length", "2k")),
     )
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+    if args.context_length < 2048:
+        _, others_flash_attention = args.flash_attention
+        args.flash_attention = (0, others_flash_attention)
     return args
 
 
@@ -121,9 +101,7 @@ if __name__ == "__main__":
     llm_flash_attention, others_flash_attention = args.flash_attention
 
     if args.stage == "build" or args.stage == "all":
-        assert (
-            get_platform() == "x86_64"
-        ), f"Only supported for compilation on the x86_64 platform."
+        assert get_platform() == "x86_64", f"Only supported for compilation on the x86_64 platform."
 
         build_configs = [
             # Non-LLM sub-models

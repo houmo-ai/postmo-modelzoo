@@ -39,25 +39,6 @@ HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
-def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    llm_val, vit_val = flash_vals
-
-    if llm_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
-        )
-
-    if vit_val not in [0, 1, 2]:
-        raise ValueError(
-            f"ViT FlashAttention values only support 0/1/2, current value:{vit_val}"
-        )
-
-    if context_length < 2048:
-        llm_val = 0
-
-    return (llm_val, vit_val)
-
-
 def get_args() -> argparse.Namespace:
     # fmt: off
     parser = argparse.ArgumentParser()
@@ -75,7 +56,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--max_size_h", type=int, default=None)
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number for multi-device")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
-    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention switches: 1st=llm(0/1/2), 2nd=vit(0/1/2); e.g. --flash_attention 2 2")
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 2), help="FlashAttention modes for LLM and ViT; both support 0/1/2")
     
     args = parser.parse_args()
     default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
@@ -90,7 +71,9 @@ def get_args() -> argparse.Namespace:
     args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
         args.context_length = parse_context_length(model_config.get("context_length", "32k"))
-    args.flash_attention = _validate_adjust_flash_attention(args.flash_attention, args.context_length)
+    if args.context_length < 2048:
+        _, vit_flash_attention = args.flash_attention
+        args.flash_attention = (0, vit_flash_attention)
     # fmt: on
     return args
 
@@ -108,9 +91,7 @@ if __name__ == "__main__":
     llm_flash_attn, flash_attn = args.flash_attention
 
     if args.stage in ["build", "all"]:
-        assert (
-            get_platform() == "x86_64"
-        ), "Only supported for compilation on the x86_64 platform."
+        assert get_platform() == "x86_64", "Only supported for compilation on the x86_64 platform."
         Xh2Exec.build_from_hmonnx(
             is_prefill=True,
             hmonnx=find_hmonnx_file(os.path.join(model_dir, "prefill")),
@@ -137,13 +118,9 @@ if __name__ == "__main__":
             ndevice=ndevice,
             parallel_jobs=parallel_jobs,
         )
-        visual_model_name = (
-            f"{model_name}-{model_size}_visual_{args.max_size_w}x{args.max_size_h}"
-        )
+        visual_model_name = f"{model_name}-{model_size}_visual_{args.max_size_w}x{args.max_size_h}"
         Xh2Exec.build_from_hmonnx(
-            hmonnx=find_hmonnx_file(
-                os.path.join(model_dir, f"visual_{args.max_size_w}x{args.max_size_h}")
-            ),
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, f"visual_{args.max_size_w}x{args.max_size_h}")),
             hmm_name=visual_model_name,
             output=output_dir,
             ncore=ncore,

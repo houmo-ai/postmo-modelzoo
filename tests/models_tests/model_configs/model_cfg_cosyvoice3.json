@@ -52,7 +52,7 @@
         "xh2": {
             "tokenizer_dir": ["cached_models/Fun-CosyVoice3-0.5B-2512"],
             "prompt_wav_path": [
-                "cached_results/zero_shot_prompt.wav"
+                "cached_results/hmm_xh2_2k/zero_shot_prompt.wav"
             ],
             "ndevice": [null],
             "campplus_path": [

@@ -75,8 +75,7 @@ def _find_golden_file(step_dir: str, tensor_name: str, file_type: str) -> str:
     matches = sorted(glob.glob(pattern))
     if len(matches) != 1:
         raise FileNotFoundError(
-            f"Expected exactly one golden file for {tensor_name}, "
-            f"found {len(matches)}: {pattern}"
+            f"Expected exactly one golden file for {tensor_name}, " f"found {len(matches)}: {pattern}"
         )
     return os.path.abspath(matches[0])
 
@@ -99,13 +98,8 @@ def _set_golden_inputs(
             is_vcache = "vcache" in name_lower
             if input_info.dtype == np.int8 and (is_kcache or is_vcache):
                 pack_axis = -2 if is_vcache else -1
-                input_data = cast_fp_data_to_act_hmfp_data(
-                    input_data, "g32e8", pack_axis
-                )
-                print(
-                    f"packed golden input[{input_name}] as g32e8 "
-                    f"along axis {pack_axis}"
-                )
+                input_data = cast_fp_data_to_act_hmfp_data(input_data, "g32e8", pack_axis)
+                print(f"packed golden input[{input_name}] as g32e8 " f"along axis {pack_axis}")
             else:
                 input_data = input_data.astype(input_info.dtype)
         input_data = np.concatenate([input_data for _ in range(batch)], axis=0)
@@ -115,8 +109,7 @@ def _set_golden_inputs(
         )
         if tuple(input_data.shape) != tuple(input_info.shape):
             raise ValueError(
-                f"Golden input [{input_name}] shape not match "
-                f"{input_data.shape} vs {tuple(input_info.shape)}"
+                f"Golden input [{input_name}] shape not match " f"{input_data.shape} vs {tuple(input_info.shape)}"
             )
         start = time.time()
         module.set_input(input_name, input_data)
@@ -136,8 +129,7 @@ def _select_compared_output(
     ):
         token_count = golden_output.shape[1]
         print(
-            f"[compare] output [{output_name}] selected final "
-            f"{token_count} token(s) from shape {output_data.shape}"
+            f"[compare] output [{output_name}] selected final " f"{token_count} token(s) from shape {output_data.shape}"
         )
         return output_data[:, -token_count:]
     return output_data
@@ -159,9 +151,7 @@ def _check_golden_outputs(
         output_data_path = _find_golden_file(step_dir, output_name, "output")
         golden_output = np.load(output_data_path)
         golden_output = np.concatenate([golden_output for _ in range(batch)], axis=0)
-        compared_output = _select_compared_output(
-            output_name, output_data, golden_output
-        )
+        compared_output = _select_compared_output(output_name, output_data, golden_output)
 
         if golden_output.shape != compared_output.shape:
             result_check = False
@@ -181,30 +171,6 @@ def _check_golden_outputs(
         if not is_match and cosine_dist < GOLDEN_THRESH:
             result_check = False
     return result_check
-
-
-def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    """Validates and adjusts FlashAttention parameter values."""
-    llm_val, vit_val = flash_vals
-
-    # Validate LLM (Prefill & Decode) FlashAttention parameter
-    # Values: 0=off, 1/2=on
-    if llm_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
-        )
-
-    # Validate ViT (Vision Transformer) FlashAttention parameter
-    # Values: 0=off, 1=on
-    if vit_val not in [0, 1]:
-        raise ValueError(
-            f"ViT FlashAttention values only support 0/1, current value:{vit_val}"
-        )
-
-    if context_length < 2048:
-        llm_val = 0
-
-    return (llm_val, vit_val)
 
 
 def get_args() -> argparse.Namespace:
@@ -300,11 +266,8 @@ def get_args() -> argparse.Namespace:
         dest="flash_attention",
         nargs=2,
         type=int,
-        default=(2, 1),
-        help="FlashAttention optimization switches: "
-        "1st int = prefill/decode model switch (0=off, 1/2=on), "
-        "2nd int = ViT model switch (0=off, 1=on); "
-        "e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)",
+        default=(2, 2),
+        help="FlashAttention modes for LLM and ViT; both support 0/1/2",
     )
     parser.add_argument(
         "--enable_common_subgraph",
@@ -322,25 +285,19 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
-        args.context_length = parse_context_length(
-            model_config.get("context_length", "256k")
-        )
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+        args.context_length = parse_context_length(model_config.get("context_length", "256k"))
+    if args.context_length < 2048:
+        _, vit_flash_attention = args.flash_attention
+        args.flash_attention = (0, vit_flash_attention)
     return args
 
 
@@ -356,11 +313,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
     profile["load"] = time.time() - start
     print(f'{model_name} load completed in {profile["load"]:.3f} s.', flush=True)
 
-    step_dirs = [
-        path
-        for path in glob.glob(os.path.join(model_dir, "step_*"))
-        if os.path.isdir(path)
-    ]
+    step_dirs = [path for path in glob.glob(os.path.join(model_dir, "step_*")) if os.path.isdir(path)]
     step_dirs.sort(key=lambda path: int(os.path.basename(path).split("_", 1)[1]))
     if not step_dirs:
         raise FileNotFoundError(f"No golden step directory found under: {model_dir}")
@@ -410,29 +363,20 @@ if __name__ == "__main__":
     llm_flash_attention, vit_flash_attention = args.flash_attention
     profile = {}
 
-    decode_dirs = sorted(
-        path
-        for path in glob.glob(os.path.join(model_dir, "*decode*"))
-        if os.path.isdir(path)
-    )
+    decode_dirs = sorted(path for path in glob.glob(os.path.join(model_dir, "*decode*")) if os.path.isdir(path))
     if not decode_dirs:
-        raise FileNotFoundError(
-            f'No subdirectory containing "decode" found under: {model_dir}'
-        )
+        raise FileNotFoundError(f'No subdirectory containing "decode" found under: {model_dir}')
     decode_dir = os.path.abspath(decode_dirs[0])
     prefill_dir = os.path.join(model_dir, "prefill")
 
     visual_dirs = [
         folder_path
         for folder_path in glob.glob(os.path.join(model_dir, "vis*"))
-        if os.path.isdir(folder_path)
-        and any(key in os.path.basename(folder_path) for key in ["vision", "visual"])
+        if os.path.isdir(folder_path) and any(key in os.path.basename(folder_path) for key in ["vision", "visual"])
     ]
 
     if args.stage == "build" or args.stage == "all":
-        assert (
-            get_platform() == "x86_64"
-        ), f"Only supported for compilation on the x86_64 platform."
+        assert get_platform() == "x86_64", f"Only supported for compilation on the x86_64 platform."
 
         # Build all visual models with resolution suffix
         for visual_dir in visual_dirs:

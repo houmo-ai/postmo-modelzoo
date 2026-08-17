@@ -65,25 +65,6 @@ def cosine_distance(data1, data2):
     return cosine_dist
 
 
-def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    llm_val, vit_val = flash_vals
-
-    if llm_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
-        )
-
-    if vit_val not in [0, 1]:
-        raise ValueError(
-            f"ViT FlashAttention values only support 0/1, current value:{vit_val}"
-        )
-
-    if context_length < 2048:
-        llm_val = 0
-
-    return (llm_val, vit_val)
-
-
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -197,11 +178,8 @@ def get_args() -> argparse.Namespace:
         dest="flash_attention",
         nargs=2,
         type=int,
-        default=(2, 1),
-        help="FlashAttention optimization switches: "
-        "1st int = prefill/decode model switch (0=off, 1/2=on), "
-        "2nd int = ViT model switch (0=off, 1=on); "
-        "e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)",
+        default=(2, 2),
+        help="FlashAttention modes for LLM and ViT; both support 0/1/2",
     )
     parser.add_argument(
         "--enable_common_subgraph",
@@ -226,32 +204,22 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
-        args.context_length = parse_context_length(
-            model_config.get("context_length", "8k")
-        )
-    args.max_size_w = first_not_none(
-        args.max_size_w, model_config.get("max_size_w", 448)
-    )
-    args.max_size_h = first_not_none(
-        args.max_size_h, model_config.get("max_size_h", 448)
-    )
+        args.context_length = parse_context_length(model_config.get("context_length", "8k"))
+    args.max_size_w = first_not_none(args.max_size_w, model_config.get("max_size_w", 448))
+    args.max_size_h = first_not_none(args.max_size_h, model_config.get("max_size_h", 448))
     args.max_size_t = first_not_none(args.max_size_t, model_config.get("max_size_t", 2))
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+    if args.context_length < 2048:
+        _, vit_flash_attention = args.flash_attention
+        args.flash_attention = (0, vit_flash_attention)
     return args
 
 
@@ -276,20 +244,14 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
-        )
+        input_data_path = os.path.join(model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy")
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for _ in range(batch)], axis=0)
-        print(
-            f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
-        )
+        print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
         start = time.time()
         module.set_input(input_name, input_data)
         profile["set_input"] += time.time() - start
-    print(
-        f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
-    )
+    print(f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.')
 
     start = time.time()
     module.run()
@@ -309,29 +271,19 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
         start = time.time()
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
-        print(
-            f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
-        )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
-        )
+        print(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
+        output_data_path = os.path.join(model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy")
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
-            golden_output = np.concatenate(
-                [golden_output for _ in range(batch)], axis=0
-            )
+            golden_output = np.concatenate([golden_output for _ in range(batch)], axis=0)
         else:
             result_check = False
-            print(
-                f"[warning] compare canceled while golden data not found -> {output_data_path}"
-            )
+            print(f"[warning] compare canceled while golden data not found -> {output_data_path}")
             continue
         if golden_output.shape == output_data.shape:
             cosine_dist = cosine_distance(golden_output, output_data)
             is_match = (golden_output == output_data).all()
-            print(
-                f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
-            )
+            print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
             if cosine_dist < GOLDEN_THRESH:
@@ -341,9 +293,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None):
             print(
                 f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}"
             )
-    print(
-        f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
-    )
+    print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
     if not result_check:
         print("[error] result check failed.")
         exit(-1)
@@ -364,26 +314,15 @@ if __name__ == "__main__":
     llm_flash_attention, vit_flash_attention = args.flash_attention
     profile = {}
 
-    decode_dirs = sorted(
-        path
-        for path in glob.glob(os.path.join(model_dir, "*decode*"))
-        if os.path.isdir(path)
-    )
+    decode_dirs = sorted(path for path in glob.glob(os.path.join(model_dir, "*decode*")) if os.path.isdir(path))
     if not decode_dirs:
-        raise FileNotFoundError(
-            f'No subdirectory containing "decode" found under: {model_dir}'
-        )
+        raise FileNotFoundError(f'No subdirectory containing "decode" found under: {model_dir}')
     decode_dir = os.path.abspath(decode_dirs[0])
-    visual_model_name = (
-        f"{model_name}-{model_size}_visual_"
-        f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
-    )
+    visual_model_name = f"{model_name}-{model_size}_visual_" f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
 
     with ProcessMemoryMonitor(interval=args.monitor_interval, quiet=True) as monitor:
         if args.stage == "build" or args.stage == "all":
-            assert (
-                get_platform() == "x86_64"
-            ), f"Only supported for compilation on the x86_64 platform."
+            assert get_platform() == "x86_64", f"Only supported for compilation on the x86_64 platform."
 
             Xh2Exec.build_from_hmonnx(
                 is_prefill=True,
@@ -447,6 +386,4 @@ if __name__ == "__main__":
                 prefix=model_name,
             )
 
-    print(
-        f"\n=== Build/Test completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
-    )
+    print(f"\n=== Build/Test completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ===")

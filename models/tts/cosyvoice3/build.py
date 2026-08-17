@@ -42,30 +42,6 @@ GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
-def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    """Validates and adjusts FlashAttention parameter values."""
-    llm_val, other_val = flash_vals
-
-    # Validate LLM (Prefill & Decode) FlashAttention parameter
-    # Values: 0=off, 1/2=on
-    if llm_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
-        )
-
-    # Validate non-LLM submodel FlashAttention parameter
-    # Values: 0=off, 1=on
-    if other_val not in [0, 1]:
-        raise ValueError(
-            f"Non-LLM FlashAttention values only support 0/1, current value:{other_val}"
-        )
-
-    if context_length < 2048:
-        llm_val = 0
-
-    return (llm_val, other_val)
-
-
 def sanitize_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
@@ -188,32 +164,25 @@ def get_args() -> argparse.Namespace:
         nargs=2,
         type=int,
         default=(0, 0),
-        help="FlashAttention optimization switches (default: 0 0): "
-        "1st int = LLM prefill/decode switch (0=off, 1/2=on), "
-        "2nd int = non-LLM submodel switch (0=off, 1=on); "
-        "e.g., --flash_attention 0 0 (prefill&decode=0, others=0)",
+        help="FlashAttention modes for LLM and non-LLM; both support 0/1/2",
     )
 
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     args.context_length = first_not_none(
         args.context_length,
         parse_context_length(model_config.get("context_length", "2k")),
     )
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+    if args.context_length < 2048:
+        _, others_flash_attention = args.flash_attention
+        args.flash_attention = (0, others_flash_attention)
     return args
 
 
@@ -237,21 +206,15 @@ def test(model_name, model_dir, output_dir, batch=1):
         logger.info(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_files = glob.glob(
-            f"{model_dir}/**/hmquant_*{sanitize_name(input_name)}*.npy", recursive=True
-        )
+        input_files = glob.glob(f"{model_dir}/**/hmquant_*{sanitize_name(input_name)}*.npy", recursive=True)
         input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        logger.info(
-            f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
-        )
+        logger.info(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
         start = time.time()
         module.set_input(input_name, input_data)
         set_input_time += time.time() - start
-    logger.info(
-        f"{model_name} set {input_num} inputs completed in {set_input_time*1000:.3f} ms."
-    )
+    logger.info(f"{model_name} set {input_num} inputs completed in {set_input_time*1000:.3f} ms.")
 
     # infer model
     start = time.time()
@@ -273,30 +236,20 @@ def test(model_name, model_dir, output_dir, batch=1):
         start = time.time()
         output_data = module.get_output(output_name).numpy()
         get_output_time += time.time() - start
-        logger.info(
-            f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
-        )
-        output_files = glob.glob(
-            f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
-        )
+        logger.info(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
+        output_files = glob.glob(f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True)
         output_data_path = os.path.abspath(output_files[0]) if output_files else ""
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
-            golden_output = np.concatenate(
-                [golden_output for i in range(batch)], axis=0
-            )
+            golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
         else:
             result_check = False
-            logger.info(
-                f"[warning] compare canceled while golden data not found -> {output_data_path}"
-            )
+            logger.info(f"[warning] compare canceled while golden data not found -> {output_data_path}")
             continue
         if golden_output.shape == output_data.shape:
             cosine_dist = cosine_distance(golden_output, output_data)
             is_match = (golden_output == output_data).all()
-            logger.info(
-                f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
-            )
+            logger.info(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
             if cosine_dist < GOLDEN_THRESH:
@@ -306,9 +259,7 @@ def test(model_name, model_dir, output_dir, batch=1):
             logger.info(
                 f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}"
             )
-    logger.info(
-        f"{model_name} get {output_num} ouputs completed in {get_output_time*1000:.3f} ms."
-    )
+    logger.info(f"{model_name} get {output_num} ouputs completed in {get_output_time*1000:.3f} ms.")
     if not result_check:
         logger.info("[error] result check failed.")
         exit(-1)
@@ -332,9 +283,7 @@ if __name__ == "__main__":
     llm_flash_attention, others_flash_attention = args.flash_attention
 
     if args.stage == "build" or args.stage == "all":
-        assert (
-            get_platform() == "x86_64"
-        ), f"Only supported for compilation on the x86_64 platform."
+        assert get_platform() == "x86_64", f"Only supported for compilation on the x86_64 platform."
 
         Xh2Exec.build_from_hmonnx(
             hmonnx=find_hmonnx_file(os.path.join(model_dir, "campplus")),
@@ -418,9 +367,7 @@ if __name__ == "__main__":
             parallel_jobs=j,
         )
         Xh2Exec.build_from_hmonnx(
-            hmonnx=find_hmonnx_file(
-                os.path.join(model_dir, "hift"), pattern="hmquant_*part1.onnx"
-            ),
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "hift"), pattern="hmquant_*part1.onnx"),
             hmm_name=f"{model_name}-{model_size}_hift_part1",
             output=output_dir,
             ncore=ncore,
@@ -429,9 +376,7 @@ if __name__ == "__main__":
             parallel_jobs=j,
         )
         Xh2Exec.build_from_hmonnx(
-            hmonnx=find_hmonnx_file(
-                os.path.join(model_dir, "hift"), pattern="hmquant_*part2.onnx"
-            ),
+            hmonnx=find_hmonnx_file(os.path.join(model_dir, "hift"), pattern="hmquant_*part2.onnx"),
             hmm_name=f"{model_name}-{model_size}_hift_part2",
             output=output_dir,
             ncore=ncore,

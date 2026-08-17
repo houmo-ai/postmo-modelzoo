@@ -53,11 +53,7 @@ def find_lora_dirs(model_dir: str) -> list[str]:
     if not os.path.isdir(lora_root):
         raise FileNotFoundError(f"LoRA directory not found: {lora_root}")
 
-    lora_dirs = sorted(
-        path
-        for path in glob.glob(os.path.join(lora_root, "*"))
-        if os.path.isdir(path)
-    )
+    lora_dirs = sorted(path for path in glob.glob(os.path.join(lora_root, "*")) if os.path.isdir(path))
     if not lora_dirs:
         raise FileNotFoundError(f"No LoRA adapter directory found under: {lora_root}")
 
@@ -65,14 +61,10 @@ def find_lora_dirs(model_dir: str) -> list[str]:
         adapter_name = os.path.basename(lora_dir)
         prefill_dir = os.path.join(lora_dir, "prefill")
         decode_dirs = sorted(
-            path
-            for path in glob.glob(os.path.join(lora_dir, DECODE_DIR_PATTERN))
-            if os.path.isdir(path)
+            path for path in glob.glob(os.path.join(lora_dir, DECODE_DIR_PATTERN)) if os.path.isdir(path)
         )
         if not os.path.isdir(prefill_dir):
-            raise FileNotFoundError(
-                f"LoRA adapter {adapter_name} prefill directory not found: {prefill_dir}"
-            )
+            raise FileNotFoundError(f"LoRA adapter {adapter_name} prefill directory not found: {prefill_dir}")
         if not decode_dirs:
             raise FileNotFoundError(
                 f'No LoRA adapter {adapter_name} subdirectory containing "decode" found under: {lora_dir}'
@@ -98,22 +90,6 @@ def cosine_distance(data1, data2):
     return cosine_dist
 
 
-def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    """Validates and adjusts FlashAttention parameter values."""
-    llm_val, vit_val = flash_vals
-    if llm_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
-        )
-    if vit_val not in [0, 1]:
-        raise ValueError(
-            f"ViT FlashAttention values only support 0/1, current value:{vit_val}"
-        )
-    if context_length < 2048:
-        llm_val = 0
-    return (llm_val, vit_val)
-
-
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     # fmt: off
@@ -130,7 +106,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--j", dest="j", type=int, default=int(multiprocessing.cpu_count() * 0.7), help="build parallel jobs")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
     parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="build output dir")
-    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 1), help="FlashAttention optimization switches: 1st int = prefill/decode model switch (0=off, 1/2=on), 2nd int = ViT model switch (0=off, 1=on); e.g., --flash_attention 2 1 (prefill&decode=2, ViT=1)")
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 2), help="FlashAttention modes for LLM and ViT; both support 0/1/2")
     parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
     parser.add_argument("--enable_xh2_stable_output", dest="enable_xh2_stable_output", action="store_true", default=False, help="enable stable output")
     parser.add_argument("--mtp", dest="mtp", action="store_true", default=False, help="enable mtp optimization")
@@ -138,25 +114,19 @@ def get_args() -> argparse.Namespace:
     # fmt: on
 
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
-        args.context_length = parse_context_length(
-            model_config.get("context_length", "256k")
-        )
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+        args.context_length = parse_context_length(model_config.get("context_length", "256k"))
+    if args.context_length < 2048:
+        _, vit_flash_attention = args.flash_attention
+        args.flash_attention = (0, vit_flash_attention)
     return args
 
 
@@ -188,15 +158,11 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
         input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        print(
-            f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
-        )
+        print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
         start = time.time()
         module.set_input(input_name, input_data)
         profile["set_input"] += time.time() - start
-    print(
-        f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
-    )
+    print(f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.')
 
     # infer model
     start = time.time()
@@ -218,30 +184,20 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
         start = time.time()
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
-        print(
-            f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
-        )
-        output_files = glob.glob(
-            f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
-        )
+        print(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
+        output_files = glob.glob(f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True)
         output_data_path = os.path.abspath(output_files[0]) if output_files else ""
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
-            golden_output = np.concatenate(
-                [golden_output for i in range(batch)], axis=0
-            )
+            golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
         else:
             result_check = False
-            print(
-                f"[warning] compare canceled while golden data not found -> {output_data_path}"
-            )
+            print(f"[warning] compare canceled while golden data not found -> {output_data_path}")
             continue
         if golden_output.shape == output_data.shape:
             cosine_dist = cosine_distance(golden_output, output_data)
             is_match = (golden_output == output_data).all()
-            print(
-                f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
-            )
+            print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
             if cosine_dist < GOLDEN_THRESH:
@@ -251,9 +207,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
             print(
                 f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}"
             )
-    print(
-        f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
-    )
+    print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
     if not result_check:
         print("[error] result check failed.")
         exit(-1)
@@ -265,9 +219,7 @@ def _first_existing_dir(model_dir: str, names: list[str]) -> str:
         path = os.path.join(model_dir, name)
         if os.path.isdir(path):
             return os.path.abspath(path)
-    raise FileNotFoundError(
-        f"Directory not found under {model_dir}: {' or '.join(names)}"
-    )
+    raise FileNotFoundError(f"Directory not found under {model_dir}: {' or '.join(names)}")
 
 
 @dataclass(frozen=True)
@@ -285,25 +237,18 @@ def discover_model_dirs(model_dir: str, include_mtp: bool = False) -> ModelDirs:
     decode_dirs = sorted(
         os.path.abspath(path)
         for path in glob.glob(os.path.join(model_dir, DECODE_DIR_PATTERN))
-        if os.path.isdir(path)
-        and not any(key in os.path.basename(path) for key in ["mtp", "draft"])
+        if os.path.isdir(path) and not any(key in os.path.basename(path) for key in ["mtp", "draft"])
     )
     if not decode_dirs:
-        raise FileNotFoundError(
-            f'No non-MTP subdirectory containing "decode" found under: {model_dir}'
-        )
+        raise FileNotFoundError(f'No non-MTP subdirectory containing "decode" found under: {model_dir}')
 
     visual_dirs = discover_visual_dirs(model_dir)
 
     mtp_draft_prefill = None
     mtp_draft_decode = None
     if include_mtp:
-        mtp_draft_prefill = _first_existing_dir(
-            model_dir, ["mtp_draft_prefill", "draft_prefill"]
-        )
-        mtp_draft_decode = _first_existing_dir(
-            model_dir, ["mtp_draft_decode", "draft_decode"]
-        )
+        mtp_draft_prefill = _first_existing_dir(model_dir, ["mtp_draft_prefill", "draft_prefill"])
+        mtp_draft_decode = _first_existing_dir(model_dir, ["mtp_draft_decode", "draft_decode"])
 
     return ModelDirs(
         prefill=prefill_dir,
@@ -322,9 +267,7 @@ def discover_lora_model_dirs(model_dir: str) -> ModelDirs:
         )
     lora_dir = lora_dirs[0]
     decode_dirs = sorted(
-        os.path.abspath(path)
-        for path in glob.glob(os.path.join(lora_dir, DECODE_DIR_PATTERN))
-        if os.path.isdir(path)
+        os.path.abspath(path) for path in glob.glob(os.path.join(lora_dir, DECODE_DIR_PATTERN)) if os.path.isdir(path)
     )
     visual_dirs = discover_visual_dirs(model_dir)
     return ModelDirs(
@@ -338,8 +281,7 @@ def discover_visual_dirs(model_dir: str) -> list[str]:
     return sorted(
         os.path.abspath(path)
         for path in glob.glob(os.path.join(model_dir, "vis*"))
-        if os.path.isdir(path)
-        and any(key in os.path.basename(path) for key in ["vision", "visual"])
+        if os.path.isdir(path) and any(key in os.path.basename(path) for key in ["vision", "visual"])
     )
 
 
@@ -371,17 +313,13 @@ def restore_lora_build_dirs(backup_dirs: list[tuple[str, str]]) -> None:
             shutil.move(backup_dir, lora_dir)
 
 
-def rename_lora_input_dirs(
-    output_dir: str, model_name: str, model_size: str, adapter_name: str
-) -> None:
+def rename_lora_input_dirs(output_dir: str, model_name: str, model_size: str, adapter_name: str) -> None:
     adapter_suffix = sanitize_name(adapter_name)
     for stage in ["prefill", "decode"]:
         source_dir = os.path.join(output_dir, f"{model_name}-{model_size}_{stage}_lora_input")
         if not os.path.exists(source_dir):
             continue
-        target_dir = os.path.join(
-            output_dir, f"{model_name}-{model_size}_{adapter_suffix}_{stage}_lora_input"
-        )
+        target_dir = os.path.join(output_dir, f"{model_name}-{model_size}_{adapter_suffix}_{stage}_lora_input")
         if os.path.exists(target_dir):
             shutil.rmtree(target_dir)
         shutil.move(source_dir, target_dir)
@@ -439,9 +377,7 @@ def build_lora_adapters(
         return model_dirs
 
     try:
-        return build_backed_up_lora_adapters(
-            lora_build_dirs, model_dir, output_dir, model_name, model_size, run_build
-        )
+        return build_backed_up_lora_adapters(lora_build_dirs, model_dir, output_dir, model_name, model_size, run_build)
     finally:
         restore_lora_build_dirs(lora_backup_dirs)
 
@@ -493,23 +429,17 @@ if __name__ == "__main__":
     model_dirs = None
 
     if args.stage == "build" or args.stage == "all":
-        assert (
-            get_platform() == "x86_64"
-        ), f"Only supported for compilation on the x86_64 platform."
+        assert get_platform() == "x86_64", f"Only supported for compilation on the x86_64 platform."
 
         def build_visual() -> None:
             for visual_dir in discover_visual_dirs(model_dir):
                 build_kwargs = {
                     "hmonnx": find_hmonnx_file(visual_dir),
-                    "hmm_name": _get_visual_model_name(
-                        model_name, model_size, visual_dir
-                    ),
+                    "hmm_name": _get_visual_model_name(model_name, model_size, visual_dir),
                     "flash_attn": vit_flash_attention,
                 }
                 print(f'\n===> {build_kwargs["hmm_name"]} build start...')
-                Xh2Exec.build_from_hmonnx(
-                    output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs
-                )
+                Xh2Exec.build_from_hmonnx(output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs)
 
         def run_build() -> ModelDirs:
             current_model_dirs = (
@@ -529,9 +459,7 @@ if __name__ == "__main__":
                         "context_length": args.context_length,
                         "prefill_length": args.prefill_length,
                         "ndevice": ndevice,
-                        "enable_common_subgraph": (
-                            args.enable_common_subgraph if not args.mtp else False
-                        ),
+                        "enable_common_subgraph": (args.enable_common_subgraph if not args.mtp else False),
                         "enable_xh2_stable_output": args.enable_xh2_stable_output,
                         "llm_opt": True,
                     },
@@ -564,9 +492,7 @@ if __name__ == "__main__":
 
             for build_kwargs in build_tasks:
                 print(f'\n===> {build_kwargs["hmm_name"]} build start...')
-                Xh2Exec.build_from_hmonnx(
-                    output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs
-                )
+                Xh2Exec.build_from_hmonnx(output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs)
             return current_model_dirs
 
         build_visual()
@@ -597,8 +523,7 @@ if __name__ == "__main__":
             (f"{model_name}-{model_size}_decode", model_dirs.decode),
         ]
         test_tasks.extend(
-            (_get_visual_model_name(model_name, model_size, visual_dir), visual_dir)
-            for visual_dir in model_dirs.visual
+            (_get_visual_model_name(model_name, model_size, visual_dir), visual_dir) for visual_dir in model_dirs.visual
         )
         for test_model_name, test_model_dir in test_tasks:
             test(test_model_name, test_model_dir, output_dir, profile)
