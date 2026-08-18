@@ -2,6 +2,16 @@
 
 本目录提供 MiniCPM-V 4.5 的模型下载、W8A8 量化和 HMONNX 导出流程。MiniCPM-V 4.5 使用独立的 Qwen3 文本底座 workflow，不与 MiniCPM-V 4.6 的 Qwen3.5 workflow 混用。
 
+本例使用的第三方预训练模型信息如下：
+
+- 模型名称：[MiniCPM-V 4.5](https://www.modelscope.cn/models/OpenBMB/MiniCPM-V-4_5)
+- 来源：[OpenBMB/MiniCPM-V-4_5](https://www.modelscope.cn/models/OpenBMB/MiniCPM-V-4_5)
+- 许可：[Apache License 2.0](https://github.com/OpenBMB/MiniCPM-V/blob/main/LICENSE)
+
+预训练模型在运行时从上游来源下载，不随本工程发布。本工程的 Apache License 2.0
+不替代或扩展第三方模型的许可；用户使用、修改、打包或再分发模型及其衍生产物时，
+应自行核对并遵守上游许可证、模型卡和适用的使用条款。
+
 ## 模型下载
 
 ```bash

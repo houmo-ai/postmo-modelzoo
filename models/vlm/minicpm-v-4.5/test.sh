@@ -17,6 +17,17 @@ NDEVICE=1
 parse_args "$@"
 cd "${SCRIPT_DIR}"
 
+run_get_model() {
+    local file_type="$1"
+    local get_model_args=(
+        --type "${file_type}"
+        --model_name "${MODEL_NAME}"
+        --model_size "${MODEL_SIZE}"
+        --ndevice "${NDEVICE}"
+    )
+    python3 get_model.py "${get_model_args[@]}"
+}
+
 TEST_VENV_ACTIVE=0
 dir_path="minicpm_venv"
 setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} quant build"
@@ -25,25 +36,32 @@ check_step_python_packages || exit 1
 if should_run_step "quant"; then
     check_gpu require || exit 1
     if ! should_skip_download; then
-        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        run_get_model raw
     fi
     python3 ptq.py
 fi
 
 if should_run_step "build"; then
-    python3 build.py \
-        --model_name "${MODEL_NAME}" \
-        --model_size "${MODEL_SIZE}" \
+    build_args=(
+        --model_name "${MODEL_NAME}"
+        --model_size "${MODEL_SIZE}"
         --ndevice "${NDEVICE}"
+    )
+    python3 build.py "${build_args[@]}"
 fi
 
 if should_run_step "demo"; then
     if [[ "$STEP" == "demo" ]] && ! should_skip_download; then
         echo "Download pre-compiled model."
-        python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+        run_get_model hmm
     fi
     echo "Execute python demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    demo_args=(
+        --model_name "${MODEL_NAME}"
+        --model_size "${MODEL_SIZE}"
+        --ndevice "${NDEVICE}"
+    )
+    python3 demo.py "${demo_args[@]}"
 
     python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
     if command -v llm_perf &>/dev/null; then
