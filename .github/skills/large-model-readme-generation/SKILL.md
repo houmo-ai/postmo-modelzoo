@@ -19,7 +19,7 @@ description: 用于生成、修改、重构和检查 imodelzoo 大模型示例 R
 - `models/ocr/glm-ocr/README.MD`
 - `models/ocr/paddleocr-vl/README.MD`
 - `models/omni/**/README.MD`
-- 与 README 描述强相关的 `get_model.py`、`ptq.py`、`build.py`、`demo.py`、`test.sh`
+- 与 README 描述强相关的 `get_model.py`、`ptq.py`、`build.py`、根目录或 `python/` 下的 Demo、`test.sh`
 
 不适用于以下非大模型示例目录：
 
@@ -48,7 +48,7 @@ description: 用于生成、修改、重构和检查 imodelzoo 大模型示例 R
 2. 目标目录下的 `get_model.py`
 3. 目标目录下的 `ptq.py`（若存在）
 4. 目标目录下的 `build.py`
-5. 目标目录下的 `demo.py`
+5. 目标目录和 `python/` 子目录下实际存在的 Demo 脚本
 6. 目标目录下的 `test.sh`
 
 若需要选择参考模板，再补读同类型模型中格式较完整的 README。
@@ -188,14 +188,16 @@ python3 build.py
 
 xxx 模型使用 python API 进行演示。
 
-1. `demo.py` 默认从 `config.yaml` 推导 `tokenizer_dir`，并默认读取：
+1. 实际 Demo 入口默认从 `config.yaml` 推导 `tokenizer_dir`，并默认读取：
 - `output/${HOUMO_TARGET}/xxx.hmm`
 - ...
 
 2. 执行脚本，推理完成将输出性能结果。
 ```bash
-python3 demo.py
+python3 <实际-demo-路径>
 ```
+
+命令必须按当前目录结构填写：存在 `python/demo.py` 时使用 `python3 python/demo.py`；否则使用根目录 `python3 demo.py`。自定义 Demo 同样使用实际路径，不要因为历史模板固定写根目录入口。
 
 ## 3 一键评估              ← 注意：一键评估现在是第3章，不是 2.6
 
@@ -429,10 +431,11 @@ ls -la models/xxx/*/README.MD
 完成 README 修改后，至少确认以下几点：
 
 1. README 中引用的脚本、参数名、默认值能在对应脚本中找到。
-2. README 中列出的输出文件名与 `build.py` 或 `test.sh` 真实产物一致。
-3. README 中 `test.sh` 参数列表只覆盖当前模型脚本实际消费的参数，而不是共享解析器中的参数超集。
-4. README 中的 ModelScope 链接、免责声明和章节顺序没有偏离仓库主流格式（新结构）。
-5. 章节编号正确：1-模型说明、2-快速开始、3-一键评估、4-参考结果、5-免责声明。
+2. Demo 命令指向当前实际入口；根目录与 `python/` 同名脚本并存时，按模型测试的 `python/` 优先规则记录 `python/<script>`。
+3. README 中列出的输出文件名与 `build.py` 或 `test.sh` 真实产物一致。
+4. README 中 `test.sh` 参数列表只覆盖当前模型脚本实际消费的参数，而不是共享解析器中的参数超集。
+5. README 中的 ModelScope 链接、免责声明和章节顺序没有偏离仓库主流格式（新结构）。
+6. 章节编号正确：1-模型说明、2-快速开始、3-一键评估、4-参考结果、5-免责声明。
 
 ## 注意事项
 

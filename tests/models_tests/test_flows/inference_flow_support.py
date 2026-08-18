@@ -59,10 +59,23 @@ __all__ = [
     "common_skip_reason",
     "prepare_inference_workspace",
     "release_hmm_case_ids",
+    "resolve_python_script",
     "unproduced_demo_artifact_refs",
     "validate_python_compiled_artifacts",
     "validated_result",
 ]
+
+
+def resolve_python_script(workspace: Path, script, *, default: str) -> str:
+    """Prefer a matching script below ``python/`` over the model-root script."""
+    script_name = str(script) if script not in (None, "default") else default
+    script_path = Path(script_name)
+    if script_path.is_absolute() or ".." in script_path.parts:
+        return script_name
+    if script_path.parts and script_path.parts[0] == "python":
+        return script_name
+    python_script = Path("python") / script_path
+    return python_script.as_posix() if (workspace / python_script).is_file() else script_name
 
 
 def common_skip_reason(request: FlowRequest, flow: ModelFlow, family: ModelFamily) -> str | None:
@@ -114,10 +127,7 @@ def validate_python_compiled_artifacts(request: FlowRequest, services) -> list[s
         params,
         location=f"{request.config.model_name}.compile_params.{backend}",
     )
-    failures = (
-        _python_compiled_artifact_failure(request, services, backend, case)
-        for case in matrix.cases
-    )
+    failures = (_python_compiled_artifact_failure(request, services, backend, case) for case in matrix.cases)
     return [failure for failure in failures if failure is not None]
 
 
@@ -160,10 +170,7 @@ def _python_compiled_artifact_failure(
         directory,
     ):
         return None
-    return (
-        f"compiled artifact case {case.index} is {inspection.status.value}: "
-        f"{inspection.reason} ({directory})"
-    )
+    return f"compiled artifact case {case.index} is {inspection.status.value}: " f"{inspection.reason} ({directory})"
 
 
 def _publish_legacy_compiled_artifact(request, services, resolved, directory: Path) -> bool:
@@ -223,10 +230,7 @@ def release_hmm_case_ids(request: FlowRequest) -> frozenset[str]:
         and (not release or str(case.values.get("source_type") or "").lower() != "modelscope")
         if (case_id := get_model_case_artifact_id(case))
     }
-    referenced = {
-        case_id
-        for _, case_id in request.config.referenced_artifact_case_refs(backend)
-    }
+    referenced = {case_id for _, case_id in request.config.referenced_artifact_case_refs(backend)}
     return frozenset(available & referenced)
 
 

@@ -142,24 +142,16 @@ if should_run_step "demo"; then
     }
 
     echo "Execute demo."
+    demo_args=(--model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}")
     if [ "${MTP}" = "true" ]; then
-        demo_args=(
-            --model_name "${MODEL_NAME}"
-            --model_size "${MODEL_SIZE}"
-        )
+        
         demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
-        python3 demo_mtp.py "${demo_args[@]}"
         python3 python/demo_mtp.py "${demo_args[@]}"
     else
-        demo_args=(
-            --model_name "${MODEL_NAME}"
-            --model_size "${MODEL_SIZE}"
-        )
         if [ "${LORA}" = "true" ]; then
             demo_args+=(--lora)
         fi
         demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
-        python3 demo.py "${demo_args[@]}"
         python3 python/demo.py "${demo_args[@]}"
         if [ "${LORA}" = "true" ]; then
             echo "Skip prefix caching, cpp demo, and llm_perf in LoRA mode."

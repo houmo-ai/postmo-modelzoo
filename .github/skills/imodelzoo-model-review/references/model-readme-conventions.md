@@ -44,7 +44,7 @@
 ### 配置、命令和产物一致性
 
 - README 中的默认 model name/size、batch、context/prefill length、device 数、quant type 和路径必须与 `config.yaml` 及脚本解析结果一致。
-- `get_model.py`、`ptq.py`、`build.py`、`demo.py` 的 option 拼写、默认值和执行目录必须可直接执行；不要假定连字符和下划线参数等价。
+- `get_model.py`、`ptq.py`、`build.py` 和实际有效 Demo 入口的 option 拼写、默认值和执行目录必须可直接执行；Demo 可能位于根目录或 `python/`。README 命令必须指向真实入口，不要假定连字符和下划线参数等价。
 - 需要 GPU 的默认量化流程必须说明 CUDA 前提、带 `--gpus` 的 docker 命令，以及进入容器后执行 `source env.sh`、切换到当前模型目录并运行 `ptq.py` 的完整步骤。
 - 编译章节列出 build 实际生成的全部关键 HMM/HMMS 文件；Demo 章节列出或解释其实际消费的模型、tokenizer/processor、embedding、scheduler 和其他依赖。
 - `test.sh` 参数表只列当前模型脚本真正消费并透传的参数；默认 `demo`、`all`、`--skip_download` 和专有模式的说明必须与脚本一致。

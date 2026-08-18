@@ -49,6 +49,7 @@ from ..model_workflow.backend_flow_policies import FamilyFlowPolicy, should_chec
 from .artifact_preparation import ensure_inference_artifacts
 from .inference_flow_support import (
     common_skip_reason,
+    resolve_python_script,
     validated_result,
 )
 from .hmatc_flow_support import persist_separate_workspace, run_hmatc_cases
@@ -317,7 +318,11 @@ def _run_python_demo_cases(request, services, workspace, python, demo_name):
                 request.context.result_cache_dir,
             )
             script = resolved.values.get("script")
-            script_name = str(script) if script not in (None, "default") else f"{demo_name}.py"
+            script_name = resolve_python_script(
+                workspace,
+                script,
+                default=f"{demo_name}.py",
+            )
             result = services.command_runner.run(
                 CommandSpec(
                     f"{demo_name}[{case.index}]",

@@ -93,6 +93,7 @@ class _PrefillNames:
 
         self.recurrent_state_in = [name for _, name in recurrent_in]
         self.recurrent_layer_by_input = {name: layer for layer, name in recurrent_in}
+        self.recurrent_in_by_layer = {layer: name for layer, name in recurrent_in}
         recurrent_out_by_layer = {layer: name for layer, name in recurrent_out}
         self.recurrent_out_by_input = {
             name: recurrent_out_by_layer[layer]
@@ -433,12 +434,16 @@ class Qwen36MtpModule(HoumoModule):
             )
         self._validate_and_bind_mtp_cache()
 
-    def _propagate_prefill_recurrent_cache(self) -> None:
+    def _propagate_prefill_cache(self) -> None:
         for input_name in self._prefill_names.conv_cache_in:
             output_name = self._prefill_names.conv_out_by_input.get(input_name)
             if output_name is None:
                 raise RuntimeError(f"missing prefill conv output for input {input_name}")
             self.prefill.set_input(input_name, self.prefill.get_dev_output(output_name))
+
+        if not self._prefill_names.recurrent_out_by_layer:
+            return
+
         for input_name in self._prefill_names.recurrent_state_in:
             output_name = self._prefill_names.recurrent_out_by_input.get(input_name)
             if output_name is None:
@@ -446,7 +451,7 @@ class Qwen36MtpModule(HoumoModule):
             self.prefill.set_input(input_name, self.prefill.get_dev_output(output_name))
 
     def prepare_verify_from_prefill(self) -> None:
-        """Point verify recurrent inputs at the latest prefill outputs."""
+        """Point verify recurrent inputs at the latest prefill cache tensors."""
         for input_name in self._verify_names.conv_cache_in:
             key = self._verify_names.conv_key_by_input[input_name]
             output_name = self._prefill_names.conv_out_by_key.get(key)
@@ -454,13 +459,44 @@ class Qwen36MtpModule(HoumoModule):
                 raise RuntimeError(f"missing prefill conv output for verify input {input_name}")
             self._assert_output_input_compatible(self.prefill, output_name, self.verify, input_name)
             self.verify.set_input(input_name, self.prefill.get_dev_output(output_name))
+
+        if self._prefill_names.recurrent_out_by_layer:
+            recurrent_names = self._prefill_names.recurrent_out_by_layer
+            get_recurrent_state = self.prefill.get_dev_output
+            assert_compatible = self._assert_output_input_compatible
+            source_type = "output"
+        else:
+            recurrent_names = self._prefill_names.recurrent_in_by_layer
+            get_recurrent_state = self.prefill.get_dev_input
+            assert_compatible = self._assert_input_input_compatible
+            source_type = "input"
+
         for input_name in self._verify_names.recurrent_state_in:
             layer = self._verify_names.recurrent_layer_by_input[input_name]
-            output_name = self._prefill_names.recurrent_out_by_layer.get(layer)
-            if output_name is None:
-                raise RuntimeError(f"missing prefill recurrent output for verify input {input_name}")
-            self._assert_output_input_compatible(self.prefill, output_name, self.verify, input_name)
-            self.verify.set_input(input_name, self.prefill.get_dev_output(output_name))
+            recurrent_name = recurrent_names.get(layer)
+            if recurrent_name is None:
+                raise RuntimeError(f"missing prefill recurrent {source_type} for verify input {input_name}")
+            assert_compatible(self.prefill, recurrent_name, self.verify, input_name)
+            self.verify.set_input(input_name, get_recurrent_state(recurrent_name))
+
+    @staticmethod
+    def _assert_input_input_compatible(
+        source_model,
+        source_name: str,
+        input_model,
+        input_name: str,
+    ) -> None:
+        source = source_model.get_dev_input(source_name).info
+        target = input_model.get_dev_input(input_name).info
+        if tuple(source.shape) != tuple(target.shape):
+            raise RuntimeError(
+                f"cache shape differs: input {source_name} {tuple(source.shape)} "
+                f"vs input {input_name} {tuple(target.shape)}"
+            )
+        if _numpy_dtype(source.dtype) != _numpy_dtype(target.dtype):
+            raise RuntimeError(
+                f"cache dtype differs: input {source_name} {source.dtype} " f"vs input {input_name} {target.dtype}"
+            )
 
     @staticmethod
     def _assert_output_input_compatible(
@@ -524,9 +560,7 @@ class Qwen36MtpModule(HoumoModule):
     @staticmethod
     def _input_bindings(stage: str, names, tensors) -> tuple[tuple[str, Any], ...]:
         if len(tensors) != 7:
-            raise ValueError(
-                f"{stage} expects 7 semantic tensors, got {len(tensors)}"
-            )
+            raise ValueError(f"{stage} expects 7 semantic tensors, got {len(tensors)}")
         if stage in ("prefill", "verify"):
             bindings = (
                 (names.activation, tensors[0]),
@@ -599,7 +633,7 @@ class Qwen36MtpModule(HoumoModule):
                 raise ValueError(f"current_length must be in [1, {self.prefill_length}], " f"got {current_length}")
             logits = logits[:, :current_length, :].copy()
             hidden = hidden[:, :current_length, :].copy()
-            self._propagate_prefill_recurrent_cache()
+            self._propagate_prefill_cache()
         return StageOutputs(tensors=(logits, hidden), metadata=metadata)
 
 

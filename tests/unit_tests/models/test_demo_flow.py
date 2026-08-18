@@ -311,6 +311,11 @@ def test_demo_workspaces_are_isolated_and_cleaned(tmp_path: Path, monkeypatch) -
         "# shared test.sh functions\n", encoding="utf-8"
     )
     (source / "demo.py").write_text("print('demo')\n", encoding="utf-8")
+    (source / "python").mkdir()
+    (source / "python" / "demo.py").write_text(
+        "print('python demo')\n",
+        encoding="utf-8",
+    )
     (source / "test.sh").write_text("#!/bin/sh\n", encoding="utf-8")
     config = ModelConfig(
         model_name="demo",
@@ -375,6 +380,7 @@ def test_demo_workspaces_are_isolated_and_cleaned(tmp_path: Path, monkeypatch) -
             if command.name.startswith("demo["):
                 assert not (command.cwd / "test-sh-output").exists()
                 assert not (command.cwd / "test_common.sh").exists()
+                assert command.argv[1] == "python/demo.py"
             if command.name.startswith("test-sh") and shell_should_fail:
                 return CommandResult(command, 7, "failed\n", "", 0.01)
             return CommandResult(command, 0, "ok\n", "", 0.01)

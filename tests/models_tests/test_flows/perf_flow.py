@@ -52,6 +52,7 @@ from ..model_workflow.backend_flow_policies import FamilyFlowPolicy, should_chec
 from .artifact_preparation import ensure_inference_artifacts
 from .inference_flow_support import (
     common_skip_reason,
+    resolve_python_script,
     validated_result,
 )
 from .hmatc_flow_support import persist_separate_workspace, run_hmatc_cases
@@ -96,15 +97,11 @@ class PerfFlowHandler:
                 request.context.diagnostic.backend, request.context.platform
             )
             python = prepare_python_environment(workspace, request.context.log_file, activated=True)
-            results, case_failures = _run_perf_runner(
-                request, services, workspace, python, behavior
-            )
+            results, case_failures = _run_perf_runner(request, services, workspace, python, behavior)
             commands.extend(results)
             failures.extend(case_failures)
             if not failures:
-                validation, parse_failures = _validate_perf_result(
-                    behavior, baseline, results, request
-                )
+                validation, parse_failures = _validate_perf_result(behavior, baseline, results, request)
                 failures.extend(parse_failures)
 
         if validation is not None and failures:
@@ -126,14 +123,16 @@ def _run_perf_runner(request, services, workspace, python, behavior):
     """Dispatch to the configured performance runner."""
     if behavior.runner == "hmatc":
         return run_hmatc_cases(
-            request, services, workspace, section_name="hmperf_params",
-            subcommand="perf", environment=python.environment,
+            request,
+            services,
+            workspace,
+            section_name="hmperf_params",
+            subcommand="perf",
+            environment=python.environment,
         )
     if behavior.runner == "demo":
         return _run_python_perf_case(request, services, workspace, python)
-    return _run_custom_perf_case(
-        request, services, workspace, python, behavior.custom_script
-    )
+    return _run_custom_perf_case(request, services, workspace, python, behavior.custom_script)
 
 
 def _validate_perf_result(behavior, baseline, results, request):
@@ -170,7 +169,7 @@ def _run_python_perf_case(request, services, workspace, python):
         request.context.result_cache_dir,
     )
     script = case.values.get("script")
-    script_name = str(script) if script not in (None, "default") else "demo.py"
+    script_name = resolve_python_script(workspace, script, default="demo.py")
     lock_file = request.context.result_cache_dir / "lock.lock"
     request.context.result_cache_dir.mkdir(parents=True, exist_ok=True)
     with ModelResourceLock(str(lock_file), ModelResourceLock.LockMode.WRITE, "execute demo perf"):
@@ -226,12 +225,17 @@ def _run_custom_perf_case(request, services, workspace, python, specification):
         resolved.index,
         {key: resolved.values[key] for key in specification.parameter_keys},
     )
+    script_name = resolve_python_script(
+        workspace,
+        specification.script,
+        default=specification.script,
+    )
     result = services.command_runner.run(
         CommandSpec(
             f"custom-perf[{resolved.index}]",
             (
                 python.executable,
-                specification.script,
+                script_name,
                 *render_case_options(selected),
             ),
             cwd=workspace,

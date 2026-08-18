@@ -29,7 +29,7 @@
 
 - 大模型脚本体系主要位于 `models/llm/**`、`models/tts/**`、`models/vlm/**`、`models/diffusion/**`、`models/asr/**`、`models/embedding/**`、`models/omni/**`、`models/reranker/**`、`models/ocr/**`。
 - CV 与 HMATC 体系主要位于 `models/backbone/**`、`models/detection/**`、`models/segmentation/**`、`models/estimation/**`、`models/autodrive/**`、`models/ocr/**`。
-- 目录出现 `config.yaml`、`ptq.py`、`build.py`、`demo.py` 且阶段由模型脚本实现时，按大模型脚本体系评审。
+- 目录出现 `config.yaml`、`ptq.py`、`build.py`，并由根目录 `demo.py` 或 `python/demo.py` 等模型脚本实现推理阶段时，按大模型脚本体系评审。
 - 目录出现 `config.yml`、`model_impl.py`、`dataset.py` 且阶段由 `hmatc` 执行时，按 CV 与 HMATC 体系评审。
 - 混合或迁移中的示例按实际入口逐段检查，不要为了统一外观要求无关重构。
 
@@ -45,17 +45,17 @@ config.yaml
 get_model.py
 ptq.py
 build.py
-demo.py
+[python/]demo.py
 test.sh
 requirements.txt
 ```
 
-按模型能力允许缺少某个阶段，也允许存在 `demo_base.py`、`demo_mtp.py`、`demo_multibatch.py`、`quant_pipeline.py`、`cpp/` 等明确命名的变体。不要要求不支持量化的模型补空 `ptq.py`，也不要将专项 Demo 逻辑硬塞回 `demo.py`。
+标准 Demo 可以位于模型根目录或 `python/` 子目录，两者也可以在迁移期间并存。按模型能力允许缺少某个阶段，也允许存在 `demo_base.py`、`demo_mtp.py`、`demo_multibatch.py`、`quant_pipeline.py`、`cpp/` 等明确命名的变体。不要要求不支持量化的模型补空 `ptq.py`，也不要将专项 Demo 逻辑硬塞回 `demo.py`。
 
 评审文件命名时检查：
 
 - 使用 `config.yaml`，不要在同一大模型示例中同时引入 `config.yml` 作为第二套真值。
-- 保持阶段脚本名为 `get_model.py`、`ptq.py`、`build.py`、`demo.py`，除非专项脚本确实表达独立运行模式。
+- 保持阶段脚本 basename 为 `get_model.py`、`ptq.py`、`build.py`、`demo.py`；标准 Demo 可位于根目录或 `python/`，专项脚本确实表达独立运行模式时使用明确 basename。
 - 专项脚本名应表达差异，如 `demo_base.py`、`demo_mtp.py`、`demo_multibatch.py`，并在 `test.sh`、测试 JSON 和 README 中使用同一名称。
 - 不提交日志、临时副本、下载模型、编译产物或手工输出图片作为实现文件；示例基准资产确有必要时要求有明确用途和文档。
 
@@ -100,7 +100,7 @@ model_configs:
 
 评审时检查：
 
-- `--config` 默认指向脚本同目录的 `config.yaml`，从其他工作目录启动时仍可定位。
+- `--config` 默认指向模型示例根目录的 `config.yaml`。根目录脚本通常使用脚本同目录，`python/` 下的脚本应按自身位置回到模型根目录；从其他工作目录启动时仍可定位。
 - `--model_name` 和 `--model_size` 未提供时使用配置默认值；显式提供时选择对应 `model_configs` 条目。
 - 不支持的 name/size 组合应尽早报错，并列出可用值；不要让空字典延迟到模型加载阶段失败。
 - CLI 的 `0`、`false`、空 list 等合法值不会因 truthy/falsy 写法被错误替换。
@@ -109,6 +109,7 @@ model_configs:
 - `ptq.py` 的输入模型、输出目录、quant type、context/prefill length、校准参数和子模型选择正确透传。
 - `build.py` 的 model dir、output dir、batch、ncore、ndevice、context/prefill length 和 stage 正确透传。
 - `demo.py` 的 HMM、embedding/tokenizer/processor、device、sampling 或任务参数从 CLI 到运行对象保持一致。
+- 根目录与 `python/` 下同名 Demo 并存时分别检查其真实实现；测试覆盖判断以 runner 实际选择的 `python/` 版本为准，不能用根目录旧实现替代。
 - 保留已经公开的 option 拼写。部分脚本使用 `--model_name`，部分量化脚本存在 `--model-name`；测试、`test.sh` 和 README 必须匹配实际 parser，不要假定下划线和连字符可互换。
 
 ### 产物命名
@@ -289,6 +290,7 @@ hmeval_params
 - JSON key 与实际 Python/C++/HMATC option 名一致；连字符和下划线按 runner 生成规则精确匹配。
 - column-oriented 参数数组长度表达正确用例组合，不能因长度错位把不同模型变体的参数拼在一起。
 - `null`、`default`、boolean 和 script 字段符合测试 runner 的跳过/生成语义。
+- Python demo/perf runner 对任意相对脚本名先检查 `python/<script>`，存在则使用该入口，否则使用根目录 `<script>`；绝对路径、包含 `..` 的路径和已经以 `python/` 开头的路径不再改写。评审 JSON 时按解析后的有效入口核对 CLI。
 - `test_sh_params` 中每组参数都能被目标 `test.sh` 消费，并覆盖默认和重要非默认分支。
 - `support_flow`、`support_hmatc`、backend、platform、core/device/memory marker 与真实能力一致。
 - 生产阶段输出路径与后续 Demo/Compare/Eval 配置中的 `cached_results` 路径一致。
@@ -309,7 +311,7 @@ hmeval_params
    - `get_model.py` 通常对应 `get_model_params`；
    - `ptq.py` 通常对应 `quant_params`；
    - `build.py` 通常对应 `compile_params`；
-   - `demo.py`、`demo_multibatch.py` 和专项 Demo 通常对应 `demo_params`、`demo_multibatch_params` 或 `<demo_name>_params`；
+   - 根目录或 `python/` 下的 `demo.py`、`demo_multibatch.py` 和专项 Demo 通常对应 `demo_params`、`demo_multibatch_params` 或 `<demo_name>_params`；
    - 性能入口通常对应 `perf_params`；
    - `test.sh` 的原始参数组合对应 `test_sh_params`；
    - CV/HMATC 流程对应 `hmquant_params`、`hmbuild_params`、`hmdemo_params`、`hmcompare_params`、`hmperf_params` 和 `hmeval_params`。

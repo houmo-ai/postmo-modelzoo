@@ -87,7 +87,7 @@ Qwen3-ASR
 7. 具体 Engine、Process、Module 直接继承基础类，不增加空任务中间层或 Runner。
 8. 无法从原 Demo 证明的行为不得自行补充。
 9. 缺少模型资产或 NPU 时，只能声明完成静态迁移和无硬件验证，不能声明真实行为或性能已对齐。
-10. 不修改与迁移无关的量化、编译、下载或测试框架代码。
+10. 不修改与迁移无关的量化、编译、下载或测试框架代码。当前模型测试会对相对 Demo basename 自动优先选择 `python/` 下同名脚本，不要为单个模型重复实现路径特判。
 
 默认不得修改：
 
@@ -586,6 +586,8 @@ qwen3_asr.py
 
 原始 Demo 继续保留；除非用户明确要求，本 Gate 不修改 `test.sh` 的默认入口。
 
+检查 `tests/models_tests/model_configs/model_cfg_<model>.json` 的 Demo 配置：默认 `demo.py` 和 `script` 指定的相对 basename 都会优先解析到模型目录的 `python/` 子目录，不存在才回退根目录。新 Demo 保持原 basename 时通常不需要修改 JSON；只有 basename 或 CLI contract 改变时才同步 `script` 和参数列。README 若介绍新入口，应使用实际命令，例如 `python3 python/demo.py`。
+
 Gate 6 完成标准：新 Demo 可独立执行，旧 Demo 仍存在，导入路径和公开类型正确。
 
 ## Cache 对齐检查表
@@ -882,6 +884,7 @@ PYTHONDONTWRITEBYTECODE=1 python <command>
 - [ ] 原始 Demo 已审计且保留。
 - [ ] 已记录图、cache、Sampling、streaming 和性能边界。
 - [ ] 新 Demo 位于模型目录 `python/` 下。
+- [ ] 已确认 models_tests 按 `python/` 优先规则选中新 Demo；仅在 basename 或 CLI 改变时更新 JSON。
 - [ ] Demo 只组合一个 Engine。
 - [ ] Demo 和 Engine 统一使用 `generate()`。
 - [ ] CLI 与原 Demo 兼容或差异已说明。

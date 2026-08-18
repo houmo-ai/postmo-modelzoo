@@ -1,6 +1,6 @@
 ---
 name: imodelzoo-model-review
-description: "Perform static semantic review of end-to-end model example changes in iModelzoo. Use for changes under models/**, related tests/models_tests/** configurations and pytest entries, config/imodelExampleConfig.yaml, model aggregation manifests, large-model config.yaml/get_model.py/ptq.py/build.py/demo.py workflows, CV config.yml/model_impl.py/dataset.py HMATC workflows, test.sh, or model README files."
+description: "Perform static semantic review of end-to-end model example changes in iModelzoo. Use for changes under models/**, related tests/models_tests/** configurations and pytest entries, config/imodelExampleConfig.yaml, model aggregation manifests, large-model config.yaml/get_model.py/ptq.py/build.py/demo.py or python/demo.py workflows, CV config.yml/model_impl.py/dataset.py HMATC workflows, test.sh, or model README files."
 ---
 
 # iModelzoo Model Review
@@ -51,6 +51,7 @@ config / CLI
 - 对齐 FP、W8A8、W4A16 等精度名称以及 ONNX/HMONNX/HMM 等产物名。
 - 对齐 batch、sequence/context/prefill length、dynamic shape、device/core 数和目标平台。
 - 检查 `test.sh`、Python CLI、C++ CLI、测试 JSON 和 README 的默认值及 flag 拼写。
+- 修改或新增 Python Demo 时，先按测试 runner 的解析规则确定有效入口：相对脚本名优先使用模型目录下的 `python/<script>`，不存在时才回退根目录 `<script>`；不要仅因根目录缺少 `demo.py` 报告 finding。
 - 如果本次修改 Python 脚本或 C++ 程序的 CLI 入参名称、alias、`dest`、位置参数、required/default/类型或 boolean 语义，必须沿测试 runner 的命令生成逻辑检查对应 `tests/models_tests/model_configs/model_cfg_<model>.json`。确认受影响的 `get_model_params`、`quant_params`、`compile_params`、`demo_params`、`demo_multibatch_params`、`perf_params`、`test_sh_params` 或 HMATC 参数段是否仍生成目标 parser 接受的参数；有影响时要求在同一变更中同步更新 JSON。
 - 如果 `test.sh` 在任一声明支持的阶段调用了 parser 不再接受的 option、错误入口或不存在的产物，使该阶段确定性失败，按 `imodelzoo-code-review` 定为 P0；不要因为默认 `STEP` 是其他阶段、修复只需统一 flag，或用户可以手工改命令而降级。
 - 检查大模型的显式 CLI > `config.yaml` > 安全默认值优先级，或 CV 的显式 HMATC CLI override > `config.yml` 优先级没有被反转。
@@ -100,6 +101,7 @@ config / CLI
 - 检查模型配置 JSON 是否覆盖变更涉及的 get/quant/compile/demo/compare/eval/perf 阶段。
 - 对所有 Python/C++ CLI 入参变更，检查模型 JSON 中直接生成 CLI option 的 key、`test_sh_params` 中的原始参数以及 runner 特殊消费字段是否需要同步；不能只检查 `test.sh` 和 README。
 - 检查 `test_sh_params`、Python Demo 参数组、backend 分支、prerequisite 和 skip 条件是否与实现一致。
+- 检查测试实际选中的 Python Demo，而不是只检查 JSON 字面路径。`script` 未配置时默认名为 `demo.py`；配置 `demo_asr.py` 等相对自定义入口时同样优先解析 `python/demo_asr.py`。只有入口 basename 或 CLI contract 改变时才要求同步 JSON，不要为了选择 `python/` 版本机械增加 `script` 列。
 - 检查 pytest marker、model name、device 数和显存要求是否正确注册。
 - 检查 `config/imodelExampleConfig.yaml` 和聚合模型清单是否需要同步。
 - 确认测试执行了变更路径并验证产物或结果，而不只是进程成功退出。

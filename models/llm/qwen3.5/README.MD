@@ -40,7 +40,7 @@
 
 本例只适用于xh2。
 
-当前目录使用 `config.yaml` 管理 `get_model.py`、`ptq.py`、`build.py`、`demo.py` 和 `demo_mtp.py` 的模型默认值。每个 `model_name` / `model_size` 节点通过 `workflow_config` 指定 `configs_merak` 中的量化导出配置。当前默认模型为：
+当前目录使用 `config.yaml` 管理 `get_model.py`、`ptq.py`、`build.py`、`python/demo.py` 和 `python/demo_mtp.py` 的模型默认值。每个 `model_name` / `model_size` 节点通过 `workflow_config` 指定 `configs_merak` 中的量化导出配置。当前默认模型为：
 
 - `model_name=qwen3.6`
 - `model_size=35b-a3b`
@@ -70,8 +70,6 @@ LoRA 流程当前仅在 `qwen3.6-35b-a3b` 示例中提供，使用 `--lora` 作�
 - `${model_name}-${model_size}_decode.hmm`
 - `${model_name}-${model_size}_${adapter_name}_prefill_lora_input/`
 - `${model_name}-${model_size}_${adapter_name}_decode_lora_input/`
-
-`demo.py` 与 `demo_mtp.py` 默认从 `config.yaml` 中读取 `modelscope_repo`，并使用其最后一段作为 `tokenizer_dir` 默认值。
 
 ### 用于校准的数据集
 
@@ -261,19 +259,18 @@ LoRA 编译还会生成：
 标准演示：
 
 ```bash
-python3 demo.py --model_name qwen3.6 --model_size 35b-a3b
+python3 python/demo.py --model_name qwen3.6 --model_size 35b-a3b
 ```
 
 MTP 演示：
 
 ```bash
-python3 demo_mtp.py --model_name qwen3.6 --model_size 35b-a3b
+python3 python/demo_mtp.py --model_name qwen3.6 --model_size 35b-a3b
 ```
 
 LoRA 演示：
 
 ```bash
-python3 demo.py --model_name qwen3.6 --model_size 35b-a3b --lora
 python3 python/demo.py --model_name qwen3.6 --model_size 35b-a3b --lora
 ```
 
@@ -282,7 +279,7 @@ python3 python/demo.py --model_name qwen3.6 --model_size 35b-a3b --lora
 交互模式下可输入 `switch lora` 动态切换 LoRA：
 
 ```bash
-python3 demo.py --model_name qwen3.6 --model_size 35b-a3b --lora --it
+python3 python/demo.py --model_name qwen3.6 --model_size 35b-a3b --lora --it
 ```
 
 输入 `switch lora` 后：
@@ -367,7 +364,7 @@ bash test.sh -s demo --skip_download --lora --model_name qwen3.6 --model_size 35
 
 - `quant`：下载原始模型并调用 `ptq.py` 执行量化导出；启用 `--mtp` 时会把 `--mtp` 同步传给 `ptq.py`，由 `ptq.py` 自动选择 `_mtp.yaml` workflow；启用 `--lora` 时会把 `--lora` 同步传给 `ptq.py`，由 `ptq.py` 自动选择 `_lora.yaml` workflow。
 - `build`：默认调用 `build.py`；当 `--mtp` 启用时调用 `build.py` 并配置参数 `--mtp`；当 `--lora` 启用时调用 `build.py --lora` 并逐个编译 LoRA adapter。
-- `demo`：下载预编译模型后执行 `demo.py`；当 `--mtp` 启用时执行 `demo_mtp.py`；当 `--lora` 启用时执行 `demo.py --lora` 和 `python/demo.py --lora`。
+- `demo`：下载预编译模型后执行 `python/demo.py`；当 `--mtp` 启用时执行 `python/demo_mtp.py`；当 `--lora` 启用时执行 `python/demo.py --lora`。
 - 非 MTP `demo`：先执行 Python demo，再生成 C++ demo 使用的 embedding 文件并编译 C++ demo；单设备时执行 C++ demo，环境中存在 `llm_perf` 时继续执行性能测试。
 - LoRA `demo`：跳过 prefix caching、C++ demo 和 `llm_perf`。
 - C++ demo 和 `llm_perf` 会按以下顺序选择第一个存在的 visual HMM：`visual_896x896x2.hmm`、`visual_448x448x2.hmm`、`visual.hmm`。如果同时存在多个文件，优先使用排序更靠前的文件；如果三个文件都不存在，脚本会报错退出。

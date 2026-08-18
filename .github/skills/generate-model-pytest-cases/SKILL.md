@@ -25,7 +25,7 @@ description: 为 imodelzoo 模型新增或维护 tests/models_tests JSON 驱动�
 2. `tests/models_tests/ARCHITECTURE.md`：需要修改框架代码时再读；
 3. `tests/models_tests/model_configs/model_cfg_template_cv.json` 或 `model_cfg_template_llm.json`；
 4. 一个 family、runner 组合相近的现有模型配置；
-5. 目标模型目录中的 README、Python 入口、YAML、requirements 和 `test.sh`；
+5. 目标模型目录中的 README、根目录及 `python/` 子目录下的 Python 入口、YAML、requirements 和 `test.sh`；
 6. 需要聚合到示例测试时读取 `config/imodelExampleConfig.yaml` 的相邻条目。
 
 重点检查目标模型：
@@ -33,7 +33,7 @@ description: 为 imodelzoo 模型新增或维护 tests/models_tests JSON 驱动�
 - `get_model.py`；
 - `ptq.py`；
 - `build.py`；
-- `demo.py`、`demo_multibatch.py` 或自定义 demo 脚本；
+- 根目录或 `python/` 下的 `demo.py`、`demo_multibatch.py` 或自定义 demo 脚本；
 - HMATC `config.yml/yaml` 及多组件 YAML；
 - `test.sh`；
 - README 中的标准运行命令和默认参数。
@@ -135,7 +135,7 @@ tests/models_tests/model_configs/model_cfg_<model-name>.json
 | `get_model` | `get_model_params` → `get_model.py` | 无独立 HMATC get_model |
 | `quant` | `quant_params` → `ptq.py` | 存在 `hmquant_params` 时使用 HMATC quant |
 | `compile` | `compile_params` → `build.py` | 当前 backend 存在 `hmbuild_params` 时使用 HMATC quant/build |
-| `demo` | `demo_params` → `demo.py` 或 `script` | 存在 `hmdemo_params` 且非 aarch64 时使用 HMATC demo |
+| `demo` | `demo_params` → 默认 `demo.py` 或 `script`；相对脚本优先使用 `python/` 下同名文件 | 存在 `hmdemo_params` 且非 aarch64 时使用 HMATC demo |
 | `compare` | 无通用 Python runner | CV 使用 `hmcompare_params` |
 | `eval` | 无通用 Python runner | CV 使用 `hmeval_params` + `eval_threshold` |
 | `perf` | `perf_params: "demo"` 或代码侧 custom runner | 默认使用 `hmperf_params` |
@@ -180,7 +180,7 @@ section -> backend -> 列式参数对象
 - boolean `true` 生成 flag，`false` 省略；
 - key 原样渲染为 `--<key>`，不会自动转换 `_` 和 `-`；
 - 参数名必须与目标脚本真实 CLI 一致；
-- `script` 选择 Python 入口但不渲染为 `--script`；
+- `script` 选择 Python 入口但不渲染为 `--script`。相对脚本名先解析为 `python/<script>`，文件不存在时回退模型根目录；
 - 不要为了迎合历史 JSON 改坏模型脚本的公开参数。
 
 ### 5. 配置 cache 路径
@@ -278,6 +278,16 @@ cached_results/<artifact-case>
 当前 copy/restore 是测试框架约束，不代表 HMATC 工具本身不能指定绝对输入输出路径。不要在只接入模型的任务中顺带切换到尚未实现的新缓存架构。
 
 ### 9. 配置 demo、multibatch 和 `test.sh`
+
+Python demo 和以 demo 为 runner 的 perf 使用同一脚本优先级：
+
+```text
+相对 script/default basename
+    -> python/<script> 存在：使用 python/<script>
+    -> 否则：使用模型根目录 <script>
+```
+
+默认入口 basename 是 `demo.py`，因此模型只有 `python/demo.py` 时无需在 JSON 增加 `script`。自定义 basename 也遵循同一规则，例如配置 `"script": ["demo_asr.py"]` 时优先执行 `python/demo_asr.py`，不存在才回退根目录。只有需要选择不同 basename 时才配置 `script`；不要仅为了表达 `python/` 目录机械写死 `python/demo.py`。
 
 非默认 Python demo 通过 `script` 指定：
 
@@ -436,6 +446,7 @@ pytest -s -v tests/models_tests -m "<model_marker> and demo"
 - [ ] 每个 flow 的 Python/HMATC section 与期望 runner 一致
 - [ ] 没有把 `support_hmatc` 当作 runner 开关
 - [ ] 所有参数列表等长，key 与脚本真实 CLI 一致
+- [ ] 已按 `python/<script>` 优先、根目录回退规则核对 demo/perf 实际入口；没有为默认 `python/demo.py` 增加多余的 `script` 列
 - [ ] producer 输出和 demo/perf/eval/compare consumer 路径一致
 - [ ] context、batch、model size 等 case identity 已体现在目录后缀
 - [ ] HMATC YAML 的 `model_path/save_dir` 满足当前 workspace-relative 约束

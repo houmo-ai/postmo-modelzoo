@@ -444,12 +444,21 @@ eval 对每个 case 分别执行 ONNX 和 HM，并要求 `hm_metric >= onnx_metr
 
 perf 默认指标为：
 
-| JSON 指标 | 默认日志 key | 方向 | 聚合 |
+| JSON 指标 | 旧版日志 key / 新版日志位置 | 方向 | 聚合 |
 | --- | --- | --- | --- |
 | `qps` | `[Throughput] qps` | 越高越好 | max |
-| `prefill` | `Prefill Speed` | 越高越好 | max |
-| `decode` | `Decode Speed` | 越高越好 | max |
-| `end2end` | `E2E TPS` | 越高越好 | max |
+| `prefill` | `Prefill Speed`；Timing 表格 `prefill` 下缩进 `infer` 行的 Speed 列 | 越高越好 | max |
+| `decode` | `Decode Speed`；Timing 表格 `decode` 下缩进 `infer` 行的 Speed 列 | 越高越好 | max |
+| `end2end` | `E2E TPS`；Overall Performance Metrics 中的 `E2E TPS` | 越高越好 | max |
+
+Python Demo 可能输出旧版 key-value 指标，也可能输出 `Timing` 和
+`Overall Performance Metrics` 表格。框架对每个指标先尝试旧版 key，再回退到
+对应的新表格位置；Timing 中优先读取目标阶段下缩进的 `infer` 行 Speed 列，只有没有
+子行时才回退到阶段顶层 Speed 列；会忽略 `prefill_load`、`decode_load` 等其他子行。
+JSON 中配置 `vision` 时，会按同样规则自动匹配 `vision` 下的 `infer` 行（单位可以是
+`images/s`）。新增 Demo 如果保持这些语义指标，
+无需为日志格式增加 JSON 配置；只有需要校验新的指标（例如 `ttft`、`tpot`）时，
+才在 `perf_metrics` 中增加相应 baseline。
 
 特殊日志、lower-is-better 或 custom runner 属于代码 policy，不在 JSON 中扩展为执行 DSL。
 

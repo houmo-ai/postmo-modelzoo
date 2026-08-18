@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterator, Mapping, Sequence
 
 from .flow_contracts import ConfigError, ResultParseError, ValidationResult
 
@@ -42,6 +42,9 @@ __all__ = [
     "resolve_perf_behavior",
     "validate_perf_metrics",
 ]
+
+# Number (supports optional sign, decimal, scientific notation), reused by multiple extractors
+_NUMBER_RE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
 
 
 @dataclass(frozen=True)
@@ -298,16 +301,98 @@ def _extract_values(text: str, spec: PerfMetricSpec) -> list[float]:
     if spec.extractor == "regex":
         assert spec.pattern is not None
         return [float(match.group(spec.group)) for match in re.finditer(spec.pattern, text)]
+    values = _extract_key_value_values(text, spec.key)
+    if values:
+        return values
+    return _extract_structured_values(text, spec.name)
+
+
+def _extract_key_value_values(text: str, key: str) -> list[float]:
+    """Extract the legacy ``key: value`` performance representation."""
     values: list[float] = []
-    number = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
+    number = re.compile(_NUMBER_RE)
     for line in text.splitlines():
-        if spec.key not in line:
+        if key not in line:
             continue
-        suffix = line.split(spec.key, 1)[1].lstrip(" :=")
+        suffix = line.split(key, 1)[1].lstrip(" :=")
         match = number.search(suffix)
         if match:
             values.append(float(match.group(0)))
     return values
+
+
+def _extract_structured_values(text: str, metric_name: str) -> list[float]:
+    """Extract metrics from the newer Timing and Overall Metrics sections."""
+    if metric_name not in {"end2end", "ttft", "e2e_latency", "tpot"}:
+        return _extract_timing_speed(text, metric_name)
+    return _extract_overall_metric(text, metric_name)
+
+
+def _extract_timing_speed(text: str, scope: str) -> list[float]:
+    """Read the ``infer`` speed from a Timing scope and its child rows.
+
+    The aggregate scope speed can vary substantially with machine setup.  When
+    available, the parser therefore uses the indented ``infer`` row belonging
+    to the requested scope (for example ``prefill -> infer``).  The aggregate
+    row remains a compatibility fallback for logs that do not report children.
+    """
+    aggregate: list[float] = []
+    infer_values: list[float] = []
+    active_indent: int | None = None
+    for indent, columns in _iter_timing_rows(text):
+        if active_indent is not None and indent <= active_indent and columns[0] != scope:
+            active_indent = None
+        if columns[0] == scope:
+            active_indent = indent
+        speed = _parse_timing_speed(columns)
+        if speed is None:
+            continue
+        if columns[0] == scope:
+            aggregate.append(speed)
+        elif columns[0] == "infer" and active_indent is not None and indent > active_indent:
+            infer_values.append(speed)
+    return infer_values or aggregate
+
+
+def _iter_timing_rows(text: str) -> Iterator[tuple[int, list[str]]]:
+    """Yield indented, tokenized rows between the Timing section markers."""
+    in_timing = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped == "Timing":
+            in_timing = True
+            continue
+        if not in_timing:
+            continue
+        if stripped == "Overall Performance Metrics":
+            break
+        columns = stripped.split()
+        if len(columns) >= 3:
+            yield len(line) - len(line.lstrip()), columns
+
+
+def _parse_timing_speed(columns: Sequence[str]) -> float | None:
+    """Parse a numeric Speed column from a Timing row."""
+    if columns[-1] not in {"tokens/s", "images/s"}:
+        return None
+    number = re.compile(_NUMBER_RE)
+    match = number.fullmatch(columns[-2])
+    return float(match.group(0)) if match else None
+
+
+def _extract_overall_metric(text: str, metric_name: str) -> list[float]:
+    """Read a scalar from the Overall Performance Metrics section."""
+    labels = {
+        "end2end": r"E2E\s+TPS(?:\s*\([^)]*\))?",
+        "ttft": r"TTFT(?:\s*\([^)]*\))?",
+        "e2e_latency": r"E2E\s+Latency(?:\s*\([^)]*\))?",
+        "tpot": r"TPOT(?:\s*\([^)]*\))?",
+    }
+    label = labels.get(metric_name)
+    if label is None:
+        return []
+    pattern = re.compile(rf"^\s*{label}\s*:\s*(?P<value>{_NUMBER_RE})\b", re.IGNORECASE)
+    return [float(match.group("value")) for match in pattern.finditer(text)]
 
 
 def _aggregate(values: Sequence[float], aggregation: str) -> float:

@@ -29,6 +29,7 @@ from tests.models_tests.model_workflow.flow_contracts import (
     CommandResult,
     CommandSpec,
     DiagnosticContext,
+    FlowRequest,
     ModelFamily,
     ModelFlow,
 )
@@ -36,6 +37,7 @@ from tests.models_tests.model_workflow.model_config_repository import (
     ModelConfigRepository,
 )
 from tests.models_tests.model_workflow.perf_metric_validation import (
+    _extract_overall_metric,
     extract_perf_metrics,
     resolve_perf_behavior,
     validate_perf_metrics,
@@ -51,6 +53,7 @@ from tests.models_tests.test_flows.eval_flow import (
 )
 from tests.models_tests.test_flows.perf_flow import (
     _run_custom_perf_case,
+    _run_python_perf_case,
     _select_perf_text,
 )
 from types import (
@@ -84,6 +87,63 @@ def test_default_perf_rules_extract_common_demo_metrics() -> None:
         behavior,
         minimum_ratio=0.95,
     ).passed
+
+
+def test_default_perf_rules_extract_timing_and_overall_metrics() -> None:
+    behavior = resolve_perf_behavior(
+        "structured-demo",
+        backend="xh2",
+        baseline_keys=("prefill", "decode", "end2end"),
+        default_runner="demo",
+        default_source="stdout",
+    )
+    text = """
+Timing
+prefill_load       1    7669.925  7669.925  7669.925  7669.925                -
+prefill             1   1378.053  1378.053  1378.053  1378.053  587.06 tokens/s
+  infer             4   1317.884   329.471   237.329   362.842  613.86 tokens/s
+decode            420  18055.749    42.990    40.627    43.687   23.26 tokens/s
+  infer             420  15118.332    35.996    35.411    36.587  27.78 tokens/s
+
+Overall Performance Metrics
+E2E TPS (Throughput): 20.56 tokens/s
+"""
+    assert extract_perf_metrics(text, behavior) == {
+        "prefill": 613.86,
+        "decode": 27.78,
+        "end2end": 20.56,
+    }
+
+
+def test_overall_metric_accepts_parenthesized_end2end_label() -> None:
+    text = "E2E TPS (Throughput): 20.56 tokens/s\n"
+    assert _extract_overall_metric(text, "end2end") == [20.56]
+
+
+def test_timing_perf_rules_match_configured_vision_scope() -> None:
+    behavior = resolve_perf_behavior(
+        "structured-vlm",
+        backend="xh2",
+        baseline_keys=("vision",),
+        default_runner="demo",
+    )
+    text = """
+Timing
+vision              1    769.335   769.335   769.335   769.335    1.30 images/s
+  infer             1    751.099   751.099   751.099   751.099    1.33 images/s
+"""
+    assert extract_perf_metrics(text, behavior) == {"vision": 1.33}
+
+
+def test_structured_perf_metrics_can_report_missing_sections() -> None:
+    behavior = resolve_perf_behavior(
+        "structured-demo",
+        backend="xh2",
+        baseline_keys=("prefill", "decode", "end2end"),
+        default_runner="demo",
+    )
+    with pytest.raises(Exception, match="end2end"):
+        extract_perf_metrics("prefill 1 1 1 1 1 10 tokens/s\n", behavior)
 
 
 def test_sdxl_code_override_extracts_lower_is_better_latency() -> None:
@@ -120,12 +180,15 @@ def test_custom_script_perf_is_maintained_by_code_override(tmp_path: Path) -> No
         result_cache_dir=tmp_path / "results",
         log_file=tmp_path / "perf.log",
     )
+    (tmp_path / "build.py").write_text("# root perf\n", encoding="utf-8")
+    (tmp_path / "python").mkdir()
+    (tmp_path / "python" / "build.py").write_text("# perf\n", encoding="utf-8")
 
     class FakeRunner:
         def run(self, command, *, diagnostic_fields=None):
             assert command.argv == (
                 "python3",
-                "build.py",
+                "python/build.py",
                 "--model_dir",
                 str(tmp_path / "results" / "hmquant_xh1"),
             )
@@ -141,6 +204,39 @@ def test_custom_script_perf_is_maintained_by_code_override(tmp_path: Path) -> No
     assert not failures
     actual = extract_perf_metrics(results[0].stdout, wenet_behavior)
     assert actual == {"qps": 61.2}
+
+
+def test_demo_perf_prefers_script_in_python_directory(tmp_path: Path) -> None:
+    (tmp_path / "demo.py").write_text("# root demo\n", encoding="utf-8")
+    (tmp_path / "python").mkdir()
+    (tmp_path / "python" / "demo.py").write_text("# python demo\n", encoding="utf-8")
+    config = SimpleNamespace(
+        model_name="demo-perf",
+        backend_section=lambda name, backend: {"script": ["demo.py"]},
+    )
+    context = SimpleNamespace(
+        diagnostic=DiagnosticContext(
+            "demo-perf", "demo-perf", ModelFamily.LLM, "xh2", ModelFlow.PERF
+        ),
+        model_cache_dir=tmp_path / "models",
+        result_cache_dir=tmp_path / "results",
+        log_file=tmp_path / "perf.log",
+    )
+
+    class FakeRunner:
+        def run(self, command, *, diagnostic_fields=None):
+            assert command.argv[:2] == ("python3", "python/demo.py")
+            return CommandResult(command, 0, "ok\n", "", 0.1)
+
+    results, failures = _run_python_perf_case(
+        FlowRequest(context, config),
+        SimpleNamespace(command_runner=FakeRunner()),
+        tmp_path,
+        "python3",
+    )
+
+    assert len(results) == 1
+    assert failures == []
 
 
 def test_hmatc_perf_aggregates_max_qps_across_all_cases(tmp_path: Path) -> None:

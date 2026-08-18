@@ -76,9 +76,7 @@ class Qwen35Module(HoumoModule):
                 raise ValueError("unsupported device number")
 
             with self.perf.scope("llm.init.prefill_load"):
-                self.prefill = tcim.runtime.load(
-                    str(prefill_path), option=tcim.runtime.Option(weight_manager)
-                )
+                self.prefill = tcim.runtime.load(str(prefill_path), option=tcim.runtime.Option(weight_manager))
             decode_option = tcim.runtime.Option(weight_manager)
             decode_option.set_dummy_tensors(
                 [
@@ -93,26 +91,19 @@ class Qwen35Module(HoumoModule):
             if vision_path is not None:
                 vision_path = Path(vision_path)
                 vision_devices = [0, 1] if vision_path.suffix == ".hmms" else [0]
-                vision_manager = tcim.runtime.DevManager(
-                    vision_devices, "Xh2HalBackend"
-                )
-                vision_option = tcim.runtime.Option(
-                    tcim.runtime.WeightManager(vision_manager)
-                )
+                vision_manager = tcim.runtime.DevManager(vision_devices, "Xh2HalBackend")
+                vision_option = tcim.runtime.Option(tcim.runtime.WeightManager(vision_manager))
                 with self.perf.scope("llm.init.vision_load"):
-                    self.vision = tcim.runtime.load(
-                        str(vision_path), option=vision_option
-                    )
-            prefill_shape = self.prefill.get_input_info(
-                self.prefill.get_input_name(0)
-            ).shape
+                    self.vision = tcim.runtime.load(str(vision_path), option=vision_option)
+            prefill_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape
             self.prefill_length = int(prefill_shape[1])
             self.embedding_size = int(prefill_shape[2])
-            self.context_max_length = int(
-                self.decode.get_input_info(self.decode.get_input_name(7)).shape[2]
-            )
-            self.lora_input_names = [self.prefill.get_input_name(index) for index in range(self.prefill.get_num_inputs())
-                if self._is_lora_input(self.prefill.get_input_name(index))]
+            self.context_max_length = int(self.decode.get_input_info(self.decode.get_input_name(7)).shape[2])
+            self.lora_input_names = [
+                self.prefill.get_input_name(index)
+                for index in range(self.prefill.get_num_inputs())
+                if self._is_lora_input(self.prefill.get_input_name(index))
+            ]
             self.lora_path = Path(lora_path).expanduser().resolve() if lora_path is not None else None
 
             self._bind_caches()
@@ -126,6 +117,9 @@ class Qwen35Module(HoumoModule):
             self.activate_switch_lora()
 
     def _bind_caches(self) -> None:
+        prefill_has_recurrent_state_output = any(
+            "recurrent_state" in self.prefill.get_output_name(i) for i in range(self.prefill.get_num_outputs())
+        )
         for index in range(self.prefill.get_num_inputs()):
             name = self.prefill.get_input_name(index)
             if "model_layers" in name or self._is_lora_input(name):
@@ -137,11 +131,10 @@ class Qwen35Module(HoumoModule):
                 self.decode.set_dev_input(name, cache)
                 self.decode.set_dev_output(output, cache)
             elif "recurrent_state" in name:
-                output = name.replace(
-                    "past_recurrent_state_", "recurrent_state_out_"
-                )
+                output = name.replace("past_recurrent_state_", "recurrent_state_out_")
                 cache = self.prefill.get_dev_input(name)
-                self.prefill.set_dev_output(output, cache)
+                if prefill_has_recurrent_state_output:
+                    self.prefill.set_dev_output(output, cache)
                 self.decode.set_dev_input(name, cache)
                 self.decode.set_dev_output(output, cache)
 
@@ -152,19 +145,13 @@ class Qwen35Module(HoumoModule):
     @staticmethod
     def _input_dtype(model, name: str) -> np.dtype:
         return np.dtype(model.get_input_info(name).dtype)
-    
+
     def _set_input(self, model, name: str, value) -> None:
-        value = (
-            value.detach().cpu().numpy()
-            if isinstance(value, torch.Tensor)
-            else np.asarray(value)
-        )
+        value = value.detach().cpu().numpy() if isinstance(value, torch.Tensor) else np.asarray(value)
         shape = self._input_shape(model, name)
         if value.shape != shape:
             if value.size != int(np.prod(shape)):
-                raise RuntimeError(
-                    f"input {name!r} expects {shape}, got {value.shape}"
-                )
+                raise RuntimeError(f"input {name!r} expects {shape}, got {value.shape}")
             value = value.reshape(shape)
         model.set_input(name, value)
 
@@ -178,7 +165,9 @@ class Qwen35Module(HoumoModule):
         else:
             for name in self.lora_input_names:
                 lora_weight = np.load(self.lora_path / f"{name}.npy")
-                if lora_weight.shape != self._input_shape(self.prefill, name) or lora_weight.dtype != self._input_dtype(self.prefill, name):
+                if lora_weight.shape != self._input_shape(self.prefill, name) or lora_weight.dtype != self._input_dtype(
+                    self.prefill, name
+                ):
                     raise RuntimeError(
                         f"lora weight {name!r} expects {self._input_shape(self.prefill, name)} "
                         f"with dtype {self._input_dtype(self.prefill, name)}, got "
@@ -216,9 +205,7 @@ class Qwen35Module(HoumoModule):
                 self.vision.run()
                 self.vision.sync()
             with self.perf.scope("llm.vision.get_output"):
-                output = self.vision.get_output(
-                    self.vision.get_output_name(0)
-                ).numpy()
+                output = self.vision.get_output(self.vision.get_output_name(0)).numpy()
             tensor = torch.from_numpy(output)
             outputs.append(tensor.squeeze(0) if tensor.ndim == 3 else tensor)
         return StageOutputs(tensors=(torch.cat(outputs, dim=0),))
