@@ -21,6 +21,8 @@ import argparse
 import json
 import os
 
+INPUT_MODE_GROUP_TITLE = "Input mode (choose one)"
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the HMATC CLI argument parser with the current public surface."""
@@ -98,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     quant_hidden_group.add_argument("--enable_layernorm2rmsnorm", action="store_true", help=argparse.SUPPRESS)
 
     # build
-    build_mode_group = build_cmd_parser.add_argument_group("Input mode (choose one)")
+    build_mode_group = build_cmd_parser.add_argument_group(INPUT_MODE_GROUP_TITLE)
     build_exclusive_group = build_mode_group.add_mutually_exclusive_group(required=True)
     build_exclusive_group.add_argument("--config", "-c", type=str, help="Build from YAML config file")
     build_exclusive_group.add_argument("--hmonnx", type=str, help="Build directly from hmonnx file")
@@ -134,7 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     compare_data_group.add_argument("--data_path", "-d", type=str, required=True, help="Input data path, image or npz")
 
     # perf
-    perf_mode_group = perf_parser.add_argument_group("Input mode (choose one)")
+    perf_mode_group = perf_parser.add_argument_group(INPUT_MODE_GROUP_TITLE)
     perf_exclusive_group = perf_mode_group.add_mutually_exclusive_group(required=True)
     perf_exclusive_group.add_argument("--config", "-c", type=str, help="Run perf from YAML config file")
     perf_exclusive_group.add_argument("--model", "-m", type=str, help="Run perf directly from model path")
@@ -148,12 +150,23 @@ def build_parser() -> argparse.ArgumentParser:
     perf_run_group.add_argument("--infer-only", action="store_true", default=False, help="Only perform inference, without data IO")
 
     # check golden
-    check_mode_group = check_parser.add_argument_group("Input mode (choose one)")
+    check_mode_group = check_parser.add_argument_group(INPUT_MODE_GROUP_TITLE)
     check_exclusive_group = check_mode_group.add_mutually_exclusive_group(required=True)
     check_exclusive_group.add_argument("--config", "-c", type=str, help="Check golden from YAML config file")
     check_exclusive_group.add_argument("--hmm", type=str, help="Check golden directly from hmm file")
     check_data_group = check_parser.add_argument_group("Direct hmm golden options")
     check_data_group.add_argument("--golden", type=str, required=False, help="Golden data directory required with --hmm")
+    check_llm_group = check_data_group.add_mutually_exclusive_group()
+    check_llm_group.add_argument(
+        "--llm-prefill",
+        action="store_true",
+        help="Adapt LLM context and prefill lengths from HMM build options",
+    )
+    check_llm_group.add_argument(
+        "--llm-decode",
+        action="store_true",
+        help="Adapt LLM context length from HMM build options",
+    )
 
     # gen default config.yaml
     gen_input_group = gen_parser.add_argument_group("Config generation options")

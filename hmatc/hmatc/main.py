@@ -184,6 +184,9 @@ def main():
             args.hmm,
             args.golden,
             device_id=args.device_id,
+            llm_mode=(
+                "prefill" if args.llm_prefill else "decode" if args.llm_decode else None
+            ),
         )
         return
     # Generate golden

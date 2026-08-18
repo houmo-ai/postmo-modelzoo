@@ -38,11 +38,7 @@ def resolve_command_request(args: Namespace, parser: ArgumentParser) -> CommandR
             "perf.model" if args.model is not None else "perf.config", args
         )
     if command == "check":
-        if args.hmm is not None and not args.golden:
-            parser.error("hmatc check --hmm requires --golden")
-        return CommandRequest(
-            "check.hmm" if args.hmm is not None else "check.config", args
-        )
+        return _resolve_check_request(args, parser)
     if command == "eval":
         return _resolve_eval_request(args, parser)
     if command == "gen":
@@ -50,10 +46,22 @@ def resolve_command_request(args: Namespace, parser: ArgumentParser) -> CommandR
     if command == "golden":
         return CommandRequest("golden.hmonnx", args)
     if command in {"quant", "compare", "demo", "benchmark"}:
-        if not args.config:
-            parser.error(f"hmatc {command} requires -c/--config")
-        return CommandRequest(f"{command}.config", args)
+        return _resolve_config_request(args, parser)
     return CommandRequest(command, args)
+
+
+def _resolve_check_request(args: Namespace, parser: ArgumentParser) -> CommandRequest:
+    if args.hmm is not None and not args.golden:
+        parser.error("hmatc check --hmm requires --golden")
+    if args.hmm is None and (args.llm_prefill or args.llm_decode):
+        parser.error("--llm-prefill/--llm-decode require hmatc check --hmm")
+    return CommandRequest("check.hmm" if args.hmm is not None else "check.config", args)
+
+
+def _resolve_config_request(args: Namespace, parser: ArgumentParser) -> CommandRequest:
+    if not args.config:
+        parser.error(f"hmatc {args.command} requires -c/--config")
+    return CommandRequest(f"{args.command}.config", args)
 
 
 def _resolve_eval_request(args: Namespace, parser: ArgumentParser) -> CommandRequest:

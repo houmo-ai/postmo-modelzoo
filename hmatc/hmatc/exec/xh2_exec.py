@@ -17,8 +17,8 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
+import ast
 import os
-import re
 import shutil
 import time
 import numpy as np
@@ -33,7 +33,6 @@ from ..dataloaders.factory import create_dataloader
 from ..dataloaders.loaders import validate_sample
 from ..utils import logger
 from ..utils.dist_metrics import cosine_distance
-from ..utils.bfp import cast_fp_data_to_act_hmfp_data
 from ..utils.utils import (
     compress_files_to_tar_xz_with_progress,
     compress_folder_to_tar_xz_with_progress,
@@ -851,7 +850,172 @@ class Xh2Exec(BaseExec):
     # ==================== Static Utility Methods ====================
 
     @staticmethod
-    def check_golden_from_hmm(hmm, golden_dir, device_id=0):
+    def _repeat_golden_to_shape(data, tensor_info, tensor_name):
+        """Repeat a single-batch golden tensor to the shape required by HMM."""
+        data = np.asarray(data)
+        expected_shape = tuple(tensor_info.shape)
+        if data.shape == expected_shape:
+            return np.ascontiguousarray(data)
+
+        can_repeat_batch = (
+            data.ndim > 0
+            and data.ndim == len(expected_shape)
+            and data.shape[1:] == expected_shape[1:]
+            and data.shape[0] > 0
+            and expected_shape[0] % data.shape[0] == 0
+        )
+        if not can_repeat_batch:
+            raise ValueError(
+                f"Golden tensor shape mismatch for {tensor_name}: "
+                f"expected {expected_shape}, got {data.shape}"
+            )
+
+        repeats = expected_shape[0] // data.shape[0]
+        return np.ascontiguousarray(np.repeat(data, repeats=repeats, axis=0))
+
+    @staticmethod
+    def _get_llm_shape_lengths(hmm, llm_mode, tcim_runtime):
+        """Read explicitly requested LLM target lengths from HMM build options."""
+        if llm_mode is None:
+            return ()
+        if llm_mode not in {"prefill", "decode"}:
+            raise ValueError(f"Unsupported LLM check mode: {llm_mode}")
+
+        model_info = json.loads(tcim_runtime.load_model_info(hmm))
+        raw_build_option = model_info.get("info", {}).get("build_option", "")
+        if isinstance(raw_build_option, dict):
+            build_option = raw_build_option
+        else:
+            try:
+                build_option = ast.literal_eval(raw_build_option)
+            except (SyntaxError, ValueError, TypeError) as exc:
+                raise ValueError(
+                    "HMM does not contain valid build_option metadata"
+                ) from exc
+        if not isinstance(build_option, dict):
+            raise ValueError("HMM build_option metadata is not a dictionary")
+
+        modify_llm = build_option.get("modify_llm") or {}
+        if not isinstance(modify_llm, dict):
+            raise ValueError("HMM modify_llm metadata is not a dictionary")
+        if not modify_llm:
+            logger.info(
+                f"HMM modify_llm is empty; --llm-{llm_mode} keeps strict shape matching"
+            )
+            return ()
+
+        context_length = modify_llm.get("context-length")
+        lengths = []
+        if context_length is not None:
+            if not isinstance(context_length, int) or context_length <= 0:
+                raise ValueError("modify_llm.context-length must be a positive integer")
+            lengths.append(context_length)
+
+        if llm_mode == "prefill":
+            prefill_length = modify_llm.get("fill-length")
+            if prefill_length is not None:
+                if not isinstance(prefill_length, int) or prefill_length <= 0:
+                    raise ValueError(
+                        "modify_llm.fill-length must be a positive integer"
+                    )
+                lengths.append(prefill_length)
+
+        if not lengths:
+            logger.info(
+                f"HMM modify_llm does not change lengths used by --llm-{llm_mode}; "
+                "keeping strict shape matching"
+            )
+            return ()
+
+        if llm_mode == "decode" and "fill-length" in modify_llm:
+            logger.debug("Ignoring modify_llm.fill-length in LLM decode check mode")
+
+        logger.info(
+            f"LLM {llm_mode} shape adaptation lengths from HMM: "
+            f"{sorted(set(lengths))}"
+        )
+        return tuple(set(lengths))
+
+    @staticmethod
+    def _adapt_llm_input_to_shape(data, tensor_info, tensor_name, llm_lengths):
+        """Pad or truncate explicitly identified LLM length dimensions."""
+        if not llm_lengths:
+            data = np.asarray(data)
+            expected_shape = tuple(tensor_info.shape)
+            if data.shape != expected_shape:
+                raise ValueError(
+                    f"Golden tensor shape mismatch for {tensor_name}: "
+                    f"expected {expected_shape}, got {data.shape}"
+                )
+            return np.ascontiguousarray(data)
+
+        data = np.asarray(data)
+        expected_shape = tuple(tensor_info.shape)
+        if data.shape == expected_shape:
+            return np.ascontiguousarray(data)
+
+        if data.ndim != len(expected_shape):
+            raise ValueError(
+                f"Golden tensor shape mismatch for {tensor_name}: "
+                f"expected {expected_shape}, got {data.shape}"
+            )
+
+        # Batch expansion remains independent from LLM sequence dimensions.
+        if data.ndim > 0 and data.shape[1:] == expected_shape[1:]:
+            return Xh2Exec._repeat_golden_to_shape(data, tensor_info, tensor_name)
+
+        changed_axes = [
+            axis
+            for axis, (actual, expected) in enumerate(zip(data.shape, expected_shape))
+            if actual != expected
+        ]
+        invalid_axes = [
+            axis for axis in changed_axes if expected_shape[axis] not in llm_lengths
+        ]
+        if not changed_axes or invalid_axes:
+            raise ValueError(
+                f"Golden tensor shape mismatch for {tensor_name}: expected "
+                f"{expected_shape}, got {data.shape}; changed axes {invalid_axes} "
+                "are not context/prefill dimensions from HMM build_option"
+            )
+
+        adapted = np.zeros(expected_shape, dtype=data.dtype)
+        common_slices = tuple(
+            slice(0, min(actual, expected))
+            for actual, expected in zip(data.shape, expected_shape)
+        )
+        adapted[common_slices] = data[common_slices]
+        logger.info(
+            f"Adapted LLM input {tensor_name}: {data.shape} -> {expected_shape}, "
+            f"axes={changed_axes}"
+        )
+        return np.ascontiguousarray(adapted)
+
+    @staticmethod
+    def _is_hmfp_tensor_info(tensor_info, tcim_runtime):
+        """Return whether TensorInfo's native type is HMFP8 or HMFP16."""
+        native_info = getattr(tensor_info, "_info", None)
+        native_dtype = getattr(native_info, "dtype", None)
+        hmfp_types = tuple(
+            dtype
+            for name in ("HMFP8", "HMFP16")
+            if (dtype := getattr(tcim_runtime.DataType, name, None)) is not None
+        )
+        return native_dtype in hmfp_types
+
+    @staticmethod
+    def _cast_golden_to_hmfp(data, tensor_info, tcim_runtime):
+        """Encode floating-point golden data using the HMM tensor metadata."""
+        fp16_data = np.ascontiguousarray(data, dtype=np.float16)
+        fp16_tensor = tcim_runtime.Tensor(
+            info=tensor_info.astype(np.float16), array=fp16_data
+        )
+        hmfp_tensor = tcim_runtime.Tensor(info=tensor_info)
+        fp16_tensor.cast_to(hmfp_tensor)
+        return hmfp_tensor
+
+    @staticmethod
+    def check_golden_from_hmm(hmm, golden_dir, device_id=0, llm_mode=None):
         """Check model inference results against golden data consistency."""
         if not os.path.exists(hmm):
             logger.fatal(f"Not found hmm model: {hmm}")
@@ -863,8 +1027,18 @@ class Xh2Exec(BaseExec):
 
             xh2 = Xh2Infer()
             xh2.load(hmm, device_id=device_id)
-        except Exception as e:
+        except Exception:
             logger.fatal(f"Failed to load hmm model: \n{traceback.format_exc()}")
+
+        import tcim_lite
+
+        tcim_runtime = tcim_lite.runtime
+        try:
+            llm_lengths = Xh2Exec._get_llm_shape_lengths(hmm, llm_mode, tcim_runtime)
+        except Exception:
+            logger.fatal(
+                f"Failed to read LLM shape metadata: \n{traceback.format_exc()}"
+            )
 
         input_names = (
             list(xh2.inputs_info.keys()) if hasattr(xh2, "inputs_info") else []
@@ -874,6 +1048,8 @@ class Xh2Exec(BaseExec):
             output_names = [
                 xh2.engine.get_output_name(i)
                 for i in range(xh2.engine.get_num_outputs())
+                if xh2.engine.get_output_name(i)
+                not in ["auto_profile_data.bin", "primitive_profile_data.bin"]
             ]
 
         logger.info(f"Model input names: {input_names}")
@@ -894,44 +1070,27 @@ class Xh2Exec(BaseExec):
             if paths:
                 try:
                     data = np.load(paths[0])
-                    hmm_batch = xh2.inputs_batch[name]
-                    data = np.repeat(data, repeats=hmm_batch // data.shape[0], axis=0)
-
-                    # Convert fp16 golden data to hmfp format when kvcache
-                    # input expects int8 (hmfp-packed) data.
-                    # kcache: name contains both k/key and cache
-                    # vcache: name contains both v/value and cache
-                    name_lower = name.lower()
-                    has_k = bool(re.search(r"(?:^|_|\.)k(?:ey)?(?:$|_|\.)", name_lower))
-                    has_v = bool(
-                        re.search(r"(?:^|_|\.)v(?:alue)?(?:$|_|\.)", name_lower)
+                    input_info = xh2.inputs_info[name]
+                    data = Xh2Exec._adapt_llm_input_to_shape(
+                        data, input_info, name, llm_lengths
                     )
-                    has_cache = bool(re.search(r"cache", name_lower))
-                    is_kcache = has_k and has_cache
-                    is_vcache = has_v and has_cache
-                    if (
-                        (is_kcache or is_vcache)
-                        and hasattr(xh2, "inputs_info")
-                        and name in xh2.inputs_info
-                    ):
-                        input_dtype = np.dtype(xh2.inputs_info[name].dtype).name
-                        if input_dtype == "int8":
-                            # kcache: pack along last axis
-                            # vcache: pack along context-length axis (second-to-last)
-                            pack_axis = -2 if is_vcache else -1
-                            logger.info(
-                                f"Converting {name} from fp16 to hmfp "
-                                f"(pack_axis={pack_axis}, expected_dtype={input_dtype})"
-                            )
-                            data = cast_fp_data_to_act_hmfp_data(
-                                data, "g32e8", pack_axis
-                            )
+                    if np.issubdtype(
+                        data.dtype, np.floating
+                    ) and Xh2Exec._is_hmfp_tensor_info(input_info, tcim_runtime):
+                        logger.info(
+                            f"Converting input {name} from {data.dtype} to "
+                            f"{input_info._info.dtype.name} using HMM tensor metadata"
+                        )
+                        data = Xh2Exec._cast_golden_to_hmfp(
+                            data, input_info, tcim_runtime
+                        )
 
                     input_data[name] = data
+                    data_shape = tuple(input_info.shape)
                     logger.info(
-                        f"Loaded input: {name}, shape={data.shape}, from={paths[0]}"
+                        f"Loaded input: {name}, shape={data_shape}, from={paths[0]}"
                     )
-                except Exception as e:
+                except Exception:
                     logger.fatal(
                         f"Failed to load {paths[0]}: \n{traceback.format_exc()}"
                     )
@@ -940,17 +1099,20 @@ class Xh2Exec(BaseExec):
         for name, paths in output_files_map.items():
             if paths:
                 try:
-                    golden_outputs[name] = np.load(paths[0])
-                    golden_batch = xh2.outputs_batch[name]
-                    golden_outputs[name] = np.repeat(
-                        golden_outputs[name],
-                        repeats=golden_batch // golden_outputs[name].shape[0],
-                        axis=0,
-                    )
+                    golden_data = np.load(paths[0])
+                    if llm_lengths:
+                        golden_data = Xh2Exec._repeat_golden_to_shape(
+                            golden_data, xh2.outputs_info[name], name
+                        )
+                    else:
+                        golden_data = Xh2Exec._adapt_llm_input_to_shape(
+                            golden_data, xh2.outputs_info[name], name, ()
+                        )
+                    golden_outputs[name] = golden_data
                     logger.info(
                         f"Loaded golden output: {name}, shape={golden_outputs[name].shape}"
                     )
-                except Exception as e:
+                except Exception:
                     logger.fatal(
                         f"Failed to load {paths[0]}: \n{traceback.format_exc()}"
                     )
@@ -958,9 +1120,21 @@ class Xh2Exec(BaseExec):
         try:
             logger.info("Running inference...")
             outputs, _ = xh2.run(input_data)
+            outputs = {name: outputs[name] for name in output_names if name in outputs}
             logger.info("Inference completed")
-        except Exception as e:
+        except Exception:
             logger.fatal(f"Inference failed: \n{traceback.format_exc()}")
+
+        for output_name in list(outputs):
+            output_info = xh2.outputs_info[output_name]
+            if Xh2Exec._is_hmfp_tensor_info(output_info, tcim_runtime):
+                logger.info(
+                    f"Converting output {output_name} from "
+                    f"{output_info._info.dtype.name} to float16 for comparison"
+                )
+                outputs[output_name] = np.ascontiguousarray(
+                    xh2.engine.get_output(output_name).astype(np.float16).numpy()
+                )
 
         logger.info("Calculating cosine similarity...")
         similarity_results = {}
