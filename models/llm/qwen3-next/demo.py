@@ -62,8 +62,18 @@ def is_valid_char(cp):
         or (cp >= 0x2B820 and cp <= 0x2CEAF)
         or (cp >= 0xF900 and cp <= 0xFAFF)
         or (cp >= 0x2F800 and cp <= 0x2FA1F)
+        or (0x0009 <= cp and cp <= 0x000D)
+        or cp == 0x0020
+        or (0x0021 <= cp and cp <= 0x002F)
+        or (0x0030 <= cp and cp <= 0x0039)
+        or (0x003A <= cp and cp <= 0x0040)
         or (0x0041 <= cp and cp <= 0x005A)
+        or (0x005B <= cp and cp <= 0x0060)
         or (0x0061 <= cp and cp <= 0x007A)
+        or (0x007B <= cp and cp <= 0x007E)
+        or (0x2000 <= cp and cp <= 0x206F)
+        or (0x3000 <= cp and cp <= 0x303F)
+        or (0xFF00 <= cp and cp <= 0xFFEF)
     ):
         return True
 
@@ -133,7 +143,7 @@ def get_args() -> argparse.Namespace:
         "--question",
         dest="question",
         type=str,
-        default="请介绍一下存算一体技术的优势",
+        default="请介绍一下存算一体。",
         help="question to ask",
     )
     parser.add_argument(
@@ -530,6 +540,16 @@ class HmQwen:
         ).shape[2]
         self.batch = self.decode.get_input_info(self.decode.get_input_name(0)).shape[0]
 
+        prefill_output_names = {
+            self.prefill.get_output_name(i) for i in range(self.prefill.get_num_outputs())
+        }
+        decode_input_names = {
+            self.decode.get_input_name(i) for i in range(self.decode.get_num_inputs())
+        }
+        decode_output_names = {
+            self.decode.get_output_name(i) for i in range(self.decode.get_num_outputs())
+        }
+
         for i in range(self.prefill.get_num_inputs()):
             input_name = self.prefill.get_input_name(i)
             if "model_layers" in input_name:
@@ -546,9 +566,13 @@ class HmQwen:
                     "past_recurrent_state_", "recurrent_state_out_"
                 )
                 cache = self.prefill.get_dev_input(input_name)
-                self.prefill.set_dev_output(output_name, cache)
-                self.decode.set_dev_input(input_name, cache)
-                self.decode.set_dev_output(output_name, cache)
+                if output_name in prefill_output_names:
+                    self.prefill.set_dev_output(output_name, cache)
+                    self.decode.set_dev_input(input_name, cache)
+                    self.decode.set_dev_output(output_name, cache)
+                else:
+                    cache = self.decode.get_dev_input(input_name)
+                    self.decode.set_dev_output(output_name, cache)
 
         self.clear_cache()
 
@@ -651,7 +675,11 @@ class HmQwen:
         self.perf_tracker.perf_start(PERFTYPE.PREFILL_TOKEN_TIME)
         start_time = time.time()
 
-        effective_system_prompt = "You are a helpful assistant." if system_prompt is None else system_prompt
+        effective_system_prompt = (
+            "You are a helpful assistant."
+            if system_prompt is None
+            else system_prompt
+        )
         messages = []
         if effective_system_prompt:
             messages.append({"role": "system", "content": effective_system_prompt})
@@ -660,7 +688,7 @@ class HmQwen:
             messages,
             tokenize=False,
             add_generation_prompt=True,
-            enable_thinking=False,
+            enable_thinking=True,
         )
         inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False)
         all_input_ids = inputs["input_ids"]
@@ -847,6 +875,7 @@ class HmQwen:
 if __name__ == "__main__":
 
     args = get_args()
+    print(args.tokenizer_dir)
     hmqwen = HmQwen(
         args.prefill_path,
         args.decode_path,
@@ -874,7 +903,9 @@ if __name__ == "__main__":
 
             start_time = time.time()
             try:
-                response, input_tokens, output_tokens = hmqwen.chat(question, system_prompt=args.system_prompt)
+                response, input_tokens, output_tokens = hmqwen.chat(
+                    question, system_prompt=args.system_prompt
+                )
                 total_time = time.time() - start_time
                 if args.debug:
                     show_ttft_breakdown(

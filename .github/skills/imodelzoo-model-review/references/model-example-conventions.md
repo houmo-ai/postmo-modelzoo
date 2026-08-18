@@ -105,6 +105,7 @@ model_configs:
 - 不支持的 name/size 组合应尽早报错，并列出可用值；不要让空字典延迟到模型加载阶段失败。
 - CLI 的 `0`、`false`、空 list 等合法值不会因 truthy/falsy 写法被错误替换。
 - `get_model.py` 的 `--type raw|hmm`、下载目录、解压目录和模型变体共同决定正确资源。
+- 评审 `get_model.py` 调用 `hmatc_get_file(model_cfgs, ...)` 时，只要求 `model_cfgs` 顶层包含 `model_name`、`model_type`、`target`、`version`，并要求其 `model_info` 包含 `model_size`、`ndevice`、`ncore`、`quant_type`。`raw_files`、`context_len`、`modelscope_repo` 及其他字段均为可选字段，不得仅因缺失这些字段形成 finding。
 - `ptq.py` 的输入模型、输出目录、quant type、context/prefill length、校准参数和子模型选择正确透传。
 - `build.py` 的 model dir、output dir、batch、ncore、ndevice、context/prefill length 和 stage 正确透传。
 - `demo.py` 的 HMM、embedding/tokenizer/processor、device、sampling 或任务参数从 CLI 到运行对象保持一致。

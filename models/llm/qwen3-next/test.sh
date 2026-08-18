@@ -25,7 +25,16 @@ fi
 check_step_python_packages || exit 1
 
 if should_run_step "quant"; then
-    echo "Not support model quantization."
+    if ! check_gpu require; then
+        exit 1
+    fi
+
+    if ! should_skip_download; then
+        echo "Download raw model."
+        python3 get_model.py --type raw --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
+    fi
+    echo "Start model quantization (${MODEL_NAME}-${MODEL_SIZE})."
+    python3 ptq.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 fi
 
 if should_run_step "build"; then

@@ -64,157 +64,40 @@ def cosine_distance(data1, data2):
     return cosine_dist
 
 
-def _validate_adjust_flash_attention(flash_vals: tuple, context_length: int) -> tuple:
-    """Validates and adjusts FlashAttention parameter values."""
-    llm_val, other_val = flash_vals
-
-    # Validate LLM (Prefill & Decode) FlashAttention parameter
-    # Values: 0=off, 1/2=on
-    if llm_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{llm_val}"
-        )
-
-    # Validate ViT & Audio Models FlashAttention parameter
-    # Values: 0=off, 1=on
-    if other_val not in [0, 1]:
-        raise ValueError(
-            f"ViT&Audio FlashAttention values only support 0/1, current value:{other_val}"
-        )
-
-    if context_length < 2048:
-        llm_val = 0
-
-    return (llm_val, other_val)
-
-
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
+    # fmt: off
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        dest="config_path",
-        type=str,
-        default=DEFAULT_CONFIG_PATH,
-        help="path to config.yaml",
-    )
-    parser.add_argument(
-        "--model_dir",
-        dest="model_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
-        help="path to the model dir",
-    )
-    parser.add_argument(
-        "--model_name",
-        dest="model_name",
-        type=str,
-        default=None,
-        help="output houmo model name",
-    )
-    parser.add_argument(
-        "--batch",
-        dest="batch",
-        type=int,
-        default=None,
-        help="batch size",
-    )
-    parser.add_argument(
-        "--ncore",
-        dest="ncore",
-        type=int,
-        default=None,
-        help="core number",
-    )
-    parser.add_argument(
-        "--context_length",
-        dest="context_length",
-        type=int,
-        default=None,
-        help="context_length",
-    )
-    parser.add_argument(
-        "--ndevice",
-        dest="ndevice",
-        type=int,
-        default=None,
-        choices=[0, 1, 2],
-        help="device number",
-    )
-    parser.add_argument(
-        "--model_size",
-        dest="model_size",
-        type=str,
-        default=None,
-        help="model size",
-    )
-    parser.add_argument(
-        "--j",
-        dest="j",
-        type=int,
-        default=multiprocessing.cpu_count(),
-        help="build parallel jobs",
-    )
-    parser.add_argument(
-        "--stage",
-        dest="stage",
-        type=str,
-        default="build",
-        choices=["build", "test", "all"],
-        help="build stage",
-    )
-    parser.add_argument(
-        "--output_dir",
-        dest="output_dir",
-        type=str,
-        default=os.path.join("output", HOUMO_TARGET),
-        help="build output dir",
-    )
-    parser.add_argument(
-        "--prefill_length",
-        dest="prefill_length",
-        type=int,
-        default=None,
-        help="prefill_length",
-    )
-    parser.add_argument(
-        "--enable_xh2_stable_output",
-        dest="enable_xh2_stable_output",
-        action="store_true",
-        help="enable xh2 stable output",
-    )
-    parser.add_argument(
-        "--flash_attention",
-        dest="flash_attention",
-        nargs=2,
-        type=int,
-        default=(2, 0),
-        help="FlashAttention optimization switches: "
-        "1st int = Prefill/Decode model switch (0=off, 1/2=on), "
-        "2nd int = ViT/Audio model switch (0=off, 1=on); "
-        "e.g., --flash_attention 2 0 (prefill&decode=2, ViT&Audio=0)",
-    )
+    parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
+    parser.add_argument("--model_dir", dest="model_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="path to the model dir")
+    parser.add_argument("--model_name", dest="model_name", type=str, default=None, help="output houmo model name")
+    parser.add_argument("--batch", dest="batch", type=int, default=None, help="batch size")
+    parser.add_argument("--ncore", dest="ncore", type=int, default=None, help="core number")
+    parser.add_argument("--context_length", dest="context_length", type=int, default=None, help="context_length")
+    parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, choices=[0, 1, 2], help="device number")
+    parser.add_argument("--model_size", dest="model_size", type=str, default=None, help="model size")
+    parser.add_argument("--j", dest="j", type=int, default=int(multiprocessing.cpu_count()*0.7), help="build parallel jobs")
+    parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
+    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="build output dir")
+    parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill_length")
+    parser.add_argument("--enable_xh2_stable_output", dest="enable_xh2_stable_output", action="store_true", help="enable xh2 stable output")
+    parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 0), help="FlashAttention modes for LLM and non-LLM; both support 0/1/2")
+    # fmt: on
 
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 0))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
-        args.context_length = parse_context_length(
-            model_config.get("context_length", "4k")
-        )
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+        args.context_length = parse_context_length(model_config.get("context_length", "4k"))
+    if args.context_length < 2048:
+        _, others_flash_attention = args.flash_attention
+        args.flash_attention = (0, others_flash_attention)
     return args
 
 
@@ -248,20 +131,14 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None, ndevi
         print(
             f"input_info[{input_name}] shape = {input_info.shape}, dtype = {input_info.dtype}, format = {input_info.format.name}"
         )
-        input_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy"
-        )
+        input_data_path = os.path.join(model_dir, f"hmquant_{prefix}_{sanitize_name(input_name)}_input.npy")
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        print(
-            f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}"
-        )
+        print(f"golden input[{input_name}] shape = {input_data.shape}, dtype = {input_data.dtype}")
         start = time.time()
         module.set_input(input_name, input_data)
         profile["set_input"] += time.time() - start
-    print(
-        f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.'
-    )
+    print(f'{model_name} set {input_num} inputs completed in {profile["set_input"]*1000:.3f} ms.')
 
     # infer model
     start = time.time()
@@ -283,29 +160,19 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None, ndevi
         start = time.time()
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
-        print(
-            f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}"
-        )
-        output_data_path = os.path.join(
-            model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy"
-        )
+        print(f"output[{output_name}] shape = {output_data.shape}, dtype = {output_data.dtype}")
+        output_data_path = os.path.join(model_dir, f"hmquant_{prefix}_{sanitize_name(output_name)}_output.npy")
         if os.path.exists(output_data_path):
             golden_output = np.load(output_data_path)
-            golden_output = np.concatenate(
-                [golden_output for i in range(batch)], axis=0
-            )
+            golden_output = np.concatenate([golden_output for i in range(batch)], axis=0)
         else:
             result_check = False
-            print(
-                f"[warning] compare canceled while golden data not found -> {output_data_path}"
-            )
+            print(f"[warning] compare canceled while golden data not found -> {output_data_path}")
             continue
         if golden_output.shape == output_data.shape:
             cosine_dist = cosine_distance(golden_output, output_data)
             is_match = (golden_output == output_data).all()
-            print(
-                f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}"
-            )
+            print(f"[compare] golden output [{output_name}] match={is_match}, similarity={cosine_dist:.6f}")
             if is_match:
                 continue
             if cosine_dist < GOLDEN_THRESH:
@@ -315,9 +182,7 @@ def test(model_name, model_dir, output_dir, profile, batch=1, prefix=None, ndevi
             print(
                 f"[compare] golden output [{output_name}] shape not match {golden_output.shape} vs {output_data.shape}"
             )
-    print(
-        f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.'
-    )
+    print(f'{model_name} get {output_num} ouputs completed in {profile["get_output"]*1000:.3f} ms.')
     if not result_check:
         print("[error] result check failed.")
         exit(-1)
@@ -345,9 +210,7 @@ if __name__ == "__main__":
     with ProcessMemoryMonitor(interval=2, quiet=True) as monitor:
         # build model
         if args.stage == "build" or args.stage == "all":
-            assert (
-                get_platform() == "x86_64"
-            ), "Only supported for compilation on the x86_64 platform."
+            assert get_platform() == "x86_64", "Only supported for compilation on the x86_64 platform."
 
             Xh2Exec.build_from_hmonnx(
                 is_prefill=True,
@@ -402,9 +265,7 @@ if __name__ == "__main__":
             )
             Xh2Exec.build_from_hmonnx(
                 is_prefill=True,
-                hmonnx=find_hmonnx_file(
-                    os.path.join(model_dir, "talker_prediction_prefill")
-                ),
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "talker_prediction_prefill")),
                 hmm_name=f"{model_name}-{model_size}_talker_prediction_prefill",
                 output=output_dir,
                 ncore=ncore,
@@ -416,9 +277,7 @@ if __name__ == "__main__":
                 parallel_jobs=j,
             )
             Xh2Exec.build_from_hmonnx(
-                hmonnx=find_hmonnx_file(
-                    os.path.join(model_dir, "talker_prediction_decode")
-                ),
+                hmonnx=find_hmonnx_file(os.path.join(model_dir, "talker_prediction_decode")),
                 hmm_name=f"{model_name}-{model_size}_talker_prediction_decode",
                 output=output_dir,
                 ncore=ncore,
@@ -540,6 +399,4 @@ if __name__ == "__main__":
                 prefix=model_name,
             )
 
-    print(
-        f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ==="
-    )
+    print(f"\n=== All builds completed. Peak memory: {monitor.peak_memory_mb:.2f} MB ===")

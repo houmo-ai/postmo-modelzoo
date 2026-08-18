@@ -444,7 +444,7 @@ def test_asr_qwen3_forcealigner_compile(setup_logging) -> None:
 @pytest.mark.compile
 @pytest.mark.dependency(
     name="test_compile_models.py::test_llm_qwen3_next_compile",
-    depends_on=["test_get_models.py::test_llm_qwen3_next_get_model"],
+    depends_on=["test_quant_models.py::test_llm_qwen3_next_quant"],
 )
 def test_llm_qwen3_next_compile(setup_logging) -> None:
     """test_llm_qwen3_next_compile"""

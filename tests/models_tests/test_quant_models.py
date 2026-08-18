@@ -412,6 +412,19 @@ def test_asr_qwen3_forcealigner_quant(setup_logging) -> None:
     _quant_func("qwen3-forcealigner", setup_logging)
 
 
+@pytest.mark.qwen3_next
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_48g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_llm_qwen3_next_quant",
+    depends_on=["test_get_models.py::test_llm_qwen3_next_get_model"],
+)
+def test_llm_qwen3_next_quant(setup_logging) -> None:
+    """test_llm_qwen3_next_quant"""
+    _quant_func("qwen3-next", setup_logging)
+
+
 @pytest.mark.qwen3_omni
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_24g

@@ -1,6 +1,6 @@
 # Qwen3-Next
 
-本示例展示如何把 Qwen3-Next 模型编译，部署到后摩芯片的设备上。
+本示例展示如何把 Qwen3-Next 模型量化、编译，部署到后摩芯片的设备上。
 
 [TOC]
 
@@ -9,18 +9,18 @@
 本例使用的模型实现来源于 ModelScope 的预训练模型：
 
 - 模型名称: Qwen3-Next-80B-A3B-Instruct
-- 来源: [https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct)
+- 来源: [Qwen3-Next-80B-A3B-Instruct](https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct)
 - 许可: Apache License 2.0 ([https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/blob/main/LICENSE](https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/blob/main/LICENSE))
 
 预训练模型在运行时下载，工程发布**不包含**该模型。
 
 本例只适用于 xh2 M50 双卡 24G 配置（`ndevice=2`，单设备显存 24G），不支持其他设备组合。
 
-当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型为：
+当前目录使用 `config.yaml` 作为默认值单一真值来源。该配置同时被 `get_model.py`、`ptq.py`、`build.py` 和 `demo.py` 使用。当前默认模型为：
 
 - `model_name=qwen3-next`
 - `model_size=80b-a3b`
-- `context_length=8k`
+- `context_length=256k`
 - `prefill_length=256`
 - `ndevice=2`
 - `ncore=2`
@@ -30,13 +30,36 @@
 - `${model_name}-${model_size}_prefill.hmm`
 - `${model_name}-${model_size}_decode.hmm`
 
-tokenizer 和原始模型目录默认从 `modelscope_repo` 最后一段推导，即 `qwen3-next-80b-a3b`。
+tokenizer 和原始模型目录默认从 `modelscope_repo` 最后一段推导，即 `Qwen3-Next-80B-A3B-Instruct`。
 
-本示例**不提供量化脚本**，仅支持下载预编译模型进行编译和演示。
+### 资源要求
+
+**后摩设备运行要求：**
+
+- `80b-a3b`：仅支持 xh2 M50 双卡 24G 配置（`ndevice=2`，单设备显存 24G）。
+
+**量化硬件要求：**
+
+- `80b-a3b`：GPTQ 量化需要至少 48GB GPU 空闲显存，HMONNX 导出需要至少 200GB CPU 空闲内存。
+
+**编译时 host 内存要求：**
+
+- `80b-a3b`：需要至少 300GB CPU 空闲内存。
+
+本例使用 GPTQ 对 Qwen3-Next 进行量化，并通过 Merak workflow 导出 HMONNX。量化和编译产物均不包含在仓库中。
+
+### 用于校准的数据集
+
+默认量化 workflow 使用 Qwen3-Next 专用的 GPTQ 校准数据：
+
+- `gptqmodel://quantization/calibration/moe_ebss/gen_data/Qwen3-Next-80B-A3B-Instruct.jsonl`
+- 默认配置：`512` 个样本，序列长度 `1024`，文本字段为 `text`
+
+该校准数据仅用于**研究和评估目的**，不作为本仓库的一部分进行分发。使用时请遵守其原始许可和相关使用条款。
 
 ## 2 快速开始
 
-目前 Qwen3-Next 模型仅提供 python 脚本编译方式。芯片模型只能在 Linux 环境下编译。
+目前 Qwen3-Next 模型仅提供 python 脚本量化和编译方式。芯片模型只能在 Linux 环境下量化和编译。
 
 ### 2.1 环境准备
 
@@ -48,16 +71,58 @@ pip3 install -r requirements.txt
 
 ### 2.2 获取模型和数据
 
-本示例不提供量化脚本，因此不支持下载原始模型（`--type raw` 会抛出 `NotImplementedError`）。通过 `get_model.py` 下载预编译芯片模型用于编译和演示：
+通过 `get_model.py` 下载模型，可通过参数选择下载原始模型或预编译芯片模型：
 
 ```bash
+# 下载原始模型用于量化
+python3 get_model.py --type raw --model_name qwen3-next --model_size 80b-a3b
+
 # 下载预编译模型用于演示
 python3 get_model.py --type hmm --model_name qwen3-next --model_size 80b-a3b
 ```
 
-### 2.3 编译
+### 2.3 量化
 
-将预编译模型编译为在芯片上运行的模型。执行脚本：
+量化需要使用 GPU，并在宿主机安装与 CUDA 12.8 兼容的 CUDA 和驱动。启动 docker 时需要将 GPU 映射到容器内，例如：
+
+Qwen3-Next-80B-A3B-Instruct 的 GPTQ 量化需要至少 48GB GPU 空闲显存，后续 HMONNX 导出需要至少 200GB CPU 空闲内存。
+
+```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
+```
+
+进入 docker 后，在仓库根目录执行 `source env.sh`，再进入当前目录运行 `ptq.py`：
+
+```bash
+source env.sh
+cd models/llm/qwen3-next
+python3 ptq.py --model_name qwen3-next --model_size 80b-a3b
+```
+
+`ptq.py` 默认执行 GPTQ 量化和 HMONNX 导出，默认使用 `config.yaml` 中的 workflow，最终将导出的 `hmquant` 内容移动到：
+
+```text
+output/${HOUMO_TARGET}/hmquant/
+```
+
+常用参数如下：
+
+- `--model_dir`：显式指定 Hugging Face 原始模型目录。
+- `--quant_config_path`：显式指定 Merak workflow YAML。
+- `--output_dir`：指定最终 `hmquant` 输出目录，默认 `./output/${HOUMO_TARGET}/hmquant`。
+- `--work_dir`：指定量化和导出的中间目录，默认 `./work_dirs`。
+- `--bits`：覆盖 workflow 中的量化 bit 数，默认由 workflow 配置为 `4`。
+- `--context-max-length`：覆盖导出上下文长度。
+- `--export-from-quanted-model`：输入已经量化的 HF 模型时跳过量化阶段，直接执行导出。
+- `--overwrite`：导出前删除已有的导出中间目录。
+- `--dump-golden`：导出后生成 golden 数据。
+- `--quick-test`：导出后运行快速 HMONNX 测试。
+
+### 2.4 编译
+
+将量化导出的 HMONNX 模型编译为在芯片上运行的模型。执行脚本：
+
+编译前请确保系统具有至少 300GB CPU 空闲内存。
 
 ```bash
 python3 build.py --model_name qwen3-next --model_size 80b-a3b
@@ -70,7 +135,7 @@ python3 build.py --model_name qwen3-next --model_size 80b-a3b
 
 > 编译仅支持在 x86_64 平台上执行。
 
-### 2.4 演示
+### 2.5 演示
 
 Qwen3-Next 模型使用 python API 进行演示。
 
@@ -93,7 +158,7 @@ python3 demo.py --model_name qwen3-next --model_size 80b-a3b
 # 默认执行 demo，会先下载预编译模型
 bash test.sh
 
-# 完整流程：编译 + 演示
+# 完整流程：下载原始模型 + 量化 + 编译 + 演示
 bash test.sh -s all
 ```
 
@@ -112,6 +177,7 @@ Usage: test.sh [options]
 示例：
 
 ```bash
+bash test.sh -s quant
 bash test.sh -s build
 bash test.sh -s demo
 bash test.sh -s all
@@ -120,7 +186,7 @@ bash test.sh -s demo --skip_download
 
 当前脚本行为说明：
 
-- `quant`：本示例不支持量化，会打印 `Not support model quantization.`。
+- `quant`：检查 GPU，下载原始模型并调用 `ptq.py` 执行量化导出。
 - `build`：调用 `build.py` 编译 `prefill` 和 `decode` 模型。
 - `demo`：下载预编译模型后执行 Python demo。
 
@@ -203,29 +269,29 @@ Model Inference Performance Summary Report
 ====================================================================================================
 Configuration Details:
   Batch Size:      1
-  Input Length per Sample:     26 tokens
-  Output Length per Sample:    908 tokens
-  Prefill Model Load Time: 22419.70ms
-  Decode Model Load Time: 4289.64ms
+  Input Length per Sample:     23 tokens
+  Output Length per Sample:    447 tokens
+  Prefill Model Load Time: 436096.38ms
+  Decode Model Load Time: 2346.08ms
 Prefill Stage Performance:
-  Total Time:  357.75ms | Speed:   72.68 tokens/s
-  Tokenization Time:    7.35ms
-  Embedding Time:    6.93ms
-  API SetInput Time:   1.34ms
-  API Inference Time: 338.66ms | Prefill Speed:   76.77 tokens/s
-  API GetOutput Time:  0.36ms
+  Total Time:  296.49ms | Speed:   77.57 tokens/s
+  Tokenization Time:   16.71ms
+  Embedding Time:    3.31ms
+  API SetInput Time:   4.07ms
+  API Inference Time: 268.45ms | Prefill Speed:   85.68 tokens/s
+  API GetOutput Time:  0.46ms
 Decode Stage Performance:
-  Total Time: 44669.71ms | Speed:   20.30 tokens/s
-  Tokenization Time: 5085.52ms
-  Embedding Time:  117.06ms
-  API SetInput Time:   0.28ms
-  API Inference Time: 43.11ms | Decode Speed:   23.20 tokens/s
-  API GetOutput Time:  0.21ms
+  Total Time: 18220.40ms | Speed:   24.48 tokens/s
+  Tokenization Time: 2680.59ms
+  Embedding Time:   62.04ms
+  API SetInput Time:   0.31ms
+  API Inference Time: 34.26ms | Decode Speed:   29.19 tokens/s
+  API GetOutput Time:  0.23ms
 Overall Performance Metrics:
-  TTFT (Time To First Token):  357.75 ms
-  TPOT (Time Per Output Token): 49.25 ms/token
-  E2E Latency (End-to-End):     45.29 seconds
-  E2E TPS (Throughput):         20.05 tokens/s
+  TTFT (Time To First Token):  296.49 ms
+  TPOT (Time Per Output Token): 40.85 ms/token
+  E2E Latency (End-to-End):     19.25 seconds
+  E2E TPS (Throughput):         23.22 tokens/s
 ====================================================================================================
 
 

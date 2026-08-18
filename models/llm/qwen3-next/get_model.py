@@ -154,9 +154,6 @@ if __name__ == "__main__":
         },
         "modelscope_repo": {"repo_ids": model_config.get("modelscope_repo", [])},
     }
-    
-    if args.file_type == "raw":
-        raise NotImplementedError("Quantization scripts are not yet provided, therefore raw files are not supported.")
 
     _, ret_dict = hmatc_get_file(
         model_cfgs,
