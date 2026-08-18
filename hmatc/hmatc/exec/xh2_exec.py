@@ -1015,6 +1015,203 @@ class Xh2Exec(BaseExec):
         return hmfp_tensor
 
     @staticmethod
+    def _calculate_output_error_metrics(golden_data, output_data):
+        """Calculate stable scalar error metrics and aggregation statistics."""
+        golden = np.asarray(golden_data, dtype=np.float64).reshape(-1)
+        output = np.asarray(output_data, dtype=np.float64).reshape(-1)
+        nan_count = int(np.count_nonzero(np.isnan(golden) | np.isnan(output)))
+        inf_count = int(np.count_nonzero(np.isinf(golden) | np.isinf(output)))
+        finite_mask = np.isfinite(golden) & np.isfinite(output)
+        finite_count = int(np.count_nonzero(finite_mask))
+
+        metrics = {
+            "mean_absolute_error": None,
+            "max_absolute_error": None,
+            "mean_squared_error": None,
+            "relative_l2_error": None,
+            "element_count": int(golden.size),
+            "finite_element_count": finite_count,
+            "nan_count": nan_count,
+            "inf_count": inf_count,
+        }
+        statistics = {
+            "absolute_error_sum": 0.0,
+            "squared_error_sum": 0.0,
+            "golden_squared_sum": 0.0,
+        }
+        if not finite_count:
+            return metrics, statistics
+
+        finite_golden = golden[finite_mask]
+        difference = output[finite_mask] - finite_golden
+        absolute_error = np.abs(difference)
+        with np.errstate(over="ignore", invalid="ignore"):
+            squared_error_sum = float(np.sum(np.square(difference)))
+            golden_squared_sum = float(np.sum(np.square(finite_golden)))
+
+        absolute_error_sum = float(np.sum(absolute_error))
+        error_l2 = np.sqrt(squared_error_sum)
+        golden_l2 = np.sqrt(golden_squared_sum)
+        relative_l2_error = (
+            float(error_l2 / golden_l2)
+            if golden_l2 > 0.0
+            else (0.0 if error_l2 == 0.0 else float("inf"))
+        )
+        metrics.update(
+            {
+                "mean_absolute_error": absolute_error_sum / finite_count,
+                "max_absolute_error": float(np.max(absolute_error)),
+                "mean_squared_error": squared_error_sum / finite_count,
+                "relative_l2_error": relative_l2_error,
+            }
+        )
+        statistics.update(
+            {
+                "absolute_error_sum": absolute_error_sum,
+                "squared_error_sum": squared_error_sum,
+                "golden_squared_sum": golden_squared_sum,
+            }
+        )
+        return metrics, statistics
+
+    @staticmethod
+    def _format_error_metric(value):
+        return "N/A" if value is None else f"{value:.3e}"
+
+    @staticmethod
+    def _update_metrics_aggregate(aggregate, metrics, statistics):
+        aggregate["finite_count"] += metrics["finite_element_count"]
+        aggregate["nan_count"] += metrics["nan_count"]
+        aggregate["inf_count"] += metrics["inf_count"]
+        for name in (
+            "absolute_error_sum",
+            "squared_error_sum",
+            "golden_squared_sum",
+        ):
+            aggregate[name] += statistics[name]
+        max_absolute_error = metrics["max_absolute_error"]
+        if max_absolute_error is not None:
+            current_max = aggregate["max_absolute_error"]
+            aggregate["max_absolute_error"] = (
+                max_absolute_error
+                if current_max is None
+                else max(current_max, max_absolute_error)
+            )
+
+    @staticmethod
+    def _add_output_metrics_row(table, output_name, cosine, metrics):
+        table.add_row(
+            [
+                output_name,
+                f"{cosine:.6f}",
+                Xh2Exec._format_error_metric(metrics["mean_absolute_error"]),
+                Xh2Exec._format_error_metric(metrics["max_absolute_error"]),
+                Xh2Exec._format_error_metric(metrics["mean_squared_error"]),
+                Xh2Exec._format_error_metric(metrics["relative_l2_error"]),
+                metrics["nan_count"],
+                metrics["inf_count"],
+            ]
+        )
+
+    @staticmethod
+    def _calculate_global_error_metrics(aggregate):
+        finite_count = aggregate["finite_count"]
+        if not finite_count:
+            return {
+                "mean_absolute_error": None,
+                "max_absolute_error": None,
+                "mean_squared_error": None,
+                "relative_l2_error": None,
+                "nan_count": aggregate["nan_count"],
+                "inf_count": aggregate["inf_count"],
+            }
+
+        golden_l2 = np.sqrt(aggregate["golden_squared_sum"])
+        error_l2 = np.sqrt(aggregate["squared_error_sum"])
+        relative_l2_error = (
+            error_l2 / golden_l2
+            if golden_l2 > 0.0
+            else (0.0 if error_l2 == 0.0 else float("inf"))
+        )
+        return {
+            "mean_absolute_error": aggregate["absolute_error_sum"] / finite_count,
+            "max_absolute_error": aggregate["max_absolute_error"],
+            "mean_squared_error": aggregate["squared_error_sum"] / finite_count,
+            "relative_l2_error": relative_l2_error,
+            "nan_count": aggregate["nan_count"],
+            "inf_count": aggregate["inf_count"],
+        }
+
+    @staticmethod
+    def _compare_output_metrics(outputs, golden_outputs):
+        results = {}
+        table = PrettyTable(
+            ["Output", "Cosine", "MAE", "Max abs", "MSE", "Rel L2", "NaN", "Inf"]
+        )
+        table.title = "HMM vs Golden"
+        aggregate = {
+            "finite_count": 0,
+            "nan_count": 0,
+            "inf_count": 0,
+            "absolute_error_sum": 0.0,
+            "squared_error_sum": 0.0,
+            "golden_squared_sum": 0.0,
+            "max_absolute_error": None,
+        }
+
+        for output_name, output_data in outputs.items():
+            golden_data = golden_outputs.get(output_name)
+            if golden_data is None:
+                results[output_name] = {
+                    "cosine_similarity": None,
+                    "reason": "No golden data",
+                }
+                continue
+            if golden_data.shape != output_data.shape:
+                logger.error(
+                    f"Shape mismatch for {output_name}: "
+                    f"{golden_data.shape} vs {output_data.shape}"
+                )
+                results[output_name] = {
+                    "cosine_similarity": None,
+                    "reason": "Shape mismatch",
+                }
+                continue
+
+            cosine = float(cosine_distance(golden_data, output_data))
+            metrics, statistics = Xh2Exec._calculate_output_error_metrics(
+                golden_data, output_data
+            )
+            results[output_name] = {"cosine_similarity": cosine, **metrics}
+            Xh2Exec._update_metrics_aggregate(aggregate, metrics, statistics)
+            Xh2Exec._add_output_metrics_row(table, output_name, cosine, metrics)
+
+        valid_cosines = [
+            result["cosine_similarity"]
+            for result in results.values()
+            if result["cosine_similarity"] is not None
+            and np.isfinite(result["cosine_similarity"])
+        ]
+        if not valid_cosines:
+            if results:
+                logger.info("No valid output metrics to display")
+            return results
+
+        global_metrics = Xh2Exec._calculate_global_error_metrics(aggregate)
+        average_cosine = float(np.mean(valid_cosines))
+        Xh2Exec._add_output_metrics_row(
+            table, "GLOBAL", average_cosine, global_metrics
+        )
+        logger.info(
+            f"\n{table}\n"
+            "MAE=mean absolute error; Max abs=maximum absolute error; "
+            "MSE=mean squared error; Rel L2=relative L2 error.\n"
+            "GLOBAL uses element-weighted MAE/MSE and global Relative L2; "
+            f"Cosine is the output average ({len(valid_cosines)}/{len(results)} outputs)."
+        )
+        return results
+
+    @staticmethod
     def check_golden_from_hmm(hmm, golden_dir, device_id=0, llm_mode=None):
         """Check model inference results against golden data consistency."""
         if not os.path.exists(hmm):
@@ -1136,48 +1333,8 @@ class Xh2Exec(BaseExec):
                     xh2.engine.get_output(output_name).astype(np.float16).numpy()
                 )
 
-        logger.info("Calculating cosine similarity...")
-        similarity_results = {}
-        max_name_len = max(len(n) for n in outputs.keys()) if outputs else 15
-
-        for output_name, output_data in outputs.items():
-            if output_name in golden_outputs:
-                golden_data = golden_outputs[output_name]
-                if golden_data.shape != output_data.shape:
-                    logger.error(
-                        f"Shape mismatch for {output_name}: {golden_data.shape} vs {output_data.shape}"
-                    )
-                    similarity_results[output_name] = {
-                        "cosine_similarity": None,
-                        "reason": "Shape mismatch",
-                    }
-                    continue
-
-                similarity = cosine_distance(golden_data, output_data)
-                similarity_results[output_name] = {
-                    "cosine_similarity": float(similarity)
-                }
-                logger.info(
-                    f"{output_name:<{max_name_len}}: Cosine similarity = {similarity:.6f}"
-                )
-            else:
-                similarity_results[output_name] = {
-                    "cosine_similarity": None,
-                    "reason": "No golden data",
-                }
-
-        valid = {
-            k: v
-            for k, v in similarity_results.items()
-            if v["cosine_similarity"] is not None
-        }
-        if valid:
-            avg = np.mean([v["cosine_similarity"] for v in valid.values()])
-            logger.info(
-                f"Average cosine similarity: {avg:.6f} ({len(valid)}/{len(similarity_results)} outputs)"
-            )
-
-        return similarity_results
+        logger.info("Calculating output comparison metrics...")
+        return Xh2Exec._compare_output_metrics(outputs, golden_outputs)
 
     @staticmethod
     def gen_golden(
