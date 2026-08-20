@@ -275,6 +275,16 @@ def test_ocr_paddleocr_vl_get_model(setup_logging) -> None:
     _get_model_func("paddleocr-vl", setup_logging)
 
 
+@pytest.mark.paddleocr_v5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_ocr_paddleocr_v5_get_model")
+def test_ocr_paddleocr_v5_get_model(setup_logging) -> None:
+    """test_ocr_paddleocr_v5_get_model"""
+    _get_model_func("paddleocr_v5", setup_logging)
+
+
 @pytest.mark.ppocrv3_det
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

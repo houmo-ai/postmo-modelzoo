@@ -251,6 +251,15 @@ def test_ocr_paddleocr_vl_demo(setup_logging) -> None:
     _demo_func("paddleocr-vl", setup_logging)
 
 
+@pytest.mark.paddleocr_v5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_ocr_paddleocr_v5_demo(setup_logging) -> None:
+    """test_ocr_paddleocr_v5_demo"""
+    _demo_func("paddleocr_v5", setup_logging)
+
+
 @pytest.mark.ppocrv3_det
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

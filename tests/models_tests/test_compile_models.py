@@ -334,6 +334,19 @@ def test_ocr_paddleocr_vl_compile(setup_logging) -> None:
     _compile_func("paddleocr-vl", setup_logging)
 
 
+@pytest.mark.paddleocr_v5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_compile_models.py::test_ocr_paddleocr_v5_compile",
+    depends_on=["test_quant_models.py::test_ocr_paddleocr_v5_quant"],
+)
+def test_ocr_paddleocr_v5_compile(setup_logging) -> None:
+    """test_ocr_paddleocr_v5_compile"""
+    _compile_func("paddleocr_v5", setup_logging)
+
+
 @pytest.mark.ppocrv3_det
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

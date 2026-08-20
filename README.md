@@ -186,6 +186,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | lprnet                  | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
 | mineru2.5               | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | PPOCRv3                 | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
+| paddleocr_v5            | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | paddleocr-vl            | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpmo                | omni         | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
 | qwen3-omni              | omni         | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |

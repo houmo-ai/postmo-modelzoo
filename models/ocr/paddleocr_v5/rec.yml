@@ -1,0 +1,20 @@
+model:
+  name: paddleocr_v5_rec
+  save_dir: output
+  model_path: paddleocr_v5_rec_sim.onnx
+  inputs:
+    x:
+      shape: [6, 3, 48, 320]
+      data_format: BGR
+      mean: [127.5, 127.5, 127.5]
+      std: [127.5, 127.5, 127.5]
+      resize_type: 2
+      padding_values: [128, 128, 128]
+
+quant:
+  calib_data: null
+  calib_num: 1
+
+build:
+  ncore: 1
+  opt_level: 2

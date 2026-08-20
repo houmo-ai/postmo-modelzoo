@@ -308,6 +308,19 @@ def test_ocr_paddleocr_vl_quant(setup_logging) -> None:
     _quant_func("paddleocr-vl", setup_logging)
 
 
+@pytest.mark.paddleocr_v5
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_ocr_paddleocr_v5_quant",
+    depends_on=["test_get_models.py::test_ocr_paddleocr_v5_get_model"],
+)
+def test_ocr_paddleocr_v5_quant(setup_logging) -> None:
+    """test_ocr_paddleocr_v5_quant"""
+    _quant_func("paddleocr_v5", setup_logging)
+
+
 @pytest.mark.ppocrv3_det
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

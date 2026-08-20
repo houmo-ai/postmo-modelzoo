@@ -1,0 +1,7 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+numpy
+opencv-python
+loguru
+pyclipper
+shapely
+Pillow
