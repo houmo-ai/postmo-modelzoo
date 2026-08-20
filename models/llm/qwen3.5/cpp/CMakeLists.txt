@@ -23,6 +23,7 @@ include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 add_executable(demo
   demo.cc
   src/qwen35_mllm_model.cc
+  src/qwen35_dynamic_image_processor.cc
 )
 
 target_include_directories(demo PRIVATE

@@ -18,7 +18,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from collections.abc import Sequence
+import math
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +28,97 @@ import tcim_lite as tcim
 from ..core import HoumoModule
 from ..core.types import Stage, StageInputs, StageOutputs
 from ..perf import PerfTracker
+
+
+VISION_INPUT_NAMES = (
+    "pixel_values",
+    "position_ids",
+    "position_weights",
+    "rotary_position_ids",
+    "attention_mask",
+)
+VISION_GEARS = (96, 196, 384, 704, 1536)
+SPATIAL_MERGE_SIZE = 2
+NUM_POSITION_EMBEDDINGS = 2304
+VISUAL_ROPE_CACHE_LENGTH = 3072
+
+
+def _merge_major(tensor: torch.Tensor, t: int, h: int, w: int, merge_size: int) -> torch.Tensor:
+    leading_shape = tensor.shape[:-2]
+    tensor = tensor.unsqueeze(-3).expand(*leading_shape, t, h, w)
+    tensor = tensor.reshape(*leading_shape, t, h // merge_size, merge_size, w // merge_size, merge_size)
+    base = len(leading_shape)
+    return tensor.permute(*range(base), base, base + 1, base + 3, base + 2, base + 4).flatten(len(leading_shape))
+
+
+def _build_vision_inputs(
+    pixel_values: torch.Tensor,
+    grid_thw: torch.Tensor,
+    patch_capacity: int,
+    position_dtype: torch.dtype,
+    num_position_embeddings: int = NUM_POSITION_EMBEDDINGS,
+    rotary_cache_length: int = VISUAL_ROPE_CACHE_LENGTH,
+) -> tuple[dict[str, torch.Tensor], int]:
+    t, h, w = (int(value) for value in grid_thw.reshape(-1).tolist())
+    if t != 1 or h <= 0 or w <= 0 or h % 2 or w % 2:
+        raise ValueError(f"dynamic visual grid must be (1, h, w), with even h/w; got {(t, h, w)}")
+    valid_patches = t * h * w
+    merge_unit = SPATIAL_MERGE_SIZE**2
+    if valid_patches > patch_capacity or valid_patches % merge_unit:
+        raise ValueError(f"image grid needs {valid_patches} patches, capacity is {patch_capacity}")
+    if pixel_values.ndim == 2:
+        pixel_values = pixel_values.unsqueeze(0)
+    if pixel_values.ndim != 3 or pixel_values.shape[0] != 1:
+        raise ValueError(f"pixel_values must have shape [N, D] or [1, N, D], got {tuple(pixel_values.shape)}")
+    if pixel_values.shape[1] != valid_patches:
+        raise ValueError(f"pixel_values has {pixel_values.shape[1]} patches, grid declares {valid_patches}")
+    if pixel_values.shape[1] < patch_capacity:
+        padding = pixel_values.new_zeros((1, patch_capacity - valid_patches, pixel_values.shape[2]))
+        pixel_values = torch.cat((pixel_values, padding), dim=1)
+
+    side = math.isqrt(num_position_embeddings)
+    if side * side != num_position_embeddings:
+        raise ValueError("NUM_POSITION_EMBEDDINGS must be a square")
+    h_coords = torch.linspace(0, side - 1, h, dtype=torch.float32)
+    w_coords = torch.linspace(0, side - 1, w, dtype=torch.float32)
+    h_floor, w_floor = h_coords.to(torch.int64), w_coords.to(torch.int64)
+    h_ceil = (h_floor + 1).clamp(max=side - 1)
+    w_ceil = (w_floor + 1).clamp(max=side - 1)
+    dh, dw = h_coords - h_floor, w_coords - w_floor
+    ids = torch.stack((
+        h_floor[:, None] * side + w_floor[None, :],
+        h_floor[:, None] * side + w_ceil[None, :],
+        h_ceil[:, None] * side + w_floor[None, :],
+        h_ceil[:, None] * side + w_ceil[None, :],
+    ))
+    weights = torch.stack((
+        (1 - dh)[:, None] * (1 - dw)[None, :],
+        (1 - dh)[:, None] * dw[None, :],
+        dh[:, None] * (1 - dw)[None, :],
+        dh[:, None] * dw[None, :],
+    ))
+    ids = _merge_major(ids, t, h, w, 2).reshape(4, -1)
+    weights = _merge_major(weights, t, h, w, 2).reshape(4, -1).to(position_dtype)
+    position_ids = torch.zeros((4, patch_capacity), dtype=torch.int64)
+    position_weights = torch.zeros((4, patch_capacity), dtype=position_dtype)
+    position_ids[:, :valid_patches] = ids
+    position_weights[:, :valid_patches] = weights
+    rows = _merge_major(torch.arange(h).view(h, 1).expand(h, w), t, h, w, 2).reshape(-1)
+    cols = _merge_major(torch.arange(w).view(1, w).expand(h, w), t, h, w, 2).reshape(-1)
+    rotary_position_ids = torch.zeros((2, patch_capacity), dtype=torch.int64)
+    rotary_position_ids[0, :valid_patches] = rows
+    rotary_position_ids[1, :valid_patches] = cols
+    if max(h, w) - 1 >= rotary_cache_length:
+        raise ValueError(f"image grid {(h, w)} exceeds visual RoPE cache length {rotary_cache_length}")
+    attention_mask = torch.zeros((1, 1, 1, patch_capacity), dtype=position_dtype)
+    attention_mask[..., valid_patches:] = -torch.finfo(position_dtype).max
+    return {
+        "pixel_values": pixel_values,
+        "position_ids": position_ids,
+        "position_weights": position_weights,
+        "rotary_position_ids": rotary_position_ids,
+        "attention_mask": attention_mask,
+    }, valid_patches // merge_unit
 
 
 class Qwen35Module(HoumoModule):
@@ -42,7 +133,10 @@ class Qwen35Module(HoumoModule):
         prefill_path,
         decode_path,
         *,
-        vision_path=None,
+        vision_paths,
+        vision_min_pixels: int = 65536,
+        num_position_embeddings: int = NUM_POSITION_EMBEDDINGS,
+        visual_rope_cache_length: int = VISUAL_ROPE_CACHE_LENGTH,
         lora_path=None,
         ndevice: int = 1,
         perf: PerfTracker,
@@ -52,7 +146,10 @@ class Qwen35Module(HoumoModule):
         self.load(
             prefill_path,
             decode_path,
-            vision_path=vision_path,
+            vision_paths=vision_paths,
+            vision_min_pixels=vision_min_pixels,
+            num_position_embeddings=num_position_embeddings,
+            visual_rope_cache_length=visual_rope_cache_length,
             lora_path=lora_path,
             ndevice=ndevice,
         )
@@ -62,7 +159,10 @@ class Qwen35Module(HoumoModule):
         prefill_path,
         decode_path,
         *,
-        vision_path=None,
+        vision_paths,
+        vision_min_pixels: int = 65536,
+        num_position_embeddings: int = NUM_POSITION_EMBEDDINGS,
+        visual_rope_cache_length: int = VISUAL_ROPE_CACHE_LENGTH,
         lora_path=None,
         ndevice: int = 1,
     ) -> None:
@@ -87,18 +187,39 @@ class Qwen35Module(HoumoModule):
             )
             with self.perf.scope("llm.init.decode_load"):
                 self.decode = tcim.runtime.load(str(decode_path), option=decode_option)
-            self.vision = None
-            if vision_path is not None:
-                vision_path = Path(vision_path)
-                vision_devices = [0, 1] if vision_path.suffix == ".hmms" else [0]
-                vision_manager = tcim.runtime.DevManager(vision_devices, "Xh2HalBackend")
-                vision_option = tcim.runtime.Option(tcim.runtime.WeightManager(vision_manager))
-                with self.perf.scope("llm.init.vision_load"):
-                    self.vision = tcim.runtime.load(str(vision_path), option=vision_option)
+            if not vision_paths:
+                raise ValueError("dynamic Qwen3.5 requires vision_paths")
+            self.vision_models = {}
+            self.vision_gears = tuple(sorted(int(gear) for gear in vision_paths))
+            if self.vision_gears != tuple(gear for gear in self.vision_gears if gear in VISION_GEARS):
+                raise ValueError(f"unsupported vision gears: {self.vision_gears}")
+            vision_manager = tcim.runtime.DevManager([0], "Xh2HalBackend")
+            with self.perf.scope("llm.init.vision_load"):
+                for gear in self.vision_gears:
+                    vision_path = Path(vision_paths[gear])
+                    vision_option = tcim.runtime.Option(tcim.runtime.WeightManager(vision_manager))
+                    vision_model = tcim.runtime.load(str(vision_path), option=vision_option)
+                    self._validate_vision_model_contract(vision_model, gear, str(vision_path))
+                    self.vision_models[gear] = vision_model
+            self.vision_patch_capacities = {
+                gear: gear * SPATIAL_MERGE_SIZE**2 for gear in self.vision_gears
+            }
+            self.vision_patch_capacity = self.vision_patch_capacities[max(self.vision_gears)]
+            self.vision_patch_dim = int(self.vision_models[max(self.vision_gears)].get_input_info("pixel_values").shape[2])
+            self.vision_min_pixels = int(vision_min_pixels)
+            self.num_position_embeddings = int(num_position_embeddings)
+            self.visual_rope_cache_length = int(visual_rope_cache_length)
             prefill_shape = self.prefill.get_input_info(self.prefill.get_input_name(0)).shape
             self.prefill_length = int(prefill_shape[1])
             self.embedding_size = int(prefill_shape[2])
             self.context_max_length = int(self.decode.get_input_info(self.decode.get_input_name(7)).shape[2])
+            vision_output_shape = self.vision_models[max(self.vision_gears)].get_output_info(
+                self.vision_models[max(self.vision_gears)].get_output_name(0)
+            ).shape
+            if int(vision_output_shape[-1]) != self.embedding_size:
+                raise RuntimeError(
+                    f"visual embedding size {vision_output_shape[-1]} differs from LLM embedding size {self.embedding_size}"
+                )
             self.lora_input_names = [
                 self.prefill.get_input_name(index)
                 for index in range(self.prefill.get_num_inputs())
@@ -146,8 +267,27 @@ class Qwen35Module(HoumoModule):
     def _input_dtype(model, name: str) -> np.dtype:
         return np.dtype(model.get_input_info(name).dtype)
 
+    @staticmethod
+    def _validate_vision_model_contract(model, gear: int, path: str) -> None:
+        names = tuple(model.get_input_name(i) for i in range(model.get_num_inputs()))
+        if names != VISION_INPUT_NAMES:
+            raise RuntimeError(f"vision m{gear} at {path} has inputs {names}, expected {VISION_INPUT_NAMES}")
+        capacity = gear * SPATIAL_MERGE_SIZE**2
+        expected = {
+            "pixel_values": (1, capacity, 1536),
+            "position_ids": (4, capacity),
+            "position_weights": (4, capacity),
+            "rotary_position_ids": (2, capacity),
+            "attention_mask": (1, 1, 1, capacity),
+        }
+        for name, shape in expected.items():
+            actual = tuple(int(value) for value in model.get_input_info(name).shape)
+            if actual != shape:
+                raise RuntimeError(f"vision m{gear} input {name} at {path}: expected {shape}, got {actual}")
+
     def _set_input(self, model, name: str, value) -> None:
         value = value.detach().cpu().numpy() if isinstance(value, torch.Tensor) else np.asarray(value)
+        value = value.astype(self._input_dtype(model, name), copy=False)
         shape = self._input_shape(model, name)
         if value.shape != shape:
             if value.size != int(np.prod(shape)):
@@ -193,22 +333,58 @@ class Qwen35Module(HoumoModule):
             self._set_input(self.prefill, name, zeros)
             self._set_input(self.decode, name, zeros)
 
-    def run_vision(self, pixel_values: Sequence[torch.Tensor]) -> StageOutputs:
-        if self.vision is None:
-            raise RuntimeError("vision input requires a vision model")
-        outputs = []
-        name = self.vision.get_input_name(0)
-        for value in pixel_values:
-            with self.perf.scope("llm.vision.set_input"):
-                self._set_input(self.vision, name, value)
-            with self.perf.scope("llm.vision.infer"):
-                self.vision.run()
-                self.vision.sync()
-            with self.perf.scope("llm.vision.get_output"):
-                output = self.vision.get_output(self.vision.get_output_name(0)).numpy()
-            tensor = torch.from_numpy(output)
-            outputs.append(tensor.squeeze(0) if tensor.ndim == 3 else tensor)
+    def _run_vision_item(self, item, index: int, outputs) -> None:
+        _, vision_model, values, valid_image_tokens = item
+        with self.perf.scope("llm.vision.set_input"):
+            for name in VISION_INPUT_NAMES:
+                self._set_input(vision_model, name, values[name])
+        with self.perf.scope("llm.vision.infer"):
+            vision_model.run()
+            vision_model.sync()
+        with self.perf.scope("llm.vision.get_output"):
+            output = vision_model.get_output(vision_model.get_output_name(0)).numpy()
+        tensor = torch.from_numpy(output)
+        tensor = tensor.squeeze(0) if tensor.ndim == 3 else tensor
+        if tensor.ndim != 2 or tensor.shape[0] < valid_image_tokens:
+            raise RuntimeError(f"dynamic visual output shape is invalid: {tuple(tensor.shape)}")
+        outputs[index] = tensor[:valid_image_tokens]
+
+    def run_vision(self, pixel_values: torch.Tensor, image_grid_thw: torch.Tensor) -> StageOutputs:
+        if not isinstance(pixel_values, torch.Tensor):
+            pixel_values = torch.as_tensor(pixel_values)
+        if pixel_values.ndim == 3 and pixel_values.shape[0] == 1:
+            pixel_values = pixel_values.squeeze(0)
+        grids = torch.as_tensor(image_grid_thw).reshape(-1, 3)
+        split_sizes = [int(grid.prod()) for grid in grids]
+        if pixel_values.ndim != 2 or int(pixel_values.shape[0]) != sum(split_sizes):
+            raise ValueError("dynamic visual pixel_values and image_grid_thw are inconsistent")
+        if int(pixel_values.shape[1]) != self.vision_patch_dim:
+            raise ValueError(
+                f"dynamic visual patch width must be {self.vision_patch_dim}, got {pixel_values.shape[1]}"
+            )
+        prepared = self._prepare_vision_batch(pixel_values, grids, split_sizes)
+        outputs = [None] * len(prepared)
+        for gear in self.vision_gears:
+            for index, item in enumerate(prepared):
+                if item[0] == gear:
+                    self._run_vision_item(item, index, outputs)
         return StageOutputs(tensors=(torch.cat(outputs, dim=0),))
+
+    def _prepare_vision_batch(self, pixel_values, grids, split_sizes):
+        prepared = []
+        for image, grid in zip(torch.split(pixel_values, split_sizes), grids, strict=True):
+            valid_image_tokens = int(grid.prod().item()) // SPATIAL_MERGE_SIZE**2
+            gear = next((gear for gear in self.vision_gears if valid_image_tokens <= gear), None)
+            if gear is None:
+                raise ValueError(f"image needs {valid_image_tokens} tokens, loaded gears are {self.vision_gears}")
+            model = self.vision_models[gear]
+            dtype = torch.from_numpy(np.empty((), dtype=model.get_input_info("position_weights").dtype)).dtype
+            values, valid_image_tokens = _build_vision_inputs(
+                image, grid, self.vision_patch_capacities[gear], dtype,
+                self.num_position_embeddings, self.visual_rope_cache_length,
+            )
+            prepared.append((gear, model, values, valid_image_tokens))
+        return prepared
 
     def _stage_model(self, stage: Stage):
         if stage == Stage.PREFILL:

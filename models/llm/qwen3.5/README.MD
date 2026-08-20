@@ -242,9 +242,9 @@ LoRA 编译会在 `output/${HOUMO_TARGET}/hmquant/lora/` 下查找 adapter。若
 
 - `${model_name}-${model_size}_prefill.hmm`
 - `${model_name}-${model_size}_decode.hmm`
-- `${model_name}-${model_size}_visual_${max_size_w}x${max_size_h}x${max_size_t}.hmm`
+- `${model_name}-${model_size}_visual_m${gear}.hmm`
 
-视觉模型文件名中的尺寸来自 `config.yaml` 或量化导出的实际 visual bucket。例如大多数模型使用 `visual_896x896x2.hmm`，`qwen3.5/122b-a10b` 默认使用 `visual_448x448x2.hmm`。MTP 编译还会生成：
+动态视觉模型当前支持 `m96`、`m196`、`m384`、`m704` 和 `m1536` 五档 image token gear。Python demo 可以接收包含这些文件的目录，或通过重复 `--vision_path`、逗号分隔路径显式指定多个文件，并根据预处理后的 image token 数自动选择 gear。MTP 编译还会生成：
 
 - `${model_name}-${model_size}_prefill_mtp.hmm`
 - `${model_name}-${model_size}_decode_mtp.hmm`
@@ -367,7 +367,7 @@ bash test.sh -s demo --skip_download --lora --model_name qwen3.6 --model_size 35
 - `demo`：下载预编译模型后执行 `python/demo.py`；当 `--mtp` 启用时执行 `python/demo_mtp.py`；当 `--lora` 启用时执行 `python/demo.py --lora`。
 - 非 MTP `demo`：先执行 Python demo，再生成 C++ demo 使用的 embedding 文件并编译 C++ demo；单设备时执行 C++ demo，环境中存在 `llm_perf` 时继续执行性能测试。
 - LoRA `demo`：跳过 prefix caching、C++ demo 和 `llm_perf`。
-- C++ demo 和 `llm_perf` 会按以下顺序选择第一个存在的 visual HMM：`visual_896x896x2.hmm`、`visual_448x448x2.hmm`、`visual.hmm`。如果同时存在多个文件，优先使用排序更靠前的文件；如果三个文件都不存在，脚本会报错退出。
+- Python 和 C++ demo 会扫描输出目录中的 `${model_name}-${model_size}_visual_m${gear}.hmm` 并加载可用的 dynamic vision gears；`llm_perf` 使用当前已发布的最大 gear，并保留 `visual.hmm` 兼容回退。没有可用视觉模型时脚本会报错退出。
 
 ## 4 参考结果
 

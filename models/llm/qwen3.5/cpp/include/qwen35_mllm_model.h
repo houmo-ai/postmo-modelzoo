@@ -26,7 +26,10 @@
 
 #include "core/context.h"
 #include "core/vlm_model.h"
-#include "modules/image_processor.h"
+#include "qwen35_dynamic_image_processor.h"
+
+#include <array>
+#include <map>
 
 namespace houmo {
 
@@ -37,6 +40,14 @@ constexpr int VISION_START_TOKEN_ID = 248053;
 constexpr int VISION_END_TOKEN_ID = 248054;
 constexpr int SPATIAL_MERGE_SIZE = 2;
 constexpr int PATCH_SIZE = 16;
+/** Number of frames grouped into one temporal patch. */
+constexpr int TEMPORAL_PATCH_SIZE = 2;
+/** Number of learned 2D position embeddings. */
+constexpr int NUM_POSITION_EMBEDDINGS = 2304;
+/** Maximum position covered by the visual rotary cache. */
+constexpr int VISUAL_ROPE_CACHE_LENGTH = 3072;
+/** Supported post-merge visual token capacities. */
+constexpr int VISION_GEARS[] = {96, 196, 384, 704, 1536};
 
 using ImageGridTHW = std::tuple<int, int, int>;
 
@@ -69,8 +80,8 @@ class Qwen35MLLMContext : public Context {
 
  private:
   // ========== Vision split methods (for internal profiling) ==========
-  void vision_preprocess(int image_idx);
-  void vision_inference();
+  void vision_preprocess(int image_idx, int gear);
+  void vision_inference(int gear);
   void vision_postprocess(int image_idx);
 
   // ========== Prefill split methods (for internal profiling) ==========
@@ -124,7 +135,7 @@ class Qwen35MLLMContext : public Context {
   std::vector<ImageGridTHW> image_grid_thw_;  // Per-image (t, h, w)
 
   // Vision processing temp state
-  ProcessedImage current_processed_image_;
+  qwen35::DynamicImageResult current_processed_image_;
   std::vector<float16> current_vision_tensor_;
 
   // Prefill chunk temp state
@@ -141,7 +152,7 @@ class Qwen35MLLMContext : public Context {
   std::vector<float16> decode_linear_attn_mask_;
 
   // Image processor
-  std::shared_ptr<HmImageProcessor> img_processor_;
+  std::shared_ptr<qwen35::DynamicImageProcessor> img_processor_;
 };
 
 /**
@@ -183,8 +194,11 @@ class Qwen35MLLMModel : public VLMModel {
                              const std::vector<std::string>& image_paths,
                              int max_size_h, int max_size_w);
 
-  int max_size_h() const { return max_size_h_; }
-  int max_size_w() const { return max_size_w_; }
+  int vision_patch_dim() const { return vision_patch_dim_; }
+  int vision_patch_capacity(int gear) const;
+  std::shared_ptr<tcim::Module> vision_module(int gear) const;
+  const std::vector<int>& vision_gears() const { return vision_gears_; }
+  std::string preprocessor_config_path() const;
 
  private:
   void load();
@@ -198,10 +212,12 @@ class Qwen35MLLMModel : public VLMModel {
   // Vision configuration
   std::string vision_input_name_;
   std::string vision_output_name_;
+  std::map<int, std::shared_ptr<tcim::Module>> vision_modules_;
+  std::map<int, int> vision_patch_capacities_;
+  std::vector<int> vision_gears_;
+  int vision_patch_dim_ = 0;
+  int vision_hidden_size_ = 0;
 
-  // VLM configuration
-  int max_size_h_;
-  int max_size_w_;
 };
 
 }  // namespace houmo

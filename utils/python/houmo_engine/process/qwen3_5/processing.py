@@ -223,11 +223,7 @@ class Qwen3_5Processor(ProcessorMixin):
             text_inputs["mm_token_type_ids"] = mm_token_type_ids.tolist()
 
         batch_data = {**text_inputs, **image_inputs, **videos_inputs}
-        hm_pixel_values = batch_data.pop("hm_pixel_values", None)
-        batch_feature = BatchFeature(data=batch_data, tensor_type=return_tensors)
-        if hm_pixel_values is not None:
-            batch_feature["hm_pixel_values"] = hm_pixel_values
-        return batch_feature
+        return BatchFeature(data=batch_data, tensor_type=return_tensors)
 
     def post_process_image_text_to_text(
         self, generated_outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False, **kwargs

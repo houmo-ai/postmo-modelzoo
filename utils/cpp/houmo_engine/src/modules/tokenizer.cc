@@ -30,6 +30,9 @@ namespace houmo {
 HfTokenizer::HfTokenizer(const std::string& tokenizer_path) {
   // Load tokenizer
   tokenizer_ = tokenizer::AutoTokenizer::from_pretrained(tokenizer_path);
+  if (!tokenizer_) {
+    throw Exception("failed to load tokenizer from directory: " + tokenizer_path);
+  }
 
   // Get special token IDs
   bos_token_id_ = tokenizer_->bos_token_id();

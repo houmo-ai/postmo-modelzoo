@@ -42,18 +42,18 @@ from torchvision.transforms import InterpolationMode
 
 logger = logging.getLogger(__name__)
 
-IMAGE_FACTOR = 28
-MIN_PIXELS = 4 * 28 * 28
-MAX_PIXELS = 16384 * 28 * 28
+IMAGE_FACTOR = 32
+MIN_PIXELS = 65536
+MAX_PIXELS = 1536 * IMAGE_FACTOR * IMAGE_FACTOR
 MAX_RATIO = 200
 
-VIDEO_MIN_PIXELS = 128 * 28 * 28
-VIDEO_MAX_PIXELS = 768 * 28 * 28
+VIDEO_MIN_PIXELS = 128 * IMAGE_FACTOR * IMAGE_FACTOR
+VIDEO_MAX_PIXELS = 768 * IMAGE_FACTOR * IMAGE_FACTOR
 FRAME_FACTOR = 2
 FPS = 2.0
 FPS_MIN_FRAMES = 4
 FPS_MAX_FRAMES = 768
-VIDEO_TOTAL_PIXELS = int(float(os.environ.get("VIDEO_MAX_PIXELS", 128000 * 28 * 28 * 0.9)))
+VIDEO_TOTAL_PIXELS = int(float(os.environ.get("VIDEO_MAX_PIXELS", 128000 * IMAGE_FACTOR * IMAGE_FACTOR * 0.9)))
 
 
 def round_by_factor(number: int, factor: int) -> int:
@@ -322,6 +322,7 @@ def extract_vision_info(conversations: list[dict] | list[list[dict]]) -> list[di
 def process_vision_info(
     conversations: list[dict] | list[list[dict]],
     return_video_kwargs: bool = False,
+    image_factor: int = IMAGE_FACTOR,
 ) -> tuple[list[Image.Image] | None, list[torch.Tensor | list[Image.Image]] | None, Optional[dict]]:
     vision_infos = extract_vision_info(conversations)
     image_inputs = []
@@ -330,7 +331,7 @@ def process_vision_info(
 
     for vision_info in vision_infos:
         if "image" in vision_info or "image_url" in vision_info:
-            image_inputs.append(fetch_image(vision_info))
+            image_inputs.append(fetch_image(vision_info, size_factor=image_factor))
         elif "video" in vision_info:
             video_input, video_sample_fps = fetch_video(vision_info, return_video_sample_fps=True)
             video_sample_fps_list.append(video_sample_fps)

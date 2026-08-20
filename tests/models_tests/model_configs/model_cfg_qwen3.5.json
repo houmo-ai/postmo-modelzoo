@@ -3,79 +3,78 @@
     "model_dir": "models/llm/qwen3.5",
     "model_type": "llm",
     "dependencies": {
-        "ndevice": [1],
-        "dev_mem": ["24g"]
+        "ndevice": [
+            1
+        ],
+        "dev_mem": [
+            "24g"
+        ]
     },
-    "support_platform": ["x86_64"],
-    "support_backend": ["xh2"],
+    "support_platform": [
+        "x86_64"
+    ],
+    "support_backend": [
+        "xh2"
+    ],
     "support_core_num": {
-        "xh2": [2]
+        "xh2": [
+            2
+        ]
     },
     "support_flow": {
-        "xh2": ["get_model", "quant", "compile", "demo", "perf"]
+        "xh2": [
+            "get_model",
+            "quant",
+            "compile",
+            "demo",
+            "perf"
+        ]
     },
     "support_hmatc": null,
     "perf_metrics": {
         "xh2": {
             "x86_64": {
-                "prefill": 591.85,
-                "decode": 27.35,
-                "end2end": 18.84
+                "prefill": 4379.09,
+                "decode": 73.09,
+                "end2end": 33.29
             }
         }
     },
     "get_model_params": {
         "xh2": {
-            "type": ["raw", "hmm", "hmm", "hmm", "hmm", "hmm", "hmm", "hmm"],
+            "type": [
+                "hmm",
+                "hmm",
+                "hmm"
+            ],
             "download_dir": [
-                "cached_models",
-                "cached_models",
-                "cached_models",
-                "cached_models",
-                "cached_models",
                 "cached_models",
                 "cached_models",
                 "cached_models"
             ],
             "extract_dir": [
-                null,
-                "cached_models/hmm_xh2_3.6_35b_a3b_256k",
                 "cached_models/hmm_xh2_0.8b_256k",
-                "cached_models/hmm_xh2_2b_256k",
                 "cached_models/hmm_xh2_4b_256k",
-                "cached_models/hmm_xh2_9b_256k",
-                "cached_models/hmm_xh2_3.6_27b_128k",
-                "cached_models/hmm_xh2_3.5_122b_a10b_256k"
+                "cached_models/hmm_xh2_9b_256k"
             ],
-            "source_type": [null, null, null, null, null, null, null, null],
-            "context_length": [
+            "source_type": [
                 null,
+                null,
+                null
+            ],
+            "context_length": [
                 "256k",
                 "256k",
-                "256k",
-                "256k",
-                "256k",
-                "128k",
                 "256k"
             ],
             "model_size": [
-                null,
-                null,
                 "0.8b",
-                "2b",
                 "4b",
-                "9b",
-                "27b",
-                "122b-a10b"
+                "9b"
             ],
             "model_name": [
-                null,
-                null,
                 "qwen3.5",
                 "qwen3.5",
-                "qwen3.5",
-                "qwen3.5",
-                "qwen3.6",
                 "qwen3.5"
             ]
         }
@@ -86,127 +85,159 @@
                 "hm_gptq": true
             },
             "model_dir": [
-                "cached_models/Qwen3.6-35B-A3B",
                 "cached_models/Qwen3.5-0.8B",
-                "cached_models/Qwen3.5-2B",
                 "cached_models/Qwen3.5-4B",
                 "cached_models/Qwen3.5-9B"
             ],
             "model_name": [
-                "qwen3.6",
-                "qwen3.5",
                 "qwen3.5",
                 "qwen3.5",
                 "qwen3.5"
             ],
-            "model_size": ["35b-a3b", "0.8b", "2b", "4b", "9b"],
+            "model_size": [
+                "0.8b",
+                "4b",
+                "9b"
+            ],
             "output_dir": [
-                "cached_results/hmquant_xh2_3.6_35b_a3b_2k",
                 "cached_results/hmquant_xh2_0.8b_2k",
-                "cached_results/hmquant_xh2_2b_2k",
                 "cached_results/hmquant_xh2_4b_2k",
                 "cached_results/hmquant_xh2_9b_2k"
             ],
-            "max_size_h": ["896", "896", "896", "896", "896"],
-            "max_size_w": ["896", "896", "896", "896", "896"]
+            "max_size_h": [
+                "896",
+                "896",
+                "896"
+            ],
+            "max_size_w": [
+                "896",
+                "896",
+                "896"
+            ]
         }
     },
     "compile_params": {
         "xh2": {
             "model_dir": [
-                "cached_results/hmquant_xh2_3.6_35b_a3b_2k",
                 "cached_results/hmquant_xh2_0.8b_2k",
-                "cached_results/hmquant_xh2_2b_2k",
                 "cached_results/hmquant_xh2_4b_2k",
                 "cached_results/hmquant_xh2_9b_2k"
             ],
-            "model_size": ["35b-a3b", "0.8b", "2b", "4b", "9b"],
+            "model_size": [
+                "0.8b",
+                "4b",
+                "9b"
+            ],
             "model_name": [
-                "qwen3.6",
-                "qwen3.5",
                 "qwen3.5",
                 "qwen3.5",
                 "qwen3.5"
             ],
-            "batch": [null, null, null, null, null],
-            "ncore": [null, null, null, null, null],
-            "ndevice": [null, null, null, null, null],
-            "stage": ["build", "build", "build", "build", "build"],
+            "batch": [
+                null,
+                null,
+                null
+            ],
+            "ncore": [
+                null,
+                null,
+                null
+            ],
+            "ndevice": [
+                null,
+                null,
+                null
+            ],
+            "stage": [
+                "build",
+                "build",
+                "build"
+            ],
             "context_length": [
-                "262144",
-                "262144",
                 "262144",
                 "262144",
                 "262144"
             ],
-            "prefill_length": ["256", "256", "256", "256", "256"],
+            "prefill_length": [
+                "256",
+                "256",
+                "256"
+            ],
             "output_dir": [
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k",
                 "cached_results/hmm_xh2_0.8b_256k",
-                "cached_results/hmm_xh2_2b_256k",
                 "cached_results/hmm_xh2_4b_256k",
                 "cached_results/hmm_xh2_9b_256k"
             ],
-            "j": ["24", "24", "24", "24", "24"]
+            "j": [
+                "24",
+                "24",
+                "24"
+            ]
         }
     },
     "test_sh_params": [
-        [],
-        ["--model_name", "qwen3.6", "--model_size", "27b"],
-        ["--model_name", "qwen3.5", "--model_size", "0.8b"],
-        ["--model_name", "qwen3.6", "--model_size", "27b", "--mtp"]
+        [
+            "--model_name",
+            "qwen3.5",
+            "--model_size",
+            "0.8b"
+        ],
+        [
+            "--model_name",
+            "qwen3.6",
+            "--model_size",
+            "27b",
+            "--mtp"
+        ]
     ],
     "enable_demo_test": true,
     "demo_params": {
         "xh2": {
             "model_name": [
-                "qwen3.6",
-                "qwen3.5",
                 "qwen3.5",
                 "qwen3.5",
                 "qwen3.5"
             ],
-            "model_size": ["35b-a3b", "0.8b", "2b", "4b", "9b"],
+            "model_size": [
+                "0.8b",
+                "4b",
+                "9b"
+            ],
             "tokenizer_dir": [
-                "cached_models/Qwen3.6-35B-A3B",
                 "cached_models/Qwen3.5-0.8B",
-                "cached_models/Qwen3.5-2B",
                 "cached_models/Qwen3.5-4B",
                 "cached_models/Qwen3.5-9B"
             ],
             "embedding_path": [
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_0.8b_256k/hmquant/quant_embedding.pt",
-                "cached_results/hmm_xh2_2b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_4b_256k/hmquant/quant_embedding.pt",
                 "cached_results/hmm_xh2_9b_256k/hmquant/quant_embedding.pt"
             ],
             "prefill_path": [
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6-35b-a3b_prefill.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5-0.8b_prefill.hmm",
-                "cached_results/hmm_xh2_2b_256k/qwen3.5-2b_prefill.hmm",
                 "cached_results/hmm_xh2_4b_256k/qwen3.5-4b_prefill.hmm",
                 "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_prefill.hmm"
             ],
             "decode_path": [
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6-35b-a3b_decode.hmm",
                 "cached_results/hmm_xh2_0.8b_256k/qwen3.5-0.8b_decode.hmm",
-                "cached_results/hmm_xh2_2b_256k/qwen3.5-2b_decode.hmm",
                 "cached_results/hmm_xh2_4b_256k/qwen3.5-4b_decode.hmm",
                 "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_decode.hmm"
             ],
             "vision_path": [
-                "cached_results/hmm_xh2_3.6_35b_a3b_256k/qwen3.6-35b-a3b_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_0.8b_256k/qwen3.5-0.8b_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_2b_256k/qwen3.5-2b_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_4b_256k/qwen3.5-4b_visual_896x896x2.hmm",
-                "cached_results/hmm_xh2_9b_256k/qwen3.5-9b_visual_896x896x2.hmm"
+                "cached_results/hmm_xh2_0.8b_256k",
+                "cached_results/hmm_xh2_4b_256k",
+                "cached_results/hmm_xh2_9b_256k"
             ],
-            "ndevice": ["1", "1", "1", "1", "1"],
-            "max_size_w": ["896", "896", "896", "896", "896"],
-            "max_size_h": ["896", "896", "896", "896", "896"],
-            "max_size_t": ["2", "2", "2", "2", "2"],
-            "patch_size": [null, null, null, null, null]
+            "ndevice": [
+                "1",
+                "1",
+                "1"
+            ],
+            "patch_size": [
+                null,
+                null,
+                null
+            ]
         }
     },
     "perf_params": "demo"

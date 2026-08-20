@@ -65,8 +65,8 @@ class PreparedRequest:
 
 def _build_processor(
     tokenizer_path,
-    max_size_h: int,
-    max_size_w: int,
+    vision_min_pixels: int,
+    vision_max_pixels: int,
     patch_size: int,
 ) -> Qwen3_5Processor:
     tokenizer = AutoTokenizer.from_pretrained(
@@ -76,12 +76,13 @@ def _build_processor(
     template_path = Path(tokenizer_path) / "chat_template.jinja"
     if chat_template is None and template_path.exists():
         chat_template = template_path.read_text(encoding="utf-8")
-    image_processor = Qwen3_5ImageProcessor(
+    image_processor = Qwen3_5ImageProcessor.from_pretrained(
+        tokenizer_path,
         patch_size=patch_size,
         merge_size=SPATIAL_MERGE_SIZE,
         temporal_patch_size=TEMPORAL_PATCH_SIZE,
-        min_pixels=max_size_h * max_size_w,
-        max_pixels=max_size_h * max_size_w,
+        min_pixels=vision_min_pixels,
+        max_pixels=vision_max_pixels,
     )
     return Qwen3_5Processor(
         image_processor=image_processor,
@@ -120,17 +121,20 @@ class Qwen35Process(ModelProcess):
         embedding_path,
         embedding_size: int,
         *,
-        max_size_h: int = 896,
-        max_size_w: int = 896,
+        vision_min_pixels: int = 65536,
+        vision_max_pixels: int = 1536 * 32 * 32,
         patch_size: int = 16,
         perf: PerfTracker,
     ):
-        self.max_size_h = max_size_h
-        self.max_size_w = max_size_w
+        self.vision_min_pixels = int(vision_min_pixels)
+        self.vision_max_pixels = int(vision_max_pixels)
         self.patch_size = patch_size
         self.perf = perf
         self.processor = _build_processor(
-            tokenizer_path, max_size_h, max_size_w, patch_size
+            tokenizer_path,
+            self.vision_min_pixels,
+            self.vision_max_pixels,
+            patch_size,
         )
         self.tokenizer = self.processor.tokenizer
         self.embedding_weight = _load_embedding(embedding_path, embedding_size)
@@ -172,8 +176,8 @@ class Qwen35Process(ModelProcess):
                             {
                                 "type": "image",
                                 "image": image,
-                                "resized_height": self.max_size_h,
-                                "resized_width": self.max_size_w,
+                                "min_pixels": self.vision_min_pixels,
+                                "max_pixels": self.vision_max_pixels,
                             }
                             for image in images
                         ],
@@ -188,13 +192,16 @@ class Qwen35Process(ModelProcess):
                 enable_thinking=False,
             )
             with self.perf.scope("llm.vision.preprocess"):
-                image_inputs, video_inputs = process_vision_info(messages)
+                image_inputs, video_inputs = process_vision_info(
+                    messages,
+                    image_factor=self.patch_size * SPATIAL_MERGE_SIZE,
+                )
                 model_inputs = self.processor(
                     text=[text],
                     images=image_inputs,
                     videos=video_inputs,
-                    min_pixels=self.max_size_h * self.max_size_w,
-                    max_pixels=self.max_size_h * self.max_size_w,
+                    min_pixels=self.vision_min_pixels,
+                    max_pixels=self.vision_max_pixels,
                     patch_size=self.patch_size,
                     merge_size=SPATIAL_MERGE_SIZE,
                     padding=True,
@@ -205,7 +212,7 @@ class Qwen35Process(ModelProcess):
                 input_ids=input_ids,
                 token_embeds=F.embedding(input_ids, self.embedding_weight),
                 positions=torch.empty(0),
-                vision_values=model_inputs["hm_pixel_values"],
+                vision_values=model_inputs["pixel_values"],
                 image_grid_thw=model_inputs["image_grid_thw"],
                 attention_mask=model_inputs["attention_mask"],
             )

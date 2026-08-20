@@ -29,6 +29,7 @@
 #include <iostream>
 #include <regex>
 #include <sstream>
+#include <unordered_map>
 
 #include "base/tcim_utils.h"
 #include "core/model_factory.h"
@@ -36,6 +37,95 @@
 namespace fs = std::filesystem;
 
 namespace houmo {
+namespace {
+
+bool IsActivationInput(const std::string& name);
+
+template <typename T>
+void SetHostInput(const std::shared_ptr<tcim::Module>& module,
+                  const std::string& name, const std::vector<T>& data) {
+  auto info = module->GetInputInfo(name).AsContiguous();
+  auto tensor = tcim::Tensor::CreateHostTensor(info);
+  if (tensor.MemSize() != data.size() * sizeof(T)) {
+    throw Exception("dynamic vision input size mismatch for " + name);
+  }
+  tensor.Buffer().CopyFromHost(data.data(), tensor.MemSize());
+  CHECK_TCIM_RET_STATUS(module->SetInput(name, tensor));
+}
+
+void SetPrefillInput(
+    const std::string& name, tcim::Tensor& tensor, const std::vector<float16>& embeds,
+    const std::vector<int32_t>& time_pos, const std::vector<int32_t>& height_pos,
+  const std::vector<int32_t>& width_pos, const std::vector<float16>& attn_mask,
+    int32_t valid_length, int32_t current_length) {
+  const size_t mem_size = tensor.MemSize();
+  if (IsActivationInput(name)) {
+    tensor.Buffer().CopyFromHost(embeds.data(), mem_size);
+  } else if (name.find("time_position_ids") != std::string::npos) {
+    tensor.Buffer().CopyFromHost(time_pos.data(), time_pos.size() * sizeof(int32_t));
+  } else if (name.find("hight_position_ids") != std::string::npos ||
+             name.find("height_position_ids") != std::string::npos) {
+    tensor.Buffer().CopyFromHost(height_pos.data(), height_pos.size() * sizeof(int32_t));
+  } else if (name.find("width_position_ids") != std::string::npos) {
+    tensor.Buffer().CopyFromHost(width_pos.data(), width_pos.size() * sizeof(int32_t));
+  } else if (name.find("valid_length") != std::string::npos) {
+    tensor.Buffer().CopyFromHost(&valid_length, mem_size);
+  } else if (name.find("current_length") != std::string::npos) {
+    tensor.Buffer().CopyFromHost(&current_length, mem_size);
+  } else if (name.find("linear_attn_mask") != std::string::npos) {
+    tensor.Buffer().CopyFromHost(attn_mask.data(), mem_size);
+  }
+}
+
+std::string BareTensorName(const std::string& name) {
+  constexpr const char* suffix = ".hmcc.format";
+  if (name.size() >= std::char_traits<char>::length(suffix) &&
+      name.compare(name.size() - std::char_traits<char>::length(suffix),
+                   std::char_traits<char>::length(suffix), suffix) == 0) {
+    return name.substr(0, name.size() - std::char_traits<char>::length(suffix));
+  }
+  return name;
+}
+
+bool IsActivationInput(const std::string& name) {
+  const std::string bare = BareTensorName(name);
+  return bare == "input_1" || bare.find("input_embedding") != std::string::npos ||
+         bare.find("next_token_embedding") != std::string::npos ||
+         bare.find("hidden_states") != std::string::npos ||
+         bare.find("post_norm_hidden") != std::string::npos ||
+         bare.find("pre_norm_hidden") != std::string::npos;
+}
+
+bool IsCacheInput(const std::string& name) {
+  const std::string bare = BareTensorName(name);
+  return bare.find("model_layers") != std::string::npos ||
+         bare.find("kcache_input") != std::string::npos ||
+         bare.find("vcache_input") != std::string::npos ||
+         bare.find("past_key_cache") != std::string::npos ||
+         bare.find("past_value_cache") != std::string::npos ||
+         bare.find("past_conv_cache") != std::string::npos ||
+         bare.find("past_recurrent_state") != std::string::npos;
+}
+
+std::string FindInputByBare(const std::shared_ptr<tcim::Module>& module,
+                            const std::string& bare_name) {
+  for (int i = 0; i < module->GetInputNum(); ++i) {
+    const std::string actual = module->GetInputName(i);
+    if (BareTensorName(actual) == bare_name) return actual;
+  }
+  return {};
+}
+
+std::string FindOutputByBare(const std::shared_ptr<tcim::Module>& module,
+                             const std::string& bare_name) {
+  for (int i = 0; i < module->GetOutputNum(); ++i) {
+    const std::string actual = module->GetOutputName(i);
+    if (BareTensorName(actual) == bare_name) return actual;
+  }
+  return {};
+}
+
+}  // namespace
 
 // ============================================================================
 // Qwen35MLLMContext Implementation
@@ -43,9 +133,10 @@ namespace houmo {
 
 Qwen35MLLMContext::Qwen35MLLMContext(LLMModel* model, int n_ctx)
     : Context(model, n_ctx) {
-  auto* qwen_model = static_cast<Qwen35MLLMModel*>(model_);
-  img_processor_ = std::make_shared<HmImageProcessor>(
-      qwen_model->max_size_h(), qwen_model->max_size_w(), false);
+  img_processor_ = std::make_shared<qwen35::DynamicImageProcessor>(
+      PATCH_SIZE, TEMPORAL_PATCH_SIZE, SPATIAL_MERGE_SIZE, 65536,
+      1536 * SPATIAL_MERGE_SIZE * SPATIAL_MERGE_SIZE * PATCH_SIZE * PATCH_SIZE,
+      static_cast<Qwen35MLLMModel*>(model_)->preprocessor_config_path());
 }
 
 Token Qwen35MLLMContext::prefill(const std::vector<Token>& tokens) {
@@ -151,71 +242,139 @@ void Qwen35MLLMContext::reset() {
 std::vector<Token> Qwen35MLLMContext::pad_visual_token(
     const std::vector<Token>& tokens) {
   std::vector<Token> results;
-  auto* model = static_cast<Qwen35MLLMModel*>(model_);
-  int grid_w = model->max_size_w() / (SPATIAL_MERGE_SIZE * PATCH_SIZE);
-  int grid_h = model->max_size_h() / (SPATIAL_MERGE_SIZE * PATCH_SIZE);
-  int grid_size = grid_h * grid_w;
+  size_t image_index = 0;
   for (size_t i = 0; i < tokens.size(); ++i) {
     results.push_back(tokens[i]);
     if (tokens[i] == IMAGE_TOKEN_ID) {
+      if (image_index >= image_grid_thw_.size()) {
+        throw Exception("image token count exceeds processed image count");
+      }
+      const auto [t, h, w] = image_grid_thw_[image_index++];
+      if (t <= 0 || h <= 0 || w <= 0 || h % SPATIAL_MERGE_SIZE != 0 ||
+          w % SPATIAL_MERGE_SIZE != 0) {
+        throw Exception("invalid image_grid_thw for image token expansion");
+      }
+      const int grid_size = t * (h / SPATIAL_MERGE_SIZE) *
+                            (w / SPATIAL_MERGE_SIZE);
       for (int j = 0; j < grid_size - 1; ++j) {
         results.push_back(IMAGE_TOKEN_ID);
       }
     }
   }
+  if (image_index != image_grid_thw_.size()) {
+    throw Exception("processed image count exceeds image token count");
+  }
   return results;
 }
 
-void Qwen35MLLMContext::vision_preprocess(int image_idx) {
+void Qwen35MLLMContext::vision_preprocess(int image_idx, int gear) {
   auto* model = static_cast<Qwen35MLLMModel*>(model_);
-  auto vision_module = model->vision_module();
+  auto vision_module = model->vision_module(gear);
   if (!vision_module) {
     throw Exception("Vision module not loaded");
   }
 
   const auto& path = image_paths_[image_idx];
-  current_processed_image_ = img_processor_->LoadAndProcess(path);
+  (void)path;
+  const auto& image = current_processed_image_;
+  const int patch_capacity = model->vision_patch_capacity(gear);
+  const int valid_patches = image.grid_t * image.grid_h * image.grid_w;
+  if (valid_patches > patch_capacity) {
+    throw Exception("image exceeds selected dynamic vision gear capacity");
+  }
+  current_vision_tensor_ = image.pixel_values;
+  current_vision_tensor_.resize(static_cast<size_t>(patch_capacity) * image.patch_dim,
+                                static_cast<float16>(0.0f));
 
-  // Compute image_grid_thw: (t, h, w)
-  // t = 1 (single frame image), h = height / PATCH_SIZE, w = width / PATCH_SIZE
-  int t = 1;
-  int h = current_processed_image_.height / PATCH_SIZE;
-  int w = current_processed_image_.width / PATCH_SIZE;
-  image_grid_thw_.emplace_back(t, h, w);
-
-  current_vision_tensor_ =
-      img_processor_->ToFP16Tensor(current_processed_image_);
-
-  auto input_name = vision_module->GetInputName(0);
-  auto input_info = vision_module->GetInputInfo(input_name);
-  auto input_tensor = tcim::Tensor::CreateHostTensor(input_info);
-  input_tensor.Buffer().CopyFromHost(
-      current_vision_tensor_.data(),
-      current_vision_tensor_.size() * sizeof(float16));
-  CHECK_TCIM_RET_STATUS(vision_module->SetInput(input_name, input_tensor));
+  const int side = static_cast<int>(std::sqrt(NUM_POSITION_EMBEDDINGS));
+  if (side * side != NUM_POSITION_EMBEDDINGS) {
+    throw Exception("NUM_POSITION_EMBEDDINGS must be a square");
+  }
+  std::vector<int32_t> position_ids(4 * patch_capacity, 0);
+  std::vector<float16> position_weights(4 * patch_capacity, static_cast<float16>(0.0f));
+  std::vector<int32_t> rotary_position_ids(2 * patch_capacity, 0);
+  std::vector<float16> attention_mask(patch_capacity, static_cast<float16>(0.0f));
+  auto merge_index = [&](int row, int col) {
+    const int block_h = row / SPATIAL_MERGE_SIZE;
+    const int block_w = col / SPATIAL_MERGE_SIZE;
+    const int local_h = row % SPATIAL_MERGE_SIZE;
+    const int local_w = col % SPATIAL_MERGE_SIZE;
+    return (block_h * (image.grid_w / SPATIAL_MERGE_SIZE) + block_w) *
+               SPATIAL_MERGE_SIZE * SPATIAL_MERGE_SIZE +
+           local_h * SPATIAL_MERGE_SIZE + local_w;
+  };
+  for (int row = 0; row < image.grid_h; ++row) {
+    const double y = image.grid_h == 1 ? 0.0 :
+        static_cast<double>(row) * (side - 1) / (image.grid_h - 1);
+    const int y0 = static_cast<int>(std::floor(y));
+    const int y1 = std::min(y0 + 1, side - 1);
+    const double dy = y - y0;
+    for (int col = 0; col < image.grid_w; ++col) {
+      const double x = image.grid_w == 1 ? 0.0 :
+          static_cast<double>(col) * (side - 1) / (image.grid_w - 1);
+      const int x0 = static_cast<int>(std::floor(x));
+      const int x1 = std::min(x0 + 1, side - 1);
+      const double dx = x - x0;
+      const int index = merge_index(row, col);
+      const int ids[4] = {y0 * side + x0, y0 * side + x1,
+                          y1 * side + x0, y1 * side + x1};
+      const double weights[4] = {(1 - dy) * (1 - dx), (1 - dy) * dx,
+                                 dy * (1 - dx), dy * dx};
+      for (int i = 0; i < 4; ++i) {
+        position_ids[i * patch_capacity + index] = ids[i];
+        position_weights[i * patch_capacity + index] =
+            static_cast<float16>(weights[i]);
+      }
+      rotary_position_ids[index] = row;
+      rotary_position_ids[patch_capacity + index] = col;
+    }
+  }
+  for (int i = valid_patches; i < patch_capacity; ++i) {
+    attention_mask[i] = static_cast<float16>(-65504.0f);
+  }
+  SetHostInput(vision_module, "pixel_values", current_vision_tensor_);
+  SetHostInput(vision_module, "position_ids", position_ids);
+  SetHostInput(vision_module, "position_weights", position_weights);
+  SetHostInput(vision_module, "rotary_position_ids", rotary_position_ids);
+  SetHostInput(vision_module, "attention_mask", attention_mask);
 }
 
-void Qwen35MLLMContext::vision_inference() {
+void Qwen35MLLMContext::vision_inference(int gear) {
   auto* model = static_cast<Qwen35MLLMModel*>(model_);
-  auto vision_module = model->vision_module();
+  auto vision_module = model->vision_module(gear);
   CHECK_TCIM_RET_STATUS(vision_module->Run());
   CHECK_TCIM_RET_STATUS(vision_module->Sync());
 }
 
 void Qwen35MLLMContext::vision_postprocess(int image_idx) {
   auto* model = static_cast<Qwen35MLLMModel*>(model_);
-  auto vision_module = model->vision_module();
+  const auto [t, h, w] = image_grid_thw_[image_idx];
+  const int valid_tokens = t * (h / SPATIAL_MERGE_SIZE) * (w / SPATIAL_MERGE_SIZE);
+  int selected_gear = 0;
+  for (int gear : model->vision_gears()) {
+    if (valid_tokens <= gear) {
+      selected_gear = gear;
+      break;
+    }
+  }
+  if (selected_gear == 0) {
+    throw Exception("image exceeds loaded dynamic vision gears");
+  }
+  auto vision_module = model->vision_module(selected_gear);
 
   auto output_name = vision_module->GetOutputName(0);
   auto dev_output = vision_module->GetDevOutput(output_name);
   auto host_output = dev_output.ToHost(true);
 
-  // Directly concatenate to flat_image_embeds_
   size_t output_size = host_output.Buffer().Size() / sizeof(float16);
   const float16* output_data =
       static_cast<const float16*>(host_output.Buffer().Data());
+  const int embed_dim = model->embedding_dim();
+  if (output_size < static_cast<size_t>(valid_tokens) * embed_dim) {
+    throw Exception("dynamic vision output is shorter than valid image tokens");
+  }
   flat_image_embeds_.insert(flat_image_embeds_.end(), output_data,
-                            output_data + output_size);
+                            output_data + static_cast<size_t>(valid_tokens) * embed_dim);
 }
 
 void Qwen35MLLMContext::run_vision() {
@@ -224,25 +383,42 @@ void Qwen35MLLMContext::run_vision() {
   }
 
   auto& p = profiler_;
+  auto* model = static_cast<Qwen35MLLMModel*>(model_);
 
   // Clear previous results
   flat_image_embeds_.clear();
   image_grid_thw_.clear();
 
-  for (size_t i = 0; i < image_paths_.size(); ++i) {
+  auto process_image = [&](size_t i) {
+    current_processed_image_ = img_processor_->LoadAndProcess(image_paths_[i]);
+    image_grid_thw_.emplace_back(current_processed_image_.grid_t,
+                                 current_processed_image_.grid_h,
+                                 current_processed_image_.grid_w);
+    const int valid_tokens = current_processed_image_.grid_t *
+                             (current_processed_image_.grid_h / SPATIAL_MERGE_SIZE) *
+                             (current_processed_image_.grid_w / SPATIAL_MERGE_SIZE);
+    int gear = 0;
+    for (int candidate : model->vision_gears()) {
+      if (valid_tokens <= candidate) {
+        gear = candidate;
+        break;
+      }
+    }
+    if (gear == 0) throw Exception("image exceeds loaded dynamic vision gears");
     {
       auto t = p.scope("generate.vision.preprocess");
-      vision_preprocess(i);
+      vision_preprocess(i, gear);
     }
     {
       auto t = p.scope("generate.vision.inference");
-      vision_inference();
+      vision_inference(gear);
     }
     {
       auto t = p.scope("generate.vision.postprocess");
       vision_postprocess(i);
     }
-  }
+  };
+  for (size_t i = 0; i < image_paths_.size(); ++i) process_image(i);
 }
 
 std::tuple<std::vector<std::vector<int32_t>>, int32_t, int>
@@ -494,29 +670,13 @@ void Qwen35MLLMContext::prefill_preprocess_chunk(
   auto prefill_module = model->prefill_module();
   const int attn_idx_start = model->attn_idx_start();
 
-  for (int idx = 0; idx < attn_idx_start; idx++) {
+  for (int idx = 0; idx < prefill_module->GetInputNum(); idx++) {
     const std::string& input_name = prefill_module->GetInputName(idx);
+    if (IsCacheInput(input_name)) continue;
     auto& tensor = input_map[input_name];
-    size_t mem_size = tensor.MemSize();
-
-    if (input_name.find("input_1") != std::string::npos) {
-      tensor.Buffer().CopyFromHost(chunk_embeds_.data(), mem_size);
-    } else if (input_name.find("time_position_ids") != std::string::npos) {
-      tensor.Buffer().CopyFromHost(chunk_time_pos_.data(),
-                                   chunk_time_pos_.size() * sizeof(int32_t));
-    } else if (input_name.find("hight_position_ids") != std::string::npos) {
-      tensor.Buffer().CopyFromHost(chunk_height_pos_.data(),
-                                   chunk_height_pos_.size() * sizeof(int32_t));
-    } else if (input_name.find("width_position_ids") != std::string::npos) {
-      tensor.Buffer().CopyFromHost(chunk_width_pos_.data(),
-                                   chunk_width_pos_.size() * sizeof(int32_t));
-    } else if (input_name.find("valid_length") != std::string::npos) {
-      tensor.Buffer().CopyFromHost(&valid_length, mem_size);
-    } else if (input_name.find("current_length") != std::string::npos) {
-      tensor.Buffer().CopyFromHost(&current_length, mem_size);
-    } else if (input_name.find("linear_attn_mask") != std::string::npos) {
-      tensor.Buffer().CopyFromHost(linear_attn_mask_.data(), mem_size);
-    }
+    SetPrefillInput(input_name, tensor, chunk_embeds_, chunk_time_pos_,
+                    chunk_height_pos_, chunk_width_pos_, linear_attn_mask_,
+                    valid_length, current_length);
     prefill_module->SetInput(input_name, tensor);
   }
 }
@@ -558,12 +718,11 @@ Token Qwen35MLLMContext::do_prefill_inference(const std::vector<Token>& tokens,
                                               Sampler* sampler) {
   auto& p = profiler_;
 
-  // 1. Expand image tokens
-  std::vector<Token> padded_tokens = pad_visual_token(tokens);
-
-  // 2. Vision processing — leaf stages only (generate.vision.*) so parent
-  // totals are pure rollups and not double-counted by PerfProfiler.
+  // 1. Vision processing must run before token expansion so image grids are known.
   run_vision();
+
+  // 2. Expand image tokens using the actual per-image grids.
+  std::vector<Token> padded_tokens = pad_visual_token(tokens);
 
   // 3. Prefill common setup (execute once)
   auto [position_ids_3d, seq_length, prefill_loop_chunk] = [&]() {
@@ -619,17 +778,19 @@ void Qwen35MLLMContext::decode_preprocess(Token prev_token) {
   auto decode_module = model->decode_module();
   const int attn_idx_start = model->attn_idx_start();
 
-  for (int idx = 0; idx < attn_idx_start; idx++) {
+  for (int idx = 0; idx < decode_module->GetInputNum(); idx++) {
     const std::string& input_name = decode_module->GetInputName(idx);
+    if (IsCacheInput(input_name)) continue;
     auto& tensor = input_map[input_name];
     size_t mem_size = tensor.MemSize();
 
-    if (input_name.find("input_1") != std::string::npos) {
+    if (IsActivationInput(input_name)) {
       tensor.Buffer().CopyFromHost(embed_data, mem_size);
     } else if (input_name.find("time_position_ids") != std::string::npos) {
       tensor.Buffer().CopyFromHost(decode_time_pos_.data(),
                                    decode_time_pos_.size() * sizeof(int32_t));
-    } else if (input_name.find("hight_position_ids") != std::string::npos) {
+    } else if (input_name.find("hight_position_ids") != std::string::npos ||
+               input_name.find("height_position_ids") != std::string::npos) {
       tensor.Buffer().CopyFromHost(decode_height_pos_.data(),
                                    decode_height_pos_.size() * sizeof(int32_t));
     } else if (input_name.find("width_position_ids") != std::string::npos) {
@@ -700,6 +861,25 @@ Qwen35MLLMModel::Qwen35MLLMModel(const ModelConfig& config) : VLMModel(config) {
   load();
 }
 
+int Qwen35MLLMModel::vision_patch_capacity(int gear) const {
+  auto it = vision_patch_capacities_.find(gear);
+  if (it == vision_patch_capacities_.end()) {
+    throw Exception("dynamic vision gear is not loaded: m" + std::to_string(gear));
+  }
+  return it->second;
+}
+
+std::shared_ptr<tcim::Module> Qwen35MLLMModel::vision_module(int gear) const {
+  auto it = vision_modules_.find(gear);
+  return it == vision_modules_.end() ? nullptr : it->second;
+}
+
+std::string Qwen35MLLMModel::preprocessor_config_path() const {
+  fs::path path(config_.tokenizer_path);
+  if (fs::is_regular_file(path)) path = path.parent_path();
+  return (path / "preprocessor_config.json").string();
+}
+
 std::unique_ptr<Context> Qwen35MLLMModel::create_context(int n_ctx) {
   if (n_ctx <= 0) {
     n_ctx = info_.n_ctx;
@@ -711,12 +891,13 @@ void Qwen35MLLMModel::ClearKVCache() {
   if (!prefill_module_ || !decode_module_) return;
 
   // Clear conv_cache and recurrent_state (if they exist)
-  for (int idx = 0; idx < prefill_module_->GetInputNum(); idx++) {
-    const auto input_name = prefill_module_->GetInputName(idx);
-    if (input_name.find("conv_cache") == std::string::npos &&
-        input_name.find("recurrent_state") == std::string::npos) {
-      continue;
-    }
+    for (int idx = 0; idx < prefill_module_->GetInputNum(); idx++) {
+      const auto input_name = prefill_module_->GetInputName(idx);
+      const auto bare_name = BareTensorName(input_name);
+      if (bare_name.find("conv_cache") == std::string::npos &&
+          bare_name.find("recurrent_state") == std::string::npos) {
+        continue;
+      }
 
     // Clear prefill cache
     auto prefill_input_info =
@@ -769,7 +950,7 @@ void Qwen35MLLMModel::load() {
 
     std::regex pattern("model_layers_(\\d+)_self_attn_kcache_input");
     for (int i = 0; i < prefill_module_->GetInputNum(); i++) {
-      std::string name = prefill_module_->GetInputName(i);
+      std::string name = BareTensorName(prefill_module_->GetInputName(i));
       std::smatch match;
       if (std::regex_search(name, match, pattern)) {
         int layer_idx = std::stoi(match[1].str());
@@ -778,7 +959,7 @@ void Qwen35MLLMModel::load() {
     }
 
     for (int i = 0; i < prefill_module_->GetInputNum(); i++) {
-      std::string name = prefill_module_->GetInputName(i);
+      std::string name = BareTensorName(prefill_module_->GetInputName(i));
       if (name.find("kcache_input") != std::string::npos ||
           name.find("vcache_input") != std::string::npos) {
         attn_idx_start_ = i;
@@ -786,8 +967,7 @@ void Qwen35MLLMModel::load() {
       }
     }
 
-    if (attn_idx_start_ > 0 &&
-        attn_idx_start_ < prefill_module_->GetInputNum()) {
+    if (attn_idx_start_ > 0 && attn_idx_start_ < prefill_module_->GetInputNum()) {
       auto attn_shape =
           prefill_module_
               ->GetInputInfo(prefill_module_->GetInputName(attn_idx_start_))
@@ -809,15 +989,11 @@ void Qwen35MLLMModel::load() {
     const std::string& decode_path = config_.decode_path;
 
     std::vector<std::string> dummy_names;
-    for (int i = 0; i < n_blocks_; i++) {
-      std::stringstream ss;
-      ss << "model_layers_" << i << "_self_attn_kcache_input";
-      dummy_names.emplace_back(ss.str());
-    }
-    for (int i = 0; i < n_blocks_; i++) {
-      std::stringstream ss;
-      ss << "model_layers_" << i << "_self_attn_vcache_input";
-      dummy_names.emplace_back(ss.str());
+    for (int i = 0; i < prefill_module_->GetInputNum(); ++i) {
+      const std::string name = prefill_module_->GetInputName(i);
+      if (BareTensorName(name).find("model_layers") != std::string::npos) {
+        dummy_names.push_back(name);
+      }
     }
 
     auto option_decode = tcim::Module::Option(*weight_manager_);
@@ -845,22 +1021,92 @@ void Qwen35MLLMModel::load() {
     auto option_vision = tcim::Module::Option(*weight_manager_);
     option_vision.EnableIOLazyMode(true);
     option_vision.EnableHostLazyLoading(config_.lazy_mode);
-
-    vision_module_ = std::make_shared<tcim::Module>();
-    CHECK_TCIM_RET_STATUS(
-        vision_module_->LoadModel(vision_path, option_vision));
-    std::cout << "Vision model loaded: " << vision_path << std::endl;
-
-    vision_input_name_ = vision_module_->GetInputName(0);
+    std::vector<std::pair<int, std::string>> vision_paths;
+    for (int gear : VISION_GEARS) {
+      const std::string suffix = "_visual_m" + std::to_string(gear) + ".hmm";
+      const auto pos = vision_path.rfind("_visual.hmm");
+      if (pos != std::string::npos) {
+        vision_paths.emplace_back(gear, vision_path.substr(0, pos) + suffix);
+      }
+    }
+    if (fs::is_regular_file(vision_path)) {
+      int gear = 1536;
+      std::regex gear_re(".*_m([0-9]+)\\.hmm$");
+      std::smatch match;
+      if (std::regex_match(vision_path, match, gear_re)) {
+        gear = std::stoi(match[1].str());
+        vision_paths.clear();
+        vision_paths.emplace_back(gear, vision_path);
+      } else {
+        vision_paths.clear();
+        vision_paths.emplace_back(gear, vision_path);
+      }
+    } else if (fs::is_directory(vision_path)) {
+      vision_paths.clear();
+      for (const auto& entry : fs::recursive_directory_iterator(vision_path)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".hmm") continue;
+        std::regex gear_re(".*_m([0-9]+)\\.hmm$");
+        std::smatch match;
+        const std::string path = entry.path().string();
+        if (std::regex_match(path, match, gear_re)) {
+          vision_paths.emplace_back(std::stoi(match[1].str()), path);
+        }
+      }
+    }
+    std::sort(vision_paths.begin(), vision_paths.end());
+    vision_paths.erase(std::unique(vision_paths.begin(), vision_paths.end()),
+                       vision_paths.end());
+    if (vision_paths.empty()) {
+      throw Exception("no dynamic vision HMMs found from " + vision_path);
+    }
+    for (const auto& [gear, path] : vision_paths) {
+      if (gear != 96 && gear != 196 && gear != 384 && gear != 704 && gear != 1536) {
+        continue;
+      }
+      auto module = std::make_shared<tcim::Module>();
+      CHECK_TCIM_RET_STATUS(module->LoadModel(path, option_vision));
+      const auto names = module->GetInputNum();
+      const std::array<std::string, 5> expected = {
+          "pixel_values", "position_ids", "position_weights",
+          "rotary_position_ids", "attention_mask"};
+      if (names != static_cast<int>(expected.size())) {
+        throw Exception("dynamic vision graph must expose five inputs: " + path);
+      }
+      for (int i = 0; i < names; ++i) {
+        if (module->GetInputName(i) != expected[static_cast<size_t>(i)]) {
+          throw Exception("unexpected dynamic vision input name in " + path);
+        }
+      }
+      const auto shape = module->GetInputInfo("pixel_values").Shape();
+      const int expected_capacity = gear * SPATIAL_MERGE_SIZE * SPATIAL_MERGE_SIZE;
+      if (shape.size() != 3 || shape[0] != 1 || shape[1] != expected_capacity || shape[2] != 1536) {
+        throw Exception("dynamic vision pixel_values shape mismatch: " + path);
+      }
+      const std::map<std::string, std::vector<int64_t>> expected_shapes = {
+          {"position_ids", {4, expected_capacity}},
+          {"position_weights", {4, expected_capacity}},
+          {"rotary_position_ids", {2, expected_capacity}},
+          {"attention_mask", {1, 1, 1, expected_capacity}},
+      };
+      for (const auto& [name, expected_shape] : expected_shapes) {
+      const auto actual_shape = module->GetInputInfo(name).Shape();
+        if (actual_shape.size() != expected_shape.size() ||
+            !std::equal(actual_shape.begin(), actual_shape.end(), expected_shape.begin())) {
+          throw Exception("dynamic vision input shape mismatch for " + name + ": " + path);
+        }
+      }
+      vision_patch_capacities_[gear] = expected_capacity;
+      vision_modules_[gear] = module;
+      vision_gears_.push_back(gear);
+      vision_patch_dim_ = shape[2];
+      vision_hidden_size_ = module->GetOutputInfo(module->GetOutputName(0)).Shape().back();
+      std::cout << "Vision gear m" << gear << " loaded: " << path << std::endl;
+    }
+    std::sort(vision_gears_.begin(), vision_gears_.end());
+    if (vision_gears_.empty()) throw Exception("no supported dynamic vision gears loaded");
+    vision_module_ = vision_modules_.at(vision_gears_.back());
+    vision_input_name_ = "pixel_values";
     vision_output_name_ = vision_module_->GetOutputName(0);
-    auto vision_input_shape =
-        vision_module_->GetInputInfo(vision_input_name_).Shape();
-    auto vision_output_shape =
-        vision_module_->GetOutputInfo(vision_output_name_).Shape();
-    max_size_h_ = vision_input_shape[3];
-    max_size_w_ = vision_input_shape[4];
-    vision_input_map_[vision_input_name_] = tcim::Tensor::CreateHostTensor(
-        vision_module_->GetInputInfo(vision_input_name_));
   }
 
   // Step 5 - Share KV Cache
@@ -869,41 +1115,72 @@ void Qwen35MLLMModel::load() {
 
     for (int idx = 0; idx < prefill_module_->GetInputNum(); idx++) {
       const std::string layer_name = prefill_module_->GetInputName(idx);
+      const std::string bare_layer_name = BareTensorName(layer_name);
 
       // Share model_layers / past_key_cache / past_value_cache
-      if (layer_name.find("model_layers") != std::string::npos ||
-          layer_name.find("past_key_cache_") != std::string::npos ||
-          layer_name.find("past_value_cache_") != std::string::npos) {
+      if (bare_layer_name.find("model_layers") != std::string::npos ||
+          bare_layer_name.find("past_key_cache_") != std::string::npos ||
+          bare_layer_name.find("past_value_cache_") != std::string::npos) {
         auto cache = prefill_module_->GetDevInput(layer_name);
-        CHECK_TCIM_RET_STATUS(decode_module_->SetDevInput(layer_name, cache));
+        const std::string decode_input = FindInputByBare(decode_module_, bare_layer_name);
+        if (!decode_input.empty()) {
+          CHECK_TCIM_RET_STATUS(decode_module_->SetDevInput(decode_input, cache));
+        }
       }
 
       // conv_cache: set prefill output, decode input, decode output
-      if (layer_name.find("conv_cache") != std::string::npos) {
-        std::string output_name = layer_name;
+      if (bare_layer_name.find("conv_cache") != std::string::npos) {
+        std::string output_name = bare_layer_name;
         const std::string prefix = "past_conv_cache_";
         if (output_name.rfind(prefix, 0) == 0) {
           output_name.replace(0, prefix.size(), "conv_cache_out_");
         }
         auto cache = prefill_module_->GetDevInput(layer_name);
+        const std::string actual_prefill_output =
+            FindOutputByBare(prefill_module_, output_name);
+        const std::string decode_input =
+            FindInputByBare(decode_module_, bare_layer_name);
+        const std::string actual_decode_output =
+            FindOutputByBare(decode_module_, output_name);
+        if (actual_prefill_output.empty() || decode_input.empty() ||
+            actual_decode_output.empty()) {
+          throw Exception("conv cache graph contract mismatch for " + bare_layer_name);
+        }
         CHECK_TCIM_RET_STATUS(
-            prefill_module_->SetDevOutput(output_name, cache));
-        CHECK_TCIM_RET_STATUS(decode_module_->SetDevInput(layer_name, cache));
-        CHECK_TCIM_RET_STATUS(decode_module_->SetDevOutput(output_name, cache));
+            prefill_module_->SetDevOutput(actual_prefill_output, cache));
+        CHECK_TCIM_RET_STATUS(decode_module_->SetDevInput(decode_input, cache));
+        CHECK_TCIM_RET_STATUS(
+            decode_module_->SetDevOutput(actual_decode_output, cache));
       }
 
       // recurrent_state: set prefill output, decode input, decode output
-      if (layer_name.find("recurrent_state") != std::string::npos) {
-        std::string output_name = layer_name;
+      if (bare_layer_name.find("recurrent_state") != std::string::npos) {
+        std::string output_name = bare_layer_name;
         const std::string prefix = "past_recurrent_state_";
         if (output_name.rfind(prefix, 0) == 0) {
           output_name.replace(0, prefix.size(), "recurrent_state_out_");
         }
         auto cache = prefill_module_->GetDevInput(layer_name);
-        CHECK_TCIM_RET_STATUS(
-            prefill_module_->SetDevOutput(output_name, cache));
-        CHECK_TCIM_RET_STATUS(decode_module_->SetDevInput(layer_name, cache));
-        CHECK_TCIM_RET_STATUS(decode_module_->SetDevOutput(output_name, cache));
+        // Newer Qwen graphs (including the Qwen3.8 input contract) can keep
+        // recurrent state only as an input tensor and omit the prefill output.
+        const std::string actual_prefill_output =
+            FindOutputByBare(prefill_module_, output_name);
+        const std::string decode_input =
+            FindInputByBare(decode_module_, bare_layer_name);
+        const std::string actual_decode_output =
+            FindOutputByBare(decode_module_, output_name);
+        if (!actual_prefill_output.empty()) {
+          CHECK_TCIM_RET_STATUS(
+              prefill_module_->SetDevOutput(actual_prefill_output, cache));
+        }
+        if (decode_input.empty()) {
+          throw Exception("decode recurrent input is missing for " + bare_layer_name);
+        }
+        CHECK_TCIM_RET_STATUS(decode_module_->SetDevInput(decode_input, cache));
+        if (!actual_decode_output.empty()) {
+          CHECK_TCIM_RET_STATUS(
+              decode_module_->SetDevOutput(actual_decode_output, cache));
+        }
       }
     }
     std::cout << "KV Cache shared" << std::endl;
@@ -921,8 +1198,9 @@ void Qwen35MLLMModel::load() {
   // Step 7 - Initialize input tensors
   {
     prefill_input_map_.clear();
-    for (int idx = 0; idx < attn_idx_start_; ++idx) {
+    for (int idx = 0; idx < prefill_module_->GetInputNum(); ++idx) {
       auto input_name = prefill_module_->GetInputName(idx);
+      if (IsCacheInput(input_name)) continue;
       auto input_info =
           prefill_module_->GetInputInfo(input_name).AsContiguous();
       tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
@@ -930,8 +1208,9 @@ void Qwen35MLLMModel::load() {
     }
 
     decode_input_map_.clear();
-    for (int idx = 0; idx < attn_idx_start_; ++idx) {
+    for (int idx = 0; idx < decode_module_->GetInputNum(); ++idx) {
       auto input_name = decode_module_->GetInputName(idx);
+      if (IsCacheInput(input_name)) continue;
       auto input_info = decode_module_->GetInputInfo(input_name).AsContiguous();
       tcim::Tensor input_tensor = tcim::Tensor::CreateHostTensor(input_info);
       decode_input_map_[input_name] = input_tensor;
@@ -968,8 +1247,12 @@ void Qwen35MLLMModel::load() {
   {
     if (fs::exists(config_.tokenizer_path)) {
       try {
-        tokenizer_ = std::make_shared<HfTokenizer>(config_.tokenizer_path);
-        std::cout << "Tokenizer loaded from: " << config_.tokenizer_path
+        fs::path tokenizer_path(config_.tokenizer_path);
+        if (fs::is_regular_file(tokenizer_path)) {
+          tokenizer_path = tokenizer_path.parent_path();
+        }
+        tokenizer_ = std::make_shared<HfTokenizer>(tokenizer_path.string());
+        std::cout << "Tokenizer loaded from: " << tokenizer_path.string()
                   << std::endl;
       } catch (const Exception& e) {
         std::cerr << "Warning: Failed to load tokenizer from "

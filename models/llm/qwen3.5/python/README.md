@@ -48,10 +48,14 @@ export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
 
 - `../output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
 - `../output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_${max_size_w}x${max_size_h}x${max_size_t}.hmm`
+- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m96.hmm`
+- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m196.hmm`
+- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m384.hmm`
+- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m704.hmm`
+- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m1536.hmm`
 - `../output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
 
-如果带尺寸的 visual 模型不存在但 `visual.hmm` 存在，脚本会使用后者。
+已存在的 visual gear HMM 会在启动时全部加载。图片按原始宽高比和 pixel budget 动态生成 patch，运行时根据真实 image token 数选择最小可容纳 gear，补齐到该视觉图容量，并裁剪 padding 输出。默认运行不需要传 `--vision_path`；程序会扫描实际存在的 `_visual_m<gear>.hmm`，允许只生成部分 gear。若没有带 gear 后缀的文件，则兼容加载 `visual.hmm` 作为最大 gear。
 
 MTP 示例额外读取：
 

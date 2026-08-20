@@ -21,6 +21,7 @@
 import argparse
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -38,6 +39,94 @@ DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / HOUMO_TARGET
 DEFAULT_IMAGE_PATHS = [str(HOUMO_EXAMPLES_PATH / "data" / "pic" / "beach.jpeg")]
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+DEFAULT_IMAGE_TOKEN_GEARS = (96, 196, 384, 704, 1536)
+
+
+def _infer_vision_gear(path: str) -> int | None:
+    parts = [Path(path).stem, *[parent.name for parent in Path(path).parents[:2]]]
+    for part in parts:
+        match = re.search(r"(?:^|[_-])m(\d+)(?:$|[_-])", part, flags=re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def _discover_geared_vision_paths(model_prefix: str) -> dict[int, str]:
+    paths = {}
+    candidates = sorted(path for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_visual_m*.hmm") if path.is_file())
+    for path in candidates:
+        gear = _infer_vision_gear(str(path))
+        if gear in DEFAULT_IMAGE_TOKEN_GEARS:
+            if gear in paths:
+                raise ValueError(f"duplicate vision gear m{gear}: {paths[gear]} and {path}")
+            paths[gear] = str(path)
+    return paths
+
+
+def _discover_vision_paths(model_prefix: str) -> dict[int, str]:
+    paths = _discover_geared_vision_paths(model_prefix)
+    if not paths:
+        candidates = sorted(
+            path
+            for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_visual_*.hmm")
+            if path.is_file() and _infer_vision_gear(str(path)) is None
+        )
+        if len(candidates) > 1:
+            raise ValueError(f"multiple static vision HMMs found: {candidates}")
+        if candidates:
+            paths[DEFAULT_IMAGE_TOKEN_GEARS[-1]] = str(candidates[0])
+    if not paths:
+        fallback = DEFAULT_OUTPUT_DIR / f"{model_prefix}_visual.hmm"
+        if fallback.is_file():
+            paths[DEFAULT_IMAGE_TOKEN_GEARS[-1]] = str(fallback)
+    if not paths:
+        raise FileNotFoundError(
+            f"no vision HMM found under {DEFAULT_OUTPUT_DIR}; expected "
+            f"{model_prefix}_visual_m<gear>.hmm, {model_prefix}_visual_<resolution>.hmm, "
+            f"or {model_prefix}_visual.hmm"
+        )
+    return paths
+
+
+def _expand_vision_specs(path_args):
+    specs = [item for group in path_args for value in group for item in value.split(",") if item]
+    expanded = []
+    for spec in specs:
+        explicit = re.match(r"^m?(\d+)[=:](.+)$", spec, flags=re.IGNORECASE)
+        if explicit:
+            expanded.append((int(explicit.group(1)), explicit.group(2).strip()))
+        elif Path(spec).is_dir():
+            directory_paths = [
+                (_infer_vision_gear(str(path)), str(path)) for path in sorted(Path(spec).rglob("*_visual_m*.hmm"))
+            ]
+            if not directory_paths:
+                static_paths = [
+                    path for path in sorted(Path(spec).rglob("*_visual_*.hmm")) if _infer_vision_gear(str(path)) is None
+                ]
+                if not static_paths:
+                    static_paths = sorted(Path(spec).rglob("*_visual.hmm"))
+                directory_paths = [(DEFAULT_IMAGE_TOKEN_GEARS[-1], str(path)) for path in static_paths]
+            expanded.extend(directory_paths)
+        else:
+            expanded.append((_infer_vision_gear(spec), spec))
+    return expanded
+
+
+def _resolve_vision_paths(path_args, model_prefix: str) -> dict[int, str]:
+    if path_args is None:
+        return _discover_vision_paths(model_prefix)
+    expanded = _expand_vision_specs(path_args)
+    unresolved = [path for gear, path in expanded if gear is None]
+    if unresolved:
+        raise ValueError(f"cannot infer gear from vision paths {unresolved}; use <gear>=<path>")
+    paths = {}
+    for gear, path in expanded:
+        if gear not in DEFAULT_IMAGE_TOKEN_GEARS:
+            raise ValueError(f"unsupported vision gear m{gear}")
+        if gear in paths:
+            raise ValueError(f"duplicate vision gear m{gear}")
+        paths[gear] = path
+    return dict(sorted(paths.items()))
 
 
 class HmQwen35:
@@ -50,14 +139,15 @@ class HmQwen35:
         decode_path,
         embedding_path,
         tokenizer_path,
-        vision_path=None,
+        vision_paths,
         lora: bool = False,
         model_name: str | None = None,
         model_size: str | None = None,
         ndevice: int = 1,
         batch: int = 1,
-        max_size_w: int = 896,
-        max_size_h: int = 896,
+        vision_min_pixels: int = 65536,
+        num_position_embeddings: int = 2304,
+        visual_rope_cache_length: int = 3072,
         patch_size: int = 16,
         sampling_params: GreedySamplingParams | None = None,
         perf: bool = False,
@@ -67,13 +157,14 @@ class HmQwen35:
         self.engine = Qwen35Engine(
             prefill_path=prefill_path,
             decode_path=decode_path,
-            vision_path=vision_path,
+            vision_paths=vision_paths,
             embedding_path=embedding_path,
             tokenizer_path=tokenizer_path,
             ndevice=ndevice,
             batch=batch,
-            max_size_w=max_size_w,
-            max_size_h=max_size_h,
+            vision_min_pixels=vision_min_pixels,
+            num_position_embeddings=num_position_embeddings,
+            visual_rope_cache_length=visual_rope_cache_length,
             patch_size=patch_size,
             sampling_params=sampling_params,
             perf=perf,
@@ -90,15 +181,11 @@ class HmQwen35:
             return None
         model_prefix = f"{model_name}-{model_size}"
         candidates = sorted(
-            path
-            for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_*_prefill_lora_input")
-            if path.is_dir()
+            path for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_*_prefill_lora_input") if path.is_dir()
         )
         if not candidates:
             candidates = sorted(
-                path
-                for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_prefill_lora_input")
-                if path.is_dir()
+                path for path in DEFAULT_OUTPUT_DIR.glob(f"**/{model_prefix}_prefill_lora_input") if path.is_dir()
             )
         logger.info("Found %d LoRA input directories for %s", len(candidates), model_prefix)
         if not candidates:
@@ -261,9 +348,10 @@ def get_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--vision_path",
         dest="vision_path",
-        type=str,
+        nargs="+",
+        action="append",
         default=None,
-        help="path to the vision HMM model",
+        help="dynamic vision HMMs: directory, files containing _m<gear>, or <gear>=<path>",
     )
     parser.add_argument(
         "--lora",
@@ -283,7 +371,7 @@ def get_args() -> argparse.ArgumentParser:
         "--image_path",
         dest="image_path",
         type=str,
-        default=DEFAULT_IMAGE_PATHS,
+        default=None,
         help="one or more image paths; the option may be repeated",
         nargs="+",
         action="extend",
@@ -303,25 +391,25 @@ def get_args() -> argparse.ArgumentParser:
         help="inference batch size; Qwen3.5 currently supports 1",
     )
     parser.add_argument(
-        "--max_size_w",
-        dest="max_size_w",
+        "--vision_min_pixels",
+        dest="vision_min_pixels",
         type=int,
-        default=None,
-        help="maximum resized image width",
+        default=65536,
+        help="minimum dynamic image pixel budget",
     )
     parser.add_argument(
-        "--max_size_h",
-        dest="max_size_h",
+        "--num_position_embeddings",
+        dest="num_position_embeddings",
         type=int,
-        default=None,
-        help="maximum resized image height",
+        default=2304,
+        help="number of learned ViT 2D position embeddings",
     )
     parser.add_argument(
-        "--max_size_t",
-        dest="max_size_t",
+        "--visual_rope_cache_length",
+        dest="visual_rope_cache_length",
         type=int,
-        default=None,
-        help="maximum temporal size used in the vision model filename",
+        default=3072,
+        help="maximum dynamic visual rotary position",
     )
     parser.add_argument(
         "--patch_size",
@@ -417,9 +505,8 @@ def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
         raise ValueError(f"unsupported model configuration: {args.model_name}-{args.model_size}") from error
 
     args.ndevice = args.ndevice or int(model_config.get("ndevice", 1))
-    args.max_size_w = args.max_size_w or int(model_config.get("max_size_w", 896))
-    args.max_size_h = args.max_size_h or int(model_config.get("max_size_h", 896))
-    args.max_size_t = args.max_size_t or int(model_config.get("max_size_t", 2))
+    if args.image_path is None and not args.it:
+        args.image_path = DEFAULT_IMAGE_PATHS
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.prefill_path is None:
         args.prefill_path = str(DEFAULT_OUTPUT_DIR / f"{model_prefix}_prefill.hmm")
@@ -431,12 +518,7 @@ def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
         repo_ids = model_config.get("modelscope_repo", [])
         tokenizer_name = repo_ids[0].rsplit("/", maxsplit=1)[-1] if repo_ids else model_prefix
         args.tokenizer_dir = str(MODEL_DIR / tokenizer_name)
-    if args.vision_path is None:
-        sized_path = DEFAULT_OUTPUT_DIR / (
-            f"{model_prefix}_visual_{args.max_size_w}x{args.max_size_h}x" f"{args.max_size_t}.hmm"
-        )
-        fallback_path = DEFAULT_OUTPUT_DIR / f"{model_prefix}_visual.hmm"
-        args.vision_path = str(fallback_path if not sized_path.exists() and fallback_path.exists() else sized_path)
+    args.vision_paths = _resolve_vision_paths(args.vision_path, model_prefix)
     if args.ndevice > 1:
         if args.prefill_path.endswith(".hmm"):
             args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
@@ -459,7 +541,7 @@ def _build_model(args: argparse.Namespace) -> HmQwen35:
     return HmQwen35(
         prefill_path=args.prefill_path,
         decode_path=args.decode_path,
-        vision_path=args.vision_path,
+        vision_paths=args.vision_paths,
         lora=args.lora,
         model_name=args.model_name,
         model_size=args.model_size,
@@ -467,8 +549,9 @@ def _build_model(args: argparse.Namespace) -> HmQwen35:
         tokenizer_path=args.tokenizer_dir,
         ndevice=args.ndevice,
         batch=args.batch,
-        max_size_w=args.max_size_w,
-        max_size_h=args.max_size_h,
+        vision_min_pixels=args.vision_min_pixels,
+        num_position_embeddings=args.num_position_embeddings,
+        visual_rope_cache_length=args.visual_rope_cache_length,
         patch_size=args.patch_size,
         sampling_params=_build_sampling_params(args),
         perf=args.perf,
@@ -518,7 +601,7 @@ def _run_interactive(model: HmQwen35, args: argparse.Namespace, supports_vision:
 def main():
     args = _resolve_args(get_args().parse_args())
     model = _build_model(args)
-    supports_vision = args.vision_path is not None
+    supports_vision = bool(args.vision_paths)
     if not args.it:
         _run_non_interactive(model, args, supports_vision)
         return

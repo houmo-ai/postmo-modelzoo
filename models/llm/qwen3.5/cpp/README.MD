@@ -34,7 +34,7 @@ REGISTER_MODEL(LLMModel, qwen35_mllm, ModelSeries::kQwen35MLLM,
 
 核心调用流程：
 
-1. 解析 `--prefill`、`--decode`、`--vision`、`--embedding`、`--tokenizer`、`--prompt`、`--image` 等参数。
+1. 解析 `--config`、`--model_name`、`--model_size`、`--prefill`、`--decode`、`--visual`、`--embedding`、`--tokenizer`、`--prompt`、`--image` 等参数。
 2. 构造 `houmo::ModelConfig`。
 3. 调用 `ModelFactory<LLMModel>::Create(ModelSeries::kQwen35MLLM, config)`，通过注册表创建模型。
 4. 通过返回的 `LLMModel` 基类指针调用 `model->create_context()`；图像输入时再转换为 `houmo::Qwen35MLLMContext`。
@@ -133,16 +133,24 @@ build/Release/demo.exe
 
 | 参数 | 说明 |
 |------|------|
-| `--prefill <path>` | Prefill `.hmm` 模型路径，必填 |
-| `--decode <path>` | Decode `.hmm` 模型路径，必填 |
-| `--vision <path>` | Vision `.hmm` 模型路径，图像输入时必填 |
-| `--embedding <path>` | Embedding `.bin` 文件路径，必填 |
-| `--tokenizer <path>` | Tokenizer JSON 或 tokenizer 目录路径，必填 |
-| `--prompt <text>` | 输入 prompt，默认是中文自我介绍问题 |
-| `--image <path>` | 图片路径，可重复传入多张图片 |
-| `--max-tokens <num>` | 最大生成 token 数，默认 256 |
-| `--device <id>` | 设备 ID，默认 0 |
+| `--config <path>` | `config.yaml` 路径，默认当前模型目录下的 `config.yaml` |
+| `--model_name <name>` | 模型名称，默认从 config 读取 |
+| `--model_size <size>` | 模型尺寸，默认从 config 读取 |
+| `--prefill <path>` | Prefill `.hmm` 模型路径，默认按模型名自动生成 |
+| `--decode <path>` | Decode `.hmm` 模型路径，默认按模型名自动生成 |
+| `--visual <path>` | Dynamic visual `.hmm` 文件或 gear 目录，默认使用 `visual.hmm` |
+| `--embedding <path>` | Embedding `.bin` 文件路径，默认按模型名自动生成 |
+| `--tokenizer <path>` | Tokenizer JSON 或 tokenizer 目录，默认按 `modelscope_repo` 自动生成 |
+| `--prompt <text>` / `--question <text>` | 输入 prompt，默认 `描述这些图片` |
+| `--system_prompt <text>` | 覆盖默认 system prompt |
+| `--image <path>` / `--image_path <path>` | 图片路径，可重复传入多张图片；不传时使用默认 beach.jpeg |
+| `--max-tokens <num>` / `--max-new-tokens <num>` | 最大生成 token 数 |
+| `--device <id>` / `--ndevice <num>` | 设备 ID/数量别名，当前只支持 1 个设备 |
+| `--batch <num>` | batch 大小，当前只支持 1 |
 | `-h, --help` | 打印帮助信息 |
+
+`--tokenizer` 传入 `tokenizer.json` 文件时，程序会自动使用其父目录加载完整
+tokenizer 配置，并从同一目录读取 `preprocessor_config.json`；也可以直接传入模型目录。
 
 ## 文本生成示例
 
@@ -156,40 +164,77 @@ build/Release/demo.exe
   --max-tokens 256
 ```
 
-## 图文理解示例
+也可以像 Python demo 一样只指定模型名称和尺寸：
 
-图像输入时需要额外传入 `--vision` 和至少一个 `--image`。demo 会自动在 prompt 前插入图片占位 token：
+```bash
+./build/demo \
+  --model_name qwen3.5 \
+  --model_size 9b \
+  --max-tokens 256
+```
+
+## Dynamic 图文理解
+
+Qwen3.5 dynamic visual 使用模型目录内的 ImageProcess，不修改公共
+`houmo_engine` ImageProcessor，也不引入 OpenCV、llama.cpp 或 ggml 依赖。
+ImageProcess 从 tokenizer/model 目录下的 `preprocessor_config.json` 读取
+`image_mean` 和 `image_std`。如果配置文件无法读取、JSON 解析失败、字段缺失或值
+非法，则回退到 Transformers `Qwen2VLImageProcessor` 默认的 CLIP mean/std。
+图片经过动态 resize、归一化和 merge-major patchify 后，送入 dynamic visual
+HMM 的五个输入：`pixel_values`、`position_ids`、`position_weights`、
+`rotary_position_ids` 和 `attention_mask`。
+
+如果只提供一个最大 gear，可以传入 `visual.hmm`；如果提供多 gear，可以将
+`--visual` 指向包含 `_m96`、`_m196`、`_m384`、`_m704`、`_m1536` 文件的目录。
+程序会在启动时加载实际存在的 gear，并根据图片真实 image token 数选择最小可容纳
+的 visual HMM。
+
+推荐的多 gear 文件名为：
+
+```text
+output/xh2/qwen3.5-9b_visual_m96.hmm
+output/xh2/qwen3.5-9b_visual_m196.hmm
+output/xh2/qwen3.5-9b_visual_m384.hmm
+output/xh2/qwen3.5-9b_visual_m704.hmm
+output/xh2/qwen3.5-9b_visual_m1536.hmm
+```
+
+当前 C++ 实现还兼容 Qwen3.8 风格的图契约：tensor 名称匹配会忽略
+`.hmcc.format` 后缀，recurrent state output 缺失时不会强制绑定 prefill output，
+prefill/decode 的输入会按语义名称处理，而不是只依赖固定输入下标。
+
+图像输入时需要额外传入 `--visual` 和至少一个 `--image`。demo 会自动在 prompt
+前插入图片占位 token：
 
 ```text
 <|vision_start|><|image_pad|><|vision_end|>
 ```
 
-运行示例：
+示例：
 
 ```bash
 ./build/demo \
-  --prefill ../output/xh2/qwen3.5-2b_prefill.hmm \
-  --decode ../output/xh2/qwen3.5-2b_decode.hmm \
-  --vision ../output/xh2/qwen3.5-2b_visual_448x448x2.hmm \
+  --prefill ../output/xh2/qwen3.5-9b_prefill.hmm \
+  --decode ../output/xh2/qwen3.5-9b_decode.hmm \
+  --visual ../output/xh2/qwen3.5-9b_visual.hmm \
   --embedding ../output/xh2/hmquant/quant_embedding.bin \
-  --tokenizer ../tokenizer.json \
+  --tokenizer ../Qwen3.5-9B \
   --image ./test.jpg \
   --prompt "请描述这张图片。" \
   --max-tokens 256
 ```
 
-多图输入可以重复传入 `--image`：
+多 gear 目录示例：
 
 ```bash
 ./build/demo \
-  --prefill ../output/xh2/qwen3.5-2b_prefill.hmm \
-  --decode ../output/xh2/qwen3.5-2b_decode.hmm \
-  --vision ../output/xh2/qwen3.5-2b_visual_448x448x2.hmm \
+  --prefill ../output/xh2/qwen3.5-9b_prefill.hmm \
+  --decode ../output/xh2/qwen3.5-9b_decode.hmm \
+  --visual ../output/xh2/gears \
   --embedding ../output/xh2/hmquant/quant_embedding.bin \
-  --tokenizer ../tokenizer.json \
-  --image ./a.jpg \
-  --image ./b.jpg \
-  --prompt "比较这两张图片的差异。"
+  --tokenizer ../Qwen3.5-9B \
+  --image ./test.jpg \
+  --prompt "请描述这张图片。"
 ```
 
 ## 输出指标
@@ -201,8 +246,8 @@ demo 推理结束后会输出：
 
 ## 注意事项
 
-- 文本生成不需要传入 `--vision`。
-- 只要传入 `--image`，就必须同时传入有效的 `--vision`。
+- 文本生成不需要传入 `--visual`。
+- 只要传入 `--image`，就必须同时传入 dynamic visual `.hmm` 文件或 gear 目录。
 - `--tokenizer` 需要与模型编译时使用的 tokenizer 保持一致。
 - `--embedding` 需要使用框架要求的量化 embedding 格式。
 - `$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 会链接 `houmo_infer`、`tcim_runtime_lite`，并复用 `houmo_engine` 的 include 和 lib 配置；Windows 平台下还会导入 `tokenizer_lib.lib/.dll`，并在依赖缺失时自动调用 `utils/cpp/houmo_engine/build_win.bat` 构建。

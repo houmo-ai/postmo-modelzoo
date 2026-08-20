@@ -36,12 +36,13 @@ class Qwen35Engine(HoumoEngine):
         embedding_path,
         tokenizer_path,
         *,
-        vision_path=None,
+        vision_paths,
         lora_path=None,
         ndevice: int = 1,
         batch: int = 1,
-        max_size_h: int = 896,
-        max_size_w: int = 896,
+        vision_min_pixels: int = 65536,
+        num_position_embeddings: int = 2304,
+        visual_rope_cache_length: int = 3072,
         patch_size: int = 16,
         sampling_params: GreedySamplingParams | None = None,
         perf: bool = False,
@@ -54,7 +55,10 @@ class Qwen35Engine(HoumoEngine):
         self.module = Qwen35Module(
             prefill_path,
             decode_path,
-            vision_path=vision_path,
+            vision_paths=vision_paths,
+            vision_min_pixels=vision_min_pixels,
+            num_position_embeddings=num_position_embeddings,
+            visual_rope_cache_length=visual_rope_cache_length,
             lora_path=lora_path,
             ndevice=ndevice,
             perf=self.perf,
@@ -63,8 +67,8 @@ class Qwen35Engine(HoumoEngine):
             tokenizer_path,
             embedding_path,
             self.module.embedding_size,
-            max_size_h=max_size_h,
-            max_size_w=max_size_w,
+            vision_min_pixels=vision_min_pixels,
+            vision_max_pixels=self.module.vision_patch_capacity * patch_size**2,
             patch_size=patch_size,
             perf=self.perf,
         )
@@ -100,7 +104,10 @@ class Qwen35Engine(HoumoEngine):
         if not request.uses_vision:
             return
         with self.perf.scope("llm.vision"):
-            outputs = self.module.run_vision(request.vision_values)
+            outputs = self.module.run_vision(
+                request.vision_values,
+                request.image_grid_thw,
+            )
             self.process.merge_vision(request, outputs, self.state)
 
     def _prefill(self, request):
