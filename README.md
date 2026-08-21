@@ -200,6 +200,9 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | ornith1.0               | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpm-v-4.5           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpm-v-4.6           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| qwen-agentworld         | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+
+
 
 ## API 示例
 

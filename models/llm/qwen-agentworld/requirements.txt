@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==5.5.0
+onnx-ir==0.1.13

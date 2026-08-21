@@ -1,0 +1,20 @@
+default_model_name: "qwen-agentworld"
+default_model_size: "35b-a3b"
+
+model_configs:
+  qwen-agentworld:
+    "35b-a3b":
+      modelscope_repo: ["Qwen/Qwen-AgentWorld-35B-A3B"]
+      model_name: "qwen-agentworld"
+      model_size: "35b-a3b"
+      ncore: 2
+      quant_type: "w8a8"
+      context_length: "2k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      max_size_w: 896
+      max_size_h: 896
+      max_size_t: 2
+      workflow_config: "./configs/qwen_agentworld_35b_a3b_full.yaml"
+

@@ -269,6 +269,15 @@ def test_ocr_ppocrv3_rec_demo(setup_logging) -> None:
     _demo_func("ppocrv3_rec", setup_logging)
 
 
+@pytest.mark.qwen_agentworld
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.demo
+def test_llm_qwen_agentworld_demo(setup_logging) -> None:
+    """test_llm_qwen_agentworld_demo"""
+    _demo_func("qwen-agentworld", setup_logging)
+
+
 @pytest.mark.qwen2dot5_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -636,3 +645,13 @@ def test_detection_yolox_demo(setup_logging) -> None:
 def test_diffusion_z_image_turbo_demo(setup_logging) -> None:
     """test_diffusion_z_image_turbo_demo"""
     _demo_func("z-image-turbo", setup_logging)
+
+
+
+@pytest.mark.qwen_agentworld
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.demo
+def test_qwen_agentworld_demo(setup_logging) -> None:
+    """test_qwen_agentworld_demo"""
+    _demo_func("qwen-agentworld", setup_logging)

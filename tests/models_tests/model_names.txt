@@ -39,6 +39,7 @@ qwen3_vl
 qwen3_vl_embedding
 qwen3dot5
 qwen3dot5_tool_test
+qwen_agentworld
 resnet50
 sam2
 sam3

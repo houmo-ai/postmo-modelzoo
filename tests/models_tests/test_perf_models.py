@@ -143,6 +143,15 @@ def test_ocr_ppocrv3_rec_perf(setup_logging) -> None:
     _perf_func("ppocrv3_rec", setup_logging)
 
 
+@pytest.mark.qwen_agentworld
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.perf
+def test_llm_qwen_agentworld_perf(setup_logging) -> None:
+    """test_llm_qwen_agentworld_perf"""
+    _perf_func("qwen-agentworld", setup_logging)
+
+
 @pytest.mark.qwen2dot5_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -411,3 +420,12 @@ def test_detection_yolov9m_perf(setup_logging) -> None:
 def test_detection_yolox_perf(setup_logging) -> None:
     """test_detection_yolox_perf"""
     _perf_func("yolox", setup_logging)
+
+
+@pytest.mark.qwen_agentworld
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_24g
+@pytest.mark.perf
+def test_qwen_agentworld_perf(setup_logging) -> None:
+    """test_qwen_agentworld_perf"""
+    _perf_func("qwen-agentworld", setup_logging)

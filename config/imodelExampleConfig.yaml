@@ -577,6 +577,18 @@ llm_qwen3-next:
         args: all
   test:
     - llm_qwen3-next_test
+llm_qwen-agentworld:
+  include:
+    - models/llm/qwen-agentworld
+  exclude:
+    - models/llm/qwen-agentworld/README.MD
+  example_case:
+    - llm_qwen-agentworld_test:
+        test_type: models_tests
+        script: qwen_agentworld
+        args: all
+  test:
+    - llm_qwen-agentworld_test
 llm_copaw-flash:
   include:
     - models/llm/CoPaw-Flash
