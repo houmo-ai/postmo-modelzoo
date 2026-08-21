@@ -69,6 +69,8 @@ description: "Perform static semantic review of iModelzoo model conversion, comp
 - 检查 C++ build 测试是否使用正确的 source/build/install 目录并验证实际可执行文件。
 - 对 multibatch、multistream、pipeline 和 scene 示例检查测试是否覆盖其核心并发或组合行为。
 - 检查新增示例是否同步 pytest 参数化入口、marker 和必要的聚合文档。
+- 新增或修改 `apis/converts/<example>/`、`apis/inferences/<example>/` 或 `apis/scenes/<example>/` 时，必须读取仓库根 `README.md` 的 `## API 示例` 表，确认对应示例已列出；未列出按 `imodelzoo-code-review` 定为 P0。保持现有排除路径：不要因 `apis/data/**`、`apis/models/**` 等排除路径单独触发本项。
+- 删除上述 API 示例目录时，必须检查根 `README.md` 的 `## API 示例` 是否同步删除对应行或描述；残留登记定为 P0。仅改测试配置、聚合文档或排除路径且没有 API 示例目录变更时，不要凭空报告本项。
 
 ## 示例可复制性
 

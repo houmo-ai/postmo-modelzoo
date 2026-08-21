@@ -138,11 +138,14 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 
 | models                  | path         | target | quant | build | perf | demo | eval | support |
 | ----------------------- | ------------ | ------ | ----- | ----- | ---- | ---- | ---- | ------- |
+| emotion2vec             | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | qwen3-asr               | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | glm-asr-nano-2512       | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | sensevoice              | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | whisper                 | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | whisper-turbo           | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| cam                     | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| ct_transformer          | asr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | yolop                   | autodrive    | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | efficientnet            | backbone     | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
 | mobilenetv2             | backbone     | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
@@ -169,6 +172,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen3-vl-embedding      | embedding    | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | siglip2                 | embedding    | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
 | yolov8m-pose            | estimation   | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
+| funaudiochat            | lalm         | xh2    | ❌️   | ❌️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | deepseek-r1-qwen3-8b    | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | gpt-oss                 | llm          | xh2    | ❌️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | qwen2.5                 | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
@@ -179,13 +183,14 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | CoPaw-Flash-9B          | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | glm-ocr                 | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | lprnet                  | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
-| MinerU2.5               | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| mineru2.5               | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | PPOCRv3                 | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
-| PaddleOCR-VL            | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| paddleocr-vl            | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpmo                | omni         | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
 | qwen3-omni              | omni         | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | qwen3-reranker          | reranker     | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | sam2                    | segmentation | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
+| sam3                    | segmentation | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | yolov8m-seg             | segmentation | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
 | cosyvoice3              | tts          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | qwen3-tts               | tts          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
@@ -193,6 +198,8 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen3-vl                | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
 | gemma4                  | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | ornith1.0               | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| minicpm-v-4.5           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| minicpm-v-4.6           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 
 ## API 示例
 
