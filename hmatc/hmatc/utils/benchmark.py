@@ -514,7 +514,9 @@ def run_benchmark(
 
     for model_name, model_cfg in models.items():
         location = model_cfg["location"]
-        cfg_path = model_cfg.get("config", "config.yml")
+        cfg_path = model_cfg.get(
+            "config_file", model_cfg.get("config", "config.yml")
+        )
         exec_cfgs = model_cfg.get("exec_cfgs", [])
 
         logger.info(f"\n{'='*60}")
