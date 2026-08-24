@@ -175,6 +175,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | funaudiochat            | lalm         | xh2    | ❌️   | ❌️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | deepseek-r1-qwen3-8b    | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | gpt-oss                 | llm          | xh2    | ❌️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| qwen-agentworld         | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | qwen2.5                 | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
 | qwen3                   | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
 | qwen3-30b-a3b           | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.3.0  |
@@ -200,8 +201,6 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | ornith1.0               | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpm-v-4.5           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpm-v-4.6           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
-| qwen-agentworld         | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
-
 
 
 ## API 示例
