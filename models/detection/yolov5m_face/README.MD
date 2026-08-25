@@ -16,6 +16,7 @@ python3 export.py --weights <yolov5m-face.pt路径>
 ## 2.快速开始
 
 可以通过hmatc工具执行性能测试和精度测试，详细介绍请参考houmo-examples根目录下README.md文件的快速上手章节。
+校准使用的 WIDER FACE 数据集需自行下载，下载方式请参考[数据集说明](../../../data/datasets/README.md)。
 
 ### 2.1 精度评估
 

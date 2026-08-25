@@ -48,6 +48,7 @@ torch.onnx.export(
 ## 2.快速开始
 
 通过hmatc工具执行性能测试和精度测试。
+校准使用的 ImageNet 2012 数据集需自行下载，下载方式请参考[数据集说明](../../../data/datasets/README.md)。
 
 ### 2.1 精度评估
 
