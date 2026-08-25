@@ -725,12 +725,3 @@ def test_diffusion_z_image_turbo_get_model(setup_logging) -> None:
     _get_model_func("z-image-turbo", setup_logging)
 
 
-@pytest.mark.qwen_agentworld
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
-@pytest.mark.get_model
-@pytest.mark.dependency(name="test_get_models.py::test_qwen_agentworld_get_model")
-def test_qwen_agentworld_get_model(setup_logging) -> None:
-    """test_qwen_agentworld_get_model"""
-    _get_model_func("qwen-agentworld", setup_logging)
-

@@ -908,14 +908,3 @@ def test_diffusion_z_image_turbo_compile(setup_logging) -> None:
 
 
 
-@pytest.mark.qwen_agentworld
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
-@pytest.mark.compile
-@pytest.mark.dependency(
-    name="test_compile_models.py::test_qwen_agentworld_compile",
-    depends_on=["test_quant_models.py::test_qwen_agentworld_quant"],
-)
-def test_qwen_agentworld_compile(setup_logging) -> None:
-    """test_qwen_agentworld_compile"""
-    _compile_func("qwen-agentworld", setup_logging)

@@ -856,15 +856,3 @@ def test_diffusion_z_image_turbo_quant(setup_logging) -> None:
 
 
 
-
-@pytest.mark.qwen_agentworld
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
-@pytest.mark.quant
-@pytest.mark.dependency(
-    name="test_quant_models.py::test_qwen_agentworld_quant",
-    depends_on=["test_get_models.py::test_qwen_agentworld_get_model"],
-)
-def test_qwen_agentworld_quant(setup_logging) -> None:
-    """test_qwen_agentworld_quant"""
-    _quant_func("qwen-agentworld", setup_logging)

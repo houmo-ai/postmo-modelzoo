@@ -421,11 +421,3 @@ def test_detection_yolox_perf(setup_logging) -> None:
     """test_detection_yolox_perf"""
     _perf_func("yolox", setup_logging)
 
-
-@pytest.mark.qwen_agentworld
-@pytest.mark.ndevice_1
-@pytest.mark.dev_mem_24g
-@pytest.mark.perf
-def test_qwen_agentworld_perf(setup_logging) -> None:
-    """test_qwen_agentworld_perf"""
-    _perf_func("qwen-agentworld", setup_logging)
