@@ -47,7 +47,6 @@ except ImportError:
 
 import tcim_lite as tcim
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 IMODELZOO_UTILS_PATH = SCRIPT_DIR.parents[2] / "utils" / "python"
 if str(IMODELZOO_UTILS_PATH) not in sys.path:

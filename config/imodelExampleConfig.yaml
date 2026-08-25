@@ -424,6 +424,18 @@ ocr_ppocrv3_rec:
         args: all
   test:
     - ocr_ppocrv3_rec_test
+ocr_paddleocr_v5:
+  include:
+    - models/ocr/paddleocr_v5
+  exclude:
+    - models/ocr/paddleocr_v5/README.MD
+  example_case:
+    - ocr_paddleocr_v5_test:
+        test_type: models_tests
+        script: paddleocr_v5
+        args: all
+  test:
+    - ocr_paddleocr_v5_test
 ocr_glm-ocr:
   include:
     - models/ocr/glm-ocr
