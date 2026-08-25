@@ -123,7 +123,7 @@ GLM-OCR 模型使用 python API 进行演示。
 
 2. 当 `ndevice > 1` 时，`prefill` 和 `decode` 会自动切换为 `.hmms`，视觉模型仍保持 `.hmm`。
 
-3. 执行脚本，推理完成将输出性能结果。
+3. 执行脚本，单OCR模式推理完成将输出性能结果，pipeline模式没有性能结果。
 
 ```bash
 python3 demo.py --model_name glm-ocr --model_size 0.9b
