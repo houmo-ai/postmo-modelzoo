@@ -17,11 +17,6 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
 
 ```bash
 .
-├── apis
-│   ├── converts
-│   ├── data
-│   ├── inferences
-│   └── models
 ├── cmake
 ├── data
 ├── 3rdparty
@@ -56,21 +51,20 @@ houmo-examples 目录结构如下，其中 README.md 为本说明文件：
 
 主要目录和文件说明如下：
 
-| 目录或文件                          | 说明                                                    |
-| ----------------------------------- | ------------------------------------------------------- |
-| 3rdparty                            | 仓库内使用的 C/C++ 第三方源码                           |
-| apis                                | API 示例，展示 HAL 和 Runtime 接口的调用过程            |
-| cmake                               | C/C++ 示例共用的 CMake 配置                             |
-| data                                | 数据目录，内置少量 COCO 采样，其他数据集用户自行获取，详见 DATASET_NOTICE.md |
-| hmatc                               | HMATC 工具源码，通过配置文件进行一键评估                |
-| hmodel                              | 量化模型配置和工具，主要用于大模型和 QAT 训练           |
-| licenses                            | 仓库资产和示例引用的许可证文本                          |
-| models                              | 模型示例，展示模型的转换、量化、编译、推理和评估流程    |
-| tools                               | 应用层工具源码，如算力测试和性能评估工具                |
-| utils                               | 模型和 API 共用的 C++、Python 代码及运行库              |
-| env.sh/env.bat                      | Linux 和 Windows 环境配置脚本                           |
-| LICENSE/NOTICE                      | 项目许可证和第三方组件摘要                              |
-| requirements.txt                    | Python 第三方依赖                                       |
+| 目录或文件               | 说明                                                    |
+| ----------------------- | ------------------------------------------------------- |
+| 3rdparty                | 仓库内使用的 C/C++ 第三方源码                             |
+| cmake                   | C/C++ 示例共用的 CMake 配置                              |
+| data                    | 数据目录，内置少量 COCO 采样，其他数据集用户自行获取，详见 DATASET_NOTICE.md |
+| hmatc                   | HMATC 工具源码，通过配置文件进行一键评估                   |
+| hmodel                  | 量化模型配置和工具，主要用于大模型和 QAT 训练               |
+| licenses                | 仓库资产和示例引用的许可证文本                             |
+| models                  | 模型示例，展示模型的转换、量化、编译、推理和评估流程         |
+| tools                   | 应用层工具源码，如算力测试和性能评估工具                    |
+| utils                   | 模型和 API 共用的 C++、Python 代码及运行库                 |
+| env.sh/env.bat          | Linux 和 Windows 环境配置脚本                             |
+| LICENSE/NOTICE          | 项目许可证和第三方组件摘要                                 |
+| requirements.txt        | Python 第三方依赖                                        |
 
 本项目采用 Apache License 2.0。项目许可证见 [LICENSE](LICENSE)，项目和第三方组件摘要见 [NOTICE](NOTICE)。第三方组件不受本项目 Apache License 2.0 的统一许可约束，使用和分发时应遵守各组件自身的许可证条款。
 
@@ -95,8 +89,8 @@ pip install -r requirements.txt
 ```
 
 如果需要对大模型进行量化，同时是在github等开源平台下载的代码，需要自行下载以下几个仓库：
-- [houmo-xh2modelzoo](https://github.com/houmo-ai/houmo-xh2modelzoo)，安装或者重命名为hmodel/xh2目录
-- [houmo-gptqmodel](https://github.com/houmo-ai/houmo-gptqmodel)，安装或者重命名为hmodel/gptqmodel目录
+- [postmo-quantflow](https://github.com/houmo-ai/postmo-quantflow)，安装或者重命名为hmodel/xh2目录
+- [postmo-gptqmodel](https://github.com/houmo-ai/postmo-gptqmodel)，安装或者重命名为hmodel/gptqmodel目录
 
 此外，示例运行需要依赖`houmo-tcim-runtime`以及`houmo-drv`中的推理库，参考后摩大道软件平台快速入门安装推理所需的软件包。
 linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/win_envs 目录的 README.MD 进行环境变量的设置。
@@ -202,30 +196,6 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | ornith1.0               | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpm-v-4.5           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | minicpm-v-4.6           | vlm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
-
-
-## API 示例
-
-API 示例在 apis 目录下，如下表所示，type 列为示例类型，其中 convert 表示模型转换，inference 表示模型推理。language 列为支持的编程语言，target 列为支持的芯片平台。
-
-量化和编译示例仅支持在量化工具和编译器支持的平台上运行，部署示例支持情况还受到其他交付件的限制，如固件类型（如芯片解码的示例只能在 VPU 固件上运行，大模型只能在非 VPU 固件上运行）、硬件规格（如 2 核芯片只能运行 2 核以下编译的模型），具体请查看示例内 readme 文件。
-
-windows 的示例运行前请参照 tools/win_envs 目录的 README.MD 进行环境变量的设置。
-
-| examples              | path       | description                       | language   | target | arch        | os        |
-| --------------------- | ---------- | --------------------------------- | ---------- | ------ | ----------- | --------- |
-| qwen3_pipeline        | converts   | qwen3 流水并行模型分隔编译示例    | python     | xh2    | x64         | linux     |
-| qwen3_speculative     | converts   | qwen3 投机解码模型编译示例        | python     | xh2    | x64         | linux     |
-| resnet50              | converts   | resnet50 量化编译示例             | python     | xh2    | x64         | linux     |
-| yolov5s               | converts   | yolov5s 模型转换编译示例          | python     | xh2    | x64         | linux     |
-| qwen3                 | inferences | qwen3 大语言模型推理示例          | python     | xh2    | x64/aarch64 | win/linux |
-| qwen3_multibatch      | inferences | qwen3 多 batch 推理示例           | python     | xh2    | x64/aarch64 | linux     |
-| qwen3_pipeline        | inferences | qwen3 流水并行示例                | python     | xh2    | x64/aarch64 | linux     |
-| qwen3_speculative     | inferences | qwen3 投机解码示例                | python     | xh2    | x64/aarch64 | linux     |
-| resnet50              | inferences | resnet50 单线程推理示例           | python/c++ | xh2    | x64/aarch64 | win/linux |
-| resnet50_multistreams | inferences | resnet50 多线程多 stream 推理示例 | c++        | xh2    | x64/aarch64 | win/linux |
-| resnet50_pipeline     | inferences | resnet50 流水推理示例             | c++        | xh2    | x64/aarch64 | win/linux |
-| yolov5s               | inferences | yolov5s 单线程推理示例            | python/c++ | xh2    | x64/aarch64 | win/linux |
 
 ## 快速上手
 

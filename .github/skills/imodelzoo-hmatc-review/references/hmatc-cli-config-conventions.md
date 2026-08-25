@@ -289,5 +289,5 @@ README files
 ```
 
 只把真正依赖被修改契约的调用方加入 HMATC review unit。若本次同时修改模型或 API 文件，
-分别叠加 `imodelzoo-model-review` 或 `imodelzoo-api-review`；只读确认兼容性时不必无边界加载
+分别叠加 `imodelzoo-model-review`；只读确认兼容性时不必无边界加载
 全部下游专项规则。finding 应定位到引入错误契约的可修改源文件，排除路径只作为上下文。

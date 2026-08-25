@@ -89,31 +89,18 @@ iModelzoo code review 由纯 AI 大模型 reviewer 基于评审系统提供的 c
 
 将模型目录、模型测试 JSON、pytest 入口、聚合配置和 README 作为同一个评审单元。沿模型实际支持的 get/convert/quant/build/demo/compare/eval/perf 流程检查，不要求每个模型实现全部阶段。
 
-## 2. API Example Review
-
-以下变更使用 `imodelzoo-api-review`：
-
-- `apis/converts/**`
-- `apis/inferences/**`
-- `apis/scenes/**`
-- `tests/apis_tests/**`
-- API 示例的 CMake、run script、配置、模型/数据声明和 README
-- 任务明确包含且已确认所有权的 `apis/common/**` first-party helper
-
-排除列表中的 `apis/data/**`、`apis/models/**`、`apis/3rdparty/**` 和 vendored `apis/common/**` 不进入 API review。
-
-## 3. HMATC Review
+## 2. HMATC Review
 
 以下变更使用 `imodelzoo-hmatc-review`：
 
 - `hmatc/hmatc/**`
 - `tests/hmatc_tests/**`
 - HMATC 的 `setup.py`、entry point、配置、README 和直接耦合的 package 文件
-- `models/**` 或 `apis/**` 中依赖被修改 HMATC 行为的调用方
+- `models/**` 中依赖被修改 HMATC 行为的调用方
 
 排除列表中的 `hmatc/3rdparty/**`、`hmatc/build/**`、`hmatc/dist/**` 和其他生成产物不进入 HMATC review。
 
-HMATC 是公共工具。评审其 CLI、配置或执行行为变化时，必须搜索并检查下游模型示例、API 示例、Shell 命令和 README。
+HMATC 是公共工具。评审其 CLI、配置或执行行为变化时，必须搜索并检查下游模型示例、Shell 命令和 README。
 
 ## 辅助 skill 路由
 
@@ -139,7 +126,7 @@ HMATC 是公共工具。评审其 CLI、配置或执行行为变化时，必须�
 
 当过滤排除路径后的 diff 跨越多个子系统时：
 
-1. 按所有权拆分为 model、API、HMATC 或通用子评审。
+1. 按所有权拆分为 model、HMATC 或通用子评审。
 2. 分别应用对应专项 skill，同时共享 `imodelzoo-code-review` 的 severity 和输出规则。
 3. 检查跨子系统的 CLI、配置 schema、模型产物和公共 API contract。
 4. 合并 findings，并按 severity、文件和行号排序。
@@ -149,7 +136,6 @@ HMATC 是公共工具。评审其 CLI、配置或执行行为变化时，必须�
 典型组合：
 
 - `models/**` + `tests/models_tests/**`：只作为一个 model review unit，不算 mixed review。
-- `apis/**` + `tests/apis_tests/**`：过滤 API 排除路径后，作为一个 API review unit。
 - `hmatc/**` + `tests/hmatc_tests/**`：过滤 HMATC 排除路径后，作为一个 HMATC review unit。
 - `hmatc/**` + `models/**`：同时使用 `imodelzoo-hmatc-review` 和 `imodelzoo-model-review`，重点检查公共行为变化及调用方迁移。
 

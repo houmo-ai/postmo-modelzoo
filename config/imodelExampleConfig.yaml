@@ -873,107 +873,6 @@ hmatc:
     - detection_yolov5s_test
 
 #####################################################
-# apis
-#####################################################
-inferences_resnet50:
-  include:
-    - apis/inferences/resnet50
-  exclude:
-    - apis/inferences/resnet50/README.MD
-  example_case:
-    - inferences_resnet50_test:
-        test_type: apis_tests
-        script: resnet50 and inference
-        args: all
-  test:
-    - inferences_resnet50_test
-inferences_yolov5s:
-  include:
-    - apis/inferences/yolov5s
-  exclude:
-    - apis/inferences/yolov5s/README.MD
-  example_case:
-    - inferences_yolov5s_test:
-        test_type: apis_tests
-        script: yolov5s and inference
-        args: all
-  test:
-    - inferences_yolov5s_test
-inferences_resnet50_multistreams:
-  include:
-    - apis/inferences/resnet50_multistreams
-  exclude:
-    - apis/inferences/resnet50_multistreams/README.MD
-  example_case:
-    - inferences_resnet50_multistreams_test:
-        test_type: apis_tests
-        script: resnet50 and multistreams
-        args: all
-  test:
-    - inferences_resnet50_multistreams_test
-inferences_resnet50_pipeline:
-  include:
-    - apis/inferences/resnet50_pipeline
-  exclude:
-    - apis/inferences/resnet50_pipeline/README.MD
-  example_case:
-    - inferences_resnet50_pipeline_test:
-        test_type: apis_tests
-        script: resnet50 and pipeline
-        args: all
-  test:
-    - inferences_resnet50_pipeline_test
-inferences_qwen3:
-  include:
-    - apis/inferences/qwen3
-  exclude:
-    - apis/inferences/qwen3/README.MD
-  example_case:
-    - inferences_qwen3_test:
-        test_type: apis_tests
-        script: qwen3 and inference
-        args: all
-  test:
-    - inferences_qwen3_test
-inferences_qwen3_multibatch:
-  include:
-    - apis/inferences/qwen3_multibatch
-  exclude:
-    - apis/inferences/qwen3_multibatch/README.MD
-  example_case:
-    - inferences_qwen3_multibatch_test:
-        test_type: apis_tests
-        script: qwen3_multibatch
-        args: all
-  test:
-    - inferences_qwen3_multibatch_test
-inferences_qwen3_speculative:
-  include:
-    - apis/inferences/qwen3_speculative
-  exclude:
-    - apis/inferences/qwen3_speculative/README.MD
-  example_case:
-    - inferences_qwen3_speculative_test:
-        test_type: apis_tests
-        script: qwen3_speculative
-        args: all
-  test:
-    - inferences_qwen3_speculative_test
-apis_common:
-  include:
-    - utils/cpp/include
-    - utils/python/image
-    - 3rdparty
-  exclude: null
-  example_case: null
-  test:
-    - inferences_resnet50_test
-    # - inferences_yolov5s_test
-    - inferences_resnet50_multistreams_test
-    - inferences_resnet50_pipeline_test
-    - inferences_qwen3_test
-
-#####################################################
 # tools
 #####################################################
 
@@ -1075,18 +974,8 @@ models_tests:
     - vlm_gemma4_test
     - diffusion_z_image_turbo_test
     - ocr_glm-ocr_test
-    - inferences_resnet50_test
     # - llm_qwen3_test
     # - vlm_qwen3-vl_test
-apis_tests:
-  include:
-    - tests/apis_tests
-  exclude:
-    - tests/apis_tests/__init__.py
-  example_case: null
-  test:
-    - inferences_yolov5s_test
-    - inferences_resnet50_pipeline_test
 
 #####################################################
 # tests
@@ -1119,7 +1008,3 @@ all:
     # - llm_qwen3.5_test
     # - llm_qwen3_30b_a3b_test
     # - vlm_gemma4_test
-    - inferences_resnet50_test
-    - inferences_yolov5s_test
-    - inferences_resnet50_pipeline_test
-    - inferences_resnet50_multistreams_test

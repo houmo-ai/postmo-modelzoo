@@ -13,7 +13,7 @@ description: "Perform static semantic review of HMATC public CLI and mode resolu
 
 先应用 `.github/guidance/review-guidelines.md` 的全局 `Review Exclusions`。`hmatc/3rdparty/**`、`hmatc/build/**`、`hmatc/dist/**`、wheel、native binary、缓存和其他生成产物不做内容级评审；只检查本次新增或修改的生成物是否误提交。
 
-HMATC 是多个模型示例共享的公共工具。评审 `hmatc/hmatc/**` 和 `tests/hmatc_tests/**` 时，搜索调用它的 `models/**`、`apis/**`、Shell 命令和 README，只把真正依赖被修改公共契约的调用方加入 review unit。本次同时修改模型或 API 文件时，分别叠加 `imodelzoo-model-review` 或 `imodelzoo-api-review`。
+HMATC 是多个模型示例共享的公共工具。评审 `hmatc/hmatc/**` 和 `tests/hmatc_tests/**` 时，搜索调用它的 `models/**`、`apis/**`、Shell 命令和 README，只把真正依赖被修改公共契约的调用方加入 review unit。本次同时修改模型文件时，叠加 `imodelzoo-model-review`。
 
 排除路径可作为确认下游兼容性的只读上下文，但不评审其实现内容，也不将 finding 定位到其中。
 

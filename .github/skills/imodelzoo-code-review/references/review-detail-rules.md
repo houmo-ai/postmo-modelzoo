@@ -87,5 +87,5 @@
 
 - 编译器内部 IR、Pass、lowering、Kernel 或设备原语规则；iModelzoo review 只检查公开接口的调用是否正确。
 - 单个模型独有的 tensor、prompt、sampling、音频或图像处理约束；这些内容属于 `imodelzoo-model-review` 或其 model convention reference。
-- API 示例或 HMATC CLI 的专有契约；分别由 `imodelzoo-api-review` 和 `imodelzoo-hmatc-review` 定义。
+- API 示例或 HMATC CLI 的专有契约；由 `imodelzoo-hmatc-review` 定义。
 - 一次性的 CI 时间权衡、临时环境限制或没有形成仓库约定的个人偏好。
