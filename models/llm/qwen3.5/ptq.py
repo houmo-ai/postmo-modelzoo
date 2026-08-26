@@ -34,13 +34,9 @@ def find_configs_merak_dir() -> str:
         raise FileNotFoundError("Python package xhmodel_merak not found")
 
     xhmodel_merak_dir = next(iter(spec.submodule_search_locations))
-    configs_merak_dir = os.path.join(
-        os.path.dirname(xhmodel_merak_dir), "configs_merak"
-    )
+    configs_merak_dir = os.path.join(os.path.dirname(xhmodel_merak_dir), "configs_merak")
     if not os.path.isdir(configs_merak_dir):
-        raise FileNotFoundError(
-            f"configs_merak directory not found next to xhmodel_merak: {configs_merak_dir}"
-        )
+        raise FileNotFoundError(f"configs_merak directory not found next to xhmodel_merak: {configs_merak_dir}")
     return configs_merak_dir
 
 
@@ -50,23 +46,15 @@ def _remove_output_dir_if_needed(output_dir: str, force: bool) -> None:
         shutil.rmtree(path)
 
 
-def _move_hmquant_to_output(
-    export_output_dir: str, target_dir: str, visual_suffix: str
-) -> None:
+def _move_hmquant_to_output(export_output_dir: str, target_dir: str) -> None:
     export_dir = Path(export_output_dir)
     hmquant_dirs = sorted(
-        path
-        for path in export_dir.iterdir()
-        if path.is_dir() and path.name.startswith(f"hmquant_{HOUMO_TARGET}_")
+        path for path in export_dir.iterdir() if path.is_dir() and path.name.startswith(f"hmquant_{HOUMO_TARGET}_")
     )
     if not hmquant_dirs:
-        raise FileNotFoundError(
-            f"No hmquant_{HOUMO_TARGET}_* directory found under {export_dir}"
-        )
+        raise FileNotFoundError(f"No hmquant_{HOUMO_TARGET}_* directory found under {export_dir}")
     if len(hmquant_dirs) > 1:
-        raise RuntimeError(
-            f"Expected one hmquant_{HOUMO_TARGET}_* directory under {export_dir}, found: {hmquant_dirs}"
-        )
+        raise RuntimeError(f"Expected one hmquant_{HOUMO_TARGET}_* directory under {export_dir}, found: {hmquant_dirs}")
 
     source_dir = hmquant_dirs[0]
     target = Path(target_dir)
@@ -77,9 +65,7 @@ def _move_hmquant_to_output(
     for item in source_dir.iterdir():
         if item.name == "golden_meta_info.json":
             continue
-        destination_name = (
-            f"visual_{visual_suffix}" if item.name == "visual" else item.name
-        )
+        destination_name = item.name
         shutil.move(str(item), str(target / destination_name))
 
     print(f"hmquant contents moved to: {target}")
@@ -101,8 +87,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--quick-test", action="store_true", help="Run quick HMONNX test after export.")
     parser.add_argument("--export-from-quanted-model", action="store_true", help="if --model-dir is a quanted model, set this param to True")
     parser.add_argument("--bits", type=int, default=None, help="quantization bits, set this param to override config.yaml")
-    parser.add_argument("--max_size_h", type=int, default=None, help="ViT input height, set this param to override config.yaml")
-    parser.add_argument("--max_size_w", type=int, default=None, help="ViT input width, set this param to override config.yaml")
     parser.add_argument("--mtp", dest="mtp", action="store_true", default=False, help="enable mtp optimization")
     parser.add_argument("--lora", dest="lora", action="store_true", default=False, help="enable lora workflow")
     args = parser.parse_args()
@@ -122,10 +106,6 @@ def parse_args() -> argparse.Namespace:
         args.quant_config_path = os.path.join(find_configs_merak_dir(), workflow_config)
     if not os.path.isfile(args.quant_config_path):
         raise FileNotFoundError(f"Workflow config not found: {args.quant_config_path}")
-
-    args.max_size_h = first_not_none(args.max_size_h, model_config.get("max_size_h", 896))
-    args.max_size_w = first_not_none(args.max_size_w, model_config.get("max_size_w", 896))
-    args.max_size_t = model_config.get("max_size_t", 2)
 
     # fmt: on
     return args
@@ -166,10 +146,6 @@ def main() -> None:
     export_output_dir = f"{args.work_dir}/qwen3.5_export"
     _remove_output_dir_if_needed(export_output_dir, args.overwrite)
     config_overrides = {}
-    if args.max_size_h:
-        config_overrides["export.model.visual_config.max_size_h"] = args.max_size_h
-    if args.max_size_w:
-        config_overrides["export.model.visual_config.max_size_w"] = args.max_size_w
     export_result = workflow.export(
         quant_result=quant_result,
         output_dir=export_output_dir,
@@ -200,8 +176,7 @@ def main() -> None:
         )
         print_quick_test_result(quick_result)
 
-    visual_suffix = f"{args.max_size_w}x{args.max_size_h}x{args.max_size_t}"
-    _move_hmquant_to_output(export_output_dir, args.output_dir, visual_suffix)
+    _move_hmquant_to_output(export_output_dir, args.output_dir)
 
 
 if __name__ == "__main__":

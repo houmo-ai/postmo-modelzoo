@@ -57,7 +57,11 @@
 
 - `${model_name}-${model_size}_prefill.hmm`
 - `${model_name}-${model_size}_decode.hmm`
-- `${model_name}-${model_size}_visual_${max_size_w}x${max_size_h}x${max_size_t}.hmm`
+- `${model_name}-${model_size}_visual_m1536.hmm`
+- `${model_name}-${model_size}_visual_m704.hmm`
+- `${model_name}-${model_size}_visual_m384.hmm`
+- `${model_name}-${model_size}_visual_m196.hmm`
+- `${model_name}-${model_size}_visual_m96.hmm`
 
 MTP 流程额外产物命名为：
 
@@ -165,13 +169,6 @@ python3 ptq.py \
   --model_size 35b-a3b \
   --bits 8
 
-# 覆盖视觉导出分辨率
-python3 ptq.py \
-  --model_name qwen3.6 \
-  --model_size 35b-a3b \
-  --max_size_w 896 \
-  --max_size_h 896
-
 # 自动选择对应的 MTP workflow
 python3 ptq.py \
   --model_name qwen3.6 \
@@ -199,7 +196,6 @@ python3 ptq.py \
 - `--overwrite`：export 前删除已有的 export 输出目录。
 - `--export-from-quanted-model`：输入已经量化的 HF 模型时跳过量化阶段。
 - `--bits`：覆盖 workflow 中的 `quant.bits`。
-- `--max_size_w`、`--max_size_h`：覆盖视觉模型导出尺寸。
 - `--dump-golden`：导出后生成 golden 数据。
 - `--quick-test`：导出后运行快速 HMONNX 测试。
 

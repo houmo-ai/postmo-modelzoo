@@ -13,9 +13,6 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 896
-      max_size_h: 896
-      max_size_t: 2
       workflow_config: "workflows/xh2a/llm_models/qwen3_5/0.8b/qwen3_5_0_8b_full.yaml"
     "2b":
       modelscope_repo: ["Qwen/Qwen3.5-2B"]
@@ -27,9 +24,6 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 896
-      max_size_h: 896
-      max_size_t: 2
       workflow_config: "workflows/xh2a/llm_models/qwen3_5/2b/qwen3_5_2b_full.yaml"
     "4b":
       modelscope_repo: ["Qwen/Qwen3.5-4B"]
@@ -41,9 +35,6 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 896
-      max_size_h: 896
-      max_size_t: 2
       workflow_config: "workflows/xh2a/llm_models/qwen3_5/4b/qwen3_5_4b_full.yaml"
     "9b":
       modelscope_repo: ["Qwen/Qwen3.5-9B"]
@@ -55,9 +46,6 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 896
-      max_size_h: 896
-      max_size_t: 2
       workflow_config: "workflows/xh2a/llm_models/qwen3_5/9b/qwen3_5_9b_full.yaml"
     "122b-a10b":
       modelscope_repo: ["Qwen/Qwen3.5-122B-A10B"]
@@ -69,9 +57,6 @@ model_configs:
       ndevice: 2
       batch: 1
       prefill_length: 256
-      max_size_w: 448
-      max_size_h: 448
-      max_size_t: 2
       workflow_config: "workflows/xh2a/llm_models/qwen3_5_moe/122b_a10b/qwen3_5_122b_a10b_full.yaml"
   qwen3.6:
     "27b":
@@ -84,9 +69,6 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 896
-      max_size_h: 896
-      max_size_t: 2
       workflow_config: "workflows/xh2a/llm_models/qwen3_5/27b/qwen3_6_27b_full.yaml"
     "35b-a3b":
       modelscope_repo: ["Qwen/Qwen3.6-35B-A3B"]
@@ -98,7 +80,4 @@ model_configs:
       ndevice: 1
       batch: 1
       prefill_length: 256
-      max_size_w: 896
-      max_size_h: 896
-      max_size_t: 2
       workflow_config: "workflows/xh2a/llm_models/qwen3_5_moe/35b_a3b/qwen3_6_35b_a3b_full.yaml"

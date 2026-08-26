@@ -33,6 +33,7 @@ from ..model_workflow.artifact_cache_store import (
 )
 from ..model_workflow.artifact_publication import publish_compiled_artifact
 from ..model_workflow.cache_path_resolver import (
+    RESULT_CACHE_ROOT,
     cache_case_reference,
     get_model_case_artifact_id,
     resolve_case_paths,
@@ -118,17 +119,37 @@ def prepare_inference_workspace(
 
 
 def validate_python_compiled_artifacts(request: FlowRequest, services) -> list[str]:
-    """Validate compiled artifacts in the JSON-declared output directories."""
+    """Validate only compiled artifacts referenced by the Demo configuration.
+
+    ``compile_params`` may contain producer cases for model variants that are
+    not exercised by the current Demo.  Inference preparation must not require
+    those unrelated outputs, especially in release/separate-no-infer mode.
+    """
     backend = request.context.diagnostic.backend
     params = request.config.backend_section("compile_params", backend)
     if params is None:
+        return []
+    referenced_case_ids = request.config.referenced_result_case_ids(backend)
+    if not referenced_case_ids:
         return []
     matrix = ParameterMatrix.from_columns(
         params,
         location=f"{request.config.model_name}.compile_params.{backend}",
     )
-    failures = (_python_compiled_artifact_failure(request, services, backend, case) for case in matrix.cases)
+    cases = (case for case in matrix.cases if _compile_case_id(case) in referenced_case_ids)
+    failures = (_python_compiled_artifact_failure(request, services, backend, case) for case in cases)
     return [failure for failure in failures if failure is not None]
+
+
+def _compile_case_id(case: ParameterCase) -> str | None:
+    """Return the cache case id represented by a compile output directory."""
+    value = case.values.get("output_dir")
+    if not isinstance(value, str) or not value:
+        return None
+    reference = cache_case_reference(value)
+    if reference is not None and reference[0] == RESULT_CACHE_ROOT:
+        return reference[1]
+    return Path(value).name
 
 
 def _python_compiled_artifact_failure(
