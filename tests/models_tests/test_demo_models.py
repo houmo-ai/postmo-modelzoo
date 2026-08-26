@@ -242,6 +242,15 @@ def test_vlm_ornith1dot0_demo(setup_logging) -> None:
     _demo_func("ornith1.0", setup_logging)
 
 
+@pytest.mark.paddleocr_vl_1dot6
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.demo
+def test_ocr_paddleocr_vl_1dot6_demo(setup_logging) -> None:
+    """test_ocr_paddleocr_vl_1dot6_demo"""
+    _demo_func("paddleocr-vl-1.6", setup_logging)
+
+
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -654,5 +663,3 @@ def test_detection_yolox_demo(setup_logging) -> None:
 def test_diffusion_z_image_turbo_demo(setup_logging) -> None:
     """test_diffusion_z_image_turbo_demo"""
     _demo_func("z-image-turbo", setup_logging)
-
-

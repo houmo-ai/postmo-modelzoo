@@ -460,6 +460,18 @@ ocr_paddleocr-vl:
         args: all
   test:
     - ocr_paddleocr-vl_test
+ocr_paddleocr-vl-1.6:
+  include:
+    - models/ocr/paddleocr-vl-1.6
+  exclude:
+    - models/ocr/paddleocr-vl-1.6/README.MD
+  example_case:
+    - ocr_paddleocr-vl-1.6_test:
+        test_type: models_tests
+        script: paddleocr_vl_1dot6
+        args: all
+  test:
+    - ocr_paddleocr-vl-1.6_test
 ocr_mineru2.5:
   include:
     - models/ocr/mineru2.5

@@ -69,6 +69,7 @@ kaldi-native-fbank (Apache-2.0) - https://github.com/csukuangfj/kaldi-native-fba
 libsamplerate (BSD-2-Clause) - https://github.com/libsndfile/libsamplerate
 libsndfile (LGPL-2.1+) - https://github.com/libsndfile/libsndfile
 transformers Some files were modified and saved separately (Apache-2.0) - https://github.com/huggingface/transformers
+PaddleOCR-VL processor code adapted from Transformers 5.15.0 (Apache-2.0) - https://github.com/huggingface/transformers/tree/v5.15.0/src/transformers/models/paddleocr_vl
 qwen_vl_utils Process info need (Apache-2.0) - https://github.com/QwenLM/Qwen3-VL/tree/main/qwen-vl-utils
 qwen_omni_utils Process info need (Apache-2.0) - https://github.com/QwenLM/Qwen3-VL
 jinja.hpp (Apache-2.0) - https://github.com/wangzhaode/jinja.cpp
@@ -108,5 +109,6 @@ PaddleOCR-VL - https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL
 Qwen3-next-30b-a3b - https://www.modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Instruct
 Qwen3-omni - https://www.modelscope.cn/models/Qwen/Qwen3-Omni-30B-A3B-Instruct
 Qwen3-VL-Embedding - https://github.com/QwenLM/Qwen3-VL-Embedding
+PaddleOCR-VL-1.6 - https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL-1.6
 
 For detailed third-party citation notices, licenses, and precautions, please refer to THIRD_PARTY_NOTICES.

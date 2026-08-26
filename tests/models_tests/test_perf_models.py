@@ -420,4 +420,3 @@ def test_detection_yolov9m_perf(setup_logging) -> None:
 def test_detection_yolox_perf(setup_logging) -> None:
     """test_detection_yolox_perf"""
     _perf_func("yolox", setup_logging)
-

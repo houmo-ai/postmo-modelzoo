@@ -265,6 +265,16 @@ def test_vlm_ornith1dot0_get_model(setup_logging) -> None:
     _get_model_func("ornith1.0", setup_logging)
 
 
+@pytest.mark.paddleocr_vl_1dot6
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_ocr_paddleocr_vl_1dot6_get_model")
+def test_ocr_paddleocr_vl_1dot6_get_model(setup_logging) -> None:
+    """test_ocr_paddleocr_vl_1dot6_get_model"""
+    _get_model_func("paddleocr-vl-1.6", setup_logging)
+
+
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -723,5 +733,3 @@ def test_detection_yolox_get_model(setup_logging) -> None:
 def test_diffusion_z_image_turbo_get_model(setup_logging) -> None:
     """test_diffusion_z_image_turbo_get_model"""
     _get_model_func("z-image-turbo", setup_logging)
-
-

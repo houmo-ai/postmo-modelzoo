@@ -1,0 +1,6 @@
+--extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+transformers==5.15.0
+sentencepiece
+protobuf
+torchao==0.17.0
+PaddleX

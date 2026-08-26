@@ -321,6 +321,19 @@ def test_vlm_ornith1dot0_compile(setup_logging) -> None:
     _compile_func("ornith1.0", setup_logging)
 
 
+@pytest.mark.paddleocr_vl_1dot6
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_compile_models.py::test_ocr_paddleocr_vl_1dot6_compile",
+    depends_on=["test_quant_models.py::test_ocr_paddleocr_vl_1dot6_quant"],
+)
+def test_ocr_paddleocr_vl_1dot6_compile(setup_logging) -> None:
+    """test_ocr_paddleocr_vl_1dot6_compile"""
+    _compile_func("paddleocr-vl-1.6", setup_logging)
+
+
 @pytest.mark.paddleocr_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g
@@ -904,7 +917,3 @@ def test_detection_yolox_compile(setup_logging) -> None:
 def test_diffusion_z_image_turbo_compile(setup_logging) -> None:
     """test_diffusion_z_image_turbo_compile"""
     _compile_func("z-image-turbo", setup_logging)
-
-
-
-

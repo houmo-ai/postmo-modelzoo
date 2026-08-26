@@ -1,0 +1,76 @@
+{
+    "obsolete": false,
+    "model_dir": "models/ocr/paddleocr-vl-1.6",
+    "model_type": "llm",
+    "dependencies": {
+        "ndevice": [1],
+        "dev_mem": ["12g"]
+    },
+    "support_platform": ["x86_64"],
+    "support_backend": ["xh2"],
+    "support_core_num": {
+        "xh2": [2]
+    },
+    "support_flow": {
+        "xh2": ["get_model", "quant", "compile", "demo"]
+    },
+    "support_hmatc": null,
+    "get_model_params": {
+        "xh2": {
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_16k"],
+            "source_type": [null, null],
+            "model_name": ["paddleocr-vl-1.6", "paddleocr-vl-1.6"],
+            "model_size": ["0.9b", "0.9b"],
+            "context_length": [null, "16k"]
+        }
+    },
+    "quant_params": {
+        "xh2": {
+            "model": ["cached_models/PaddleOCR-VL-1.6"],
+            "model-name": ["paddleocr-vl-1.6"],
+            "model-size": ["0.9b"],
+            "out-dir": ["cached_results/hmquant_xh2_16k"],
+            "context-length": ["16384"],
+            "input-sequence-length": ["256"]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_16k"],
+            "model_name": ["paddleocr-vl-1.6"],
+            "model_size": ["0.9b"],
+            "batch": [null],
+            "ncore": [null],
+            "ndevice": ["1"],
+            "stage": ["build"],
+            "context_length": ["16384"],
+            "prefill_length": ["256"],
+            "output_dir": ["cached_results/hmm_xh2_16k"],
+            "j": ["24"]
+        }
+    },
+    "demo_params": {
+        "xh2": {
+            "model_name": ["paddleocr-vl-1.6"],
+            "model_size": ["0.9b"],
+            "tokenizer_dir": ["cached_models/PaddleOCR-VL-1.6"],
+            "embedding_path": [
+                "cached_results/hmm_xh2_16k/hmquant/quant_embedding.pt"
+            ],
+            "prefill_path": [
+                "cached_results/hmm_xh2_16k/paddleocr-vl-1.6-0.9b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_results/hmm_xh2_16k/paddleocr-vl-1.6-0.9b_decode.hmm"
+            ],
+            "vision_path": [
+                "cached_results/hmm_xh2_16k/paddleocr-vl-1.6-0.9b_visual_896x896.hmm"
+            ],
+            "ndevice": ["1"],
+            "max_size_w": ["896"],
+            "max_size_h": ["896"]
+        }
+    }
+}

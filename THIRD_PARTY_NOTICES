@@ -1808,7 +1808,7 @@ Users are responsible for complying with the Apache License, Version 2.0
 when using, redistributing, or modifying the model.
 
 ----------------------------------------------------------------------
-CoPaw-Flash-9B (Multimodal Large Language OCR Model)
+PaddleOCR-VL (Multimodal Large Language OCR Model)
 ----------------------------------------------------------------------
 
 Component Name: PaddleOCR-VL
@@ -1829,6 +1829,42 @@ This alg is used at the following path:
     models/ocr/PaddleOCR-VL/
 
 The PaddleOCR-VL model is licensed under the Apache License, Version 2.0.
+The Apache License, Version 2.0 permits use, reproduction, modification,
+distribution, and sublicensing of the model and associated files, subject
+to the terms and conditions of the license.
+
+Any redistribution of the model or derivative works must retain the
+original copyright notice, this license text, and any applicable NOTICE
+information in accordance with the Apache License, Version 2.0.
+
+The model is provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+OF ANY KIND, either express or implied. See the License for the specific
+language governing permissions and limitations under the License.
+
+This project may reference or use PaddleOCR-VL as a third-party component.
+Users are responsible for complying with the Apache License, Version 2.0
+when using, redistributing, or modifying the model.
+
+----------------------------------------------------------------------
+PaddleOCR-VL-1.6 Model
+----------------------------------------------------------------------
+
+Component Name: PaddleOCR-VL-1.6
+Provider: PaddlePaddle
+Source:
+https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL-1.6
+
+License:
+Apache License, Version 2.0
+
+License Text:
+https://www.modelscope.cn/models/PaddlePaddle/PaddleOCR-VL-1.6/file/view/master/LICENSE
+
+Usage in this project:
+The model, tokenizer, and weights are obtained at runtime for the example at:
+    models/ocr/paddleocr-vl-1.6/
+
+The PaddleOCR-VL-1.6 model is licensed under the Apache License, Version 2.0.
 The Apache License, Version 2.0 permits use, reproduction, modification,
 distribution, and sublicensing of the model and associated files, subject
 to the terms and conditions of the license.
