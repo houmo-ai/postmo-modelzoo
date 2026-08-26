@@ -138,6 +138,15 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
 
   // Configure additional inputs for decode module (KV cache inputs)
   size_t total_mem_size = 0;
+  bool prefill_has_recurrent_state_output = false;
+  for (int output_idx = 0; output_idx < prefill_module->GetOutputNum();
+       ++output_idx) {
+    if (prefill_module->GetOutputName(output_idx).find("recurrent_state") !=
+        std::string::npos) {
+      prefill_has_recurrent_state_output = true;
+      break;
+    }
+  }
   for (int idx = 0; idx < this->prefill_module->GetInputNum(); idx++) {
     const std::string layer_name = prefill_module->GetInputName(idx);
     if (layer_name.find("model_layers") != std::string::npos) {
@@ -168,7 +177,9 @@ HmvllmInfer::HmvllmInfer(const std::string &prefillModelPath,
         output_name.replace(0, prefix.size(), "recurrent_state_out_");
       }
       auto cache = prefill_module->GetDevInput(layer_name);
-      CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
+      if (prefill_has_recurrent_state_output) {
+        CHECK_TCIM_RET_STATUS(prefill_module->SetDevOutput(output_name, cache));
+      }
       CHECK_TCIM_RET_STATUS(decode_module->SetDevInput(layer_name, cache));
       CHECK_TCIM_RET_STATUS(decode_module->SetDevOutput(output_name, cache));
       auto input_info = prefill_module->GetInputInfo(layer_name);
