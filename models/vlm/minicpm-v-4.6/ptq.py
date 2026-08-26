@@ -205,8 +205,8 @@ def export_hmonnx(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the minicpm-v-4.6 Merak W8A8 export workflow.")
     parser.add_argument("--model-dir", default="MiniCPM-V-4.6")
-    parser.add_argument("--model-name", default="minicpm")
-    parser.add_argument("--model-size", default="v-4.6")
+    parser.add_argument("--model-name", default="minicpm-v-4.6")
+    parser.add_argument("--model-size", default="1.3b")
     parser.add_argument("--config-path", default=str(DEFAULT_CONFIG_PATH))
     parser.add_argument(
         "--output-dir",

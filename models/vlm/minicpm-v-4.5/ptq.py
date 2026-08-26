@@ -48,7 +48,7 @@ def _configs_merak_dir() -> Path:
 
 def _workflow_config_path(config_path: str) -> Path:
     _, _, configs = get_model_configs(config_path)
-    relative_path = configs["minicpm"]["v-4.5"]["workflow_config"]
+    relative_path = configs["minicpm-v-4.5"]["8b"]["workflow_config"]
     path = _configs_merak_dir() / relative_path
     if not path.is_file():
         raise FileNotFoundError(f"Workflow config not found: {path}")

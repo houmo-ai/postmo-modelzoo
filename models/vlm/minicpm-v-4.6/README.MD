@@ -20,8 +20,8 @@
 
 当前目录使用 `config.yaml` 作为默认值单一真值来源。当前默认模型配置为：
 
-- `model_name=minicpm`
-- `model_size=v-4.6`
+- `model_name=minicpm-v-4.6`
+- `model_size=1.3b`
 - `context_length=256k`
 - `prefill_length=256`
 - `quant_type=w8a8h1_sefp`
@@ -73,7 +73,7 @@ pip3 install -r requirements.txt
 如果需要自行量化，可下载原始模型：
 
 ```bash
-python3 get_model.py --type raw --model_name minicpm --model_size v-4.6
+python3 get_model.py --type raw --model_name minicpm-v-4.6 --model_size 1.3b
 ```
 
 原始模型默认下载到当前目录的 `MiniCPM-V-4.6/`。
@@ -81,14 +81,14 @@ python3 get_model.py --type raw --model_name minicpm --model_size v-4.6
 如果仅运行演示，可下载预编译芯片模型：
 
 ```bash
-python3 get_model.py --type hmm --model_name minicpm --model_size v-4.6
+python3 get_model.py --type hmm --model_name minicpm-v-4.6 --model_size 1.3b
 ```
 
 下载后的资源默认解压到当前目录。Demo 默认从以下位置读取芯片模型和相关资源：
 
-- `output/${HOUMO_TARGET}/minicpm-v-4.6_prefill.hmm`
-- `output/${HOUMO_TARGET}/minicpm-v-4.6_decode.hmm`
-- `output/${HOUMO_TARGET}/minicpm-v-4.6_visual_16x.hmm`
+- `output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_prefill.hmm`
+- `output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_decode.hmm`
+- `output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_visual_16x.hmm`
 - `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
 - `MiniCPM-V-4.6/`
 
@@ -107,7 +107,7 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```bash
 source env.sh
 cd models/vlm/minicpm-v-4.6
-python3 ptq.py --model-name minicpm --model-size v-4.6
+python3 ptq.py --model-name minicpm-v-4.6 --model-size 1.3b
 ```
 
 `ptq.py` 默认读取 `MiniCPM-V-4.6/` 中的原始模型，并使用 `config.yaml` 指定的 Merak workflow 执行量化和 HMONNX 导出。默认输出目录为：
@@ -127,7 +127,7 @@ output/${HOUMO_TARGET}/hmquant/
 如需覆盖已有量化输出，可执行：
 
 ```bash
-python3 ptq.py --model-name minicpm --model-size v-4.6 --overwrite
+python3 ptq.py --model-name minicpm-v-4.6 --model-size 1.3b --overwrite
 ```
 
 ### 2.4 编译
@@ -143,22 +143,22 @@ output/${HOUMO_TARGET}/hmquant/
 执行编译：
 
 ```bash
-python3 build.py --model_name minicpm --model_size v-4.6 --ndevice 1
+python3 build.py --model_name minicpm-v-4.6 --model_size 1.3b --ndevice 1
 ```
 
 默认输出目录为 `output/${HOUMO_TARGET}`，默认输出文件为：
 
-- `minicpm-v-4.6_prefill.hmm`
-- `minicpm-v-4.6_decode.hmm`
-- `minicpm-v-4.6_visual_4x.hmm`
-- `minicpm-v-4.6_visual_16x.hmm`
+- `minicpm-v-4.6-1.3b_prefill.hmm`
+- `minicpm-v-4.6-1.3b_decode.hmm`
+- `minicpm-v-4.6-1.3b_visual_4x.hmm`
+- `minicpm-v-4.6-1.3b_visual_16x.hmm`
 
 视觉模型的输出名称由输入视觉目录名决定。默认量化流程会生成 `vision_4x` 和 `vision_16x`，因此会生成上述两个 visual 文件。当 `--ndevice` 大于 1 时，prefill 和 decode 的输出后缀为 `.hmms`。
 
 如需在编译后执行 golden comparison，可使用：
 
 ```bash
-python3 build.py --model_name minicpm --model_size v-4.6 --stage all
+python3 build.py --model_name minicpm-v-4.6 --model_size 1.3b --stage all
 ```
 
 ### 2.5 演示
@@ -223,9 +223,9 @@ python3 demo.py \
 ```bash
 python3 demo.py \
     --tokenizer-dir MiniCPM-V-4.6 \
-    --prefill-path output/${HOUMO_TARGET}/minicpm-v-4.6_prefill.hmm \
-    --decode-path output/${HOUMO_TARGET}/minicpm-v-4.6_decode.hmm \
-    --vit-path output/${HOUMO_TARGET}/minicpm-v-4.6_visual_16x.hmm \
+    --prefill-path output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_prefill.hmm \
+    --decode-path output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_decode.hmm \
+    --vit-path output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_visual_16x.hmm \
     --embedding-path output/${HOUMO_TARGET}/hmquant/quant_embedding.pt
 ```
 
@@ -276,8 +276,8 @@ bash test.sh -s build --skip_download
 Usage: test.sh [options]
   -s, --step              Step to run. Default: demo. Choices: demo, build, quant, all.
                           Supports comma-separated values or repeated flags.
-  -name, --model_name     Model name. Default: minicpm.
-  -size, --model_size     Model size. Default: v-4.6.
+  -name, --model_name     Model name. Default: minicpm-v-4.6.
+  -size, --model_size     Model size. Default: 1.3b.
   --ndevice               Number of devices. Default: 1.
   --skip_download         Skip model download steps.
   --system_prompt         System prompt passed to demo.py.
@@ -310,7 +310,7 @@ bash test.sh -s all --skip_download
 - 输出长度：`256,256,256`
 - `batch=1`
 - `loop=1`
-- 视觉模型：`minicpm-v-4.6_visual_4x.hmm`、`minicpm-v-4.6_visual_16x.hmm`
+- 视觉模型：`minicpm-v-4.6-1.3b_visual_4x.hmm`、`minicpm-v-4.6-1.3b_visual_16x.hmm`
 - embedding：`output/${HOUMO_TARGET}/hmquant/quant_embedding.bin`
 
 当 `--ndevice` 大于 1 时，性能测试使用 `.hmms` 格式的 prefill 和 decode 模型，并将设备编号展开为逗号分隔的 `--devices` 参数；视觉模型仍使用 `.hmm`。

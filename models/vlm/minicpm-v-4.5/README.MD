@@ -63,10 +63,10 @@ python3 build.py
 默认读取 `output/${HOUMO_TARGET}/hmquant/`，并在
 `output/${HOUMO_TARGET}/` 生成：
 
-- `minicpm-v-4.5_prefill.hmm`
-- `minicpm-v-4.5_decode.hmm`
-- `minicpm-v-4.5_visual_1x.hmm`
-- `minicpm-v-4.5_visual_6x.hmm`
+- `minicpm-v-4.5-8b_prefill.hmm`
+- `minicpm-v-4.5-8b_decode.hmm`
+- `minicpm-v-4.5-8b_visual_1x.hmm`
+- `minicpm-v-4.5-8b_visual_6x.hmm`
 
 默认上下文长度为 `40k`、prefill 长度为 `256`，可通过
 `--context_length`、`--prefill_length` 覆盖。

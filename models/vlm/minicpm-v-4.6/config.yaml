@@ -1,12 +1,12 @@
-default_model_name: "minicpm"
-default_model_size: "v-4.6"
+default_model_name: "minicpm-v-4.6"
+default_model_size: "1.3b"
 
 model_configs:
-  minicpm:
-    "v-4.6":
+  minicpm-v-4.6:
+    "1.3b":
       modelscope_repo: ["OpenBMB/MiniCPM-V-4.6"]
-      model_name: "minicpm"
-      model_size: "v-4.6"
+      model_name: "minicpm-v-4.6"
+      model_size: "1.3b"
       ncore: 2
       quant_type: "w8a8h1_sefp"
       context_length: "256k"

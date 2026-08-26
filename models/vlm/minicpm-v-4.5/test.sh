@@ -11,8 +11,8 @@ source "${MODELS_DIR}/test_common.sh"
 
 STEP="demo"
 SKIP_DOWNLOAD="false"
-MODEL_NAME="minicpm"
-MODEL_SIZE="v-4.5"
+MODEL_NAME="minicpm-v-4.5"
+MODEL_SIZE="8b"
 NDEVICE=1
 parse_args "$@"
 cd "${SCRIPT_DIR}"

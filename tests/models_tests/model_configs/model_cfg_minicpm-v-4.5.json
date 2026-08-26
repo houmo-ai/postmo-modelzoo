@@ -20,8 +20,8 @@
             "type": ["raw", "hmm"],
             "download_dir": ["cached_models", "cached_models"],
             "extract_dir": [null, "cached_models/hmm_xh2_v4_5_40k"],
-            "model_name": ["minicpm", "minicpm"],
-            "model_size": ["v-4.5", "v-4.5"],
+            "model_name": ["minicpm-v-4.5", "minicpm-v-4.5"],
+            "model_size": ["8b", "8b"],
             "context_length": ["40k", "40k"],
             "prefill_length": ["256", "256"],
             "batch": ["1", "1"],
@@ -40,8 +40,8 @@
     "compile_params": {
         "xh2": {
             "model_dir": ["cached_results/hmquant_xh2_v4_5_40k"],
-            "model_name": ["minicpm"],
-            "model_size": ["v-4.5"],
+            "model_name": ["minicpm-v-4.5"],
+            "model_size": ["8b"],
             "batch": ["1"],
             "ncore": ["2"],
             "context_length": ["40960"],
@@ -53,20 +53,20 @@
     },
     "demo_params": {
         "xh2": {
-            "model_name": ["minicpm"],
-            "model_size": ["v-4.5"],
+            "model_name": ["minicpm-v-4.5"],
+            "model_size": ["8b"],
             "tokenizer-dir": ["cached_models/MiniCPM-V-4_5"],
             "embedding-path": [
                 "cached_results/hmm_xh2_v4_5_40k/hmquant/quant_embedding.pt"
             ],
             "prefill-path": [
-                "cached_results/hmm_xh2_v4_5_40k/minicpm-v-4.5_prefill.hmm"
+                "cached_results/hmm_xh2_v4_5_40k/minicpm-v-4.5-8b_prefill.hmm"
             ],
             "decode-path": [
-                "cached_results/hmm_xh2_v4_5_40k/minicpm-v-4.5_decode.hmm"
+                "cached_results/hmm_xh2_v4_5_40k/minicpm-v-4.5-8b_decode.hmm"
             ],
             "vit-path": [
-                "cached_results/hmm_xh2_v4_5_40k/minicpm-v-4.5_visual_1x.hmm"
+                "cached_results/hmm_xh2_v4_5_40k/minicpm-v-4.5-8b_visual_1x.hmm"
             ],
             "ndevice": ["1"],
             "batch": ["1"],
