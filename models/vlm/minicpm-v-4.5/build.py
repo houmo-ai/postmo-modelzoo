@@ -45,7 +45,7 @@ def _validate_flash_attention(values: tuple[int, int]) -> tuple[int, int]:
     llm_value, vision_value = values
     if llm_value not in (0, 1, 2):
         raise ValueError("Prefill/decode FlashAttention only supports 0, 1, or 2, " f"got {llm_value}")
-    if vision_value not in (0, 1):
+    if vision_value not in (0, 1, 2):
         raise ValueError(f"Vision FlashAttention only supports 0 or 1, got {vision_value}")
     return llm_value, vision_value
 
@@ -89,7 +89,7 @@ def get_args() -> argparse.Namespace:
         "--flash_attention",
         nargs=2,
         type=int,
-        default=(2, 1),
+        default=(2, 2),
         metavar=("LLM", "VISION"),
         help="FlashAttention modes for prefill/decode and vision",
     )

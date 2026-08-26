@@ -129,7 +129,7 @@ def parse_args() -> argparse.Namespace:
         "--flash_attention",
         nargs=2,
         type=int,
-        default=(2, 1),
+        default=(2, 2),
         metavar=("LLM", "VIT"),
     )
     parser.add_argument("--enable_common_subgraph", action="store_true")
@@ -151,8 +151,8 @@ def parse_args() -> argparse.Namespace:
         )
 
     llm_flash, vit_flash = args.flash_attention
-    if llm_flash not in (0, 1, 2) or vit_flash not in (0, 1):
-        raise ValueError("flash_attention expects LLM in {0,1,2} and VIT in {0,1}")
+    if llm_flash not in (0, 1, 2) or vit_flash not in (0, 1, 2):
+        raise ValueError("flash_attention expects LLM in {0,1,2} and VIT in {0,1,2}")
     if args.context_length < 2048:
         llm_flash = 0
     args.flash_attention = (llm_flash, vit_flash)
