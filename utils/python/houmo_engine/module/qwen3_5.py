@@ -29,7 +29,6 @@ from ..core import HoumoModule
 from ..core.types import Stage, StageInputs, StageOutputs
 from ..perf import PerfTracker
 
-
 VISION_INPUT_NAMES = (
     "pixel_values",
     "position_ids",
@@ -85,18 +84,22 @@ def _build_vision_inputs(
     h_ceil = (h_floor + 1).clamp(max=side - 1)
     w_ceil = (w_floor + 1).clamp(max=side - 1)
     dh, dw = h_coords - h_floor, w_coords - w_floor
-    ids = torch.stack((
-        h_floor[:, None] * side + w_floor[None, :],
-        h_floor[:, None] * side + w_ceil[None, :],
-        h_ceil[:, None] * side + w_floor[None, :],
-        h_ceil[:, None] * side + w_ceil[None, :],
-    ))
-    weights = torch.stack((
-        (1 - dh)[:, None] * (1 - dw)[None, :],
-        (1 - dh)[:, None] * dw[None, :],
-        dh[:, None] * (1 - dw)[None, :],
-        dh[:, None] * dw[None, :],
-    ))
+    ids = torch.stack(
+        (
+            h_floor[:, None] * side + w_floor[None, :],
+            h_floor[:, None] * side + w_ceil[None, :],
+            h_ceil[:, None] * side + w_floor[None, :],
+            h_ceil[:, None] * side + w_ceil[None, :],
+        )
+    )
+    weights = torch.stack(
+        (
+            (1 - dh)[:, None] * (1 - dw)[None, :],
+            (1 - dh)[:, None] * dw[None, :],
+            dh[:, None] * (1 - dw)[None, :],
+            dh[:, None] * dw[None, :],
+        )
+    )
     ids = _merge_major(ids, t, h, w, 2).reshape(4, -1)
     weights = _merge_major(weights, t, h, w, 2).reshape(4, -1).to(position_dtype)
     position_ids = torch.zeros((4, patch_capacity), dtype=torch.int64)
@@ -193,19 +196,20 @@ class Qwen35Module(HoumoModule):
             self.vision_gears = tuple(sorted(int(gear) for gear in vision_paths))
             if self.vision_gears != tuple(gear for gear in self.vision_gears if gear in VISION_GEARS):
                 raise ValueError(f"unsupported vision gears: {self.vision_gears}")
-            vision_manager = tcim.runtime.DevManager([0], "Xh2HalBackend")
+            vision_dev_manager = tcim.runtime.DevManager([0], "Xh2HalBackend")
+            vision_weight_manager = tcim.runtime.WeightManager(vision_dev_manager)
             with self.perf.scope("llm.init.vision_load"):
                 for gear in self.vision_gears:
                     vision_path = Path(vision_paths[gear])
-                    vision_option = tcim.runtime.Option(tcim.runtime.WeightManager(vision_manager))
+                    vision_option = tcim.runtime.Option(vision_weight_manager)
                     vision_model = tcim.runtime.load(str(vision_path), option=vision_option)
                     self._validate_vision_model_contract(vision_model, gear, str(vision_path))
                     self.vision_models[gear] = vision_model
-            self.vision_patch_capacities = {
-                gear: gear * SPATIAL_MERGE_SIZE**2 for gear in self.vision_gears
-            }
+            self.vision_patch_capacities = {gear: gear * SPATIAL_MERGE_SIZE**2 for gear in self.vision_gears}
             self.vision_patch_capacity = self.vision_patch_capacities[max(self.vision_gears)]
-            self.vision_patch_dim = int(self.vision_models[max(self.vision_gears)].get_input_info("pixel_values").shape[2])
+            self.vision_patch_dim = int(
+                self.vision_models[max(self.vision_gears)].get_input_info("pixel_values").shape[2]
+            )
             self.vision_min_pixels = int(vision_min_pixels)
             self.num_position_embeddings = int(num_position_embeddings)
             self.visual_rope_cache_length = int(visual_rope_cache_length)
@@ -213,9 +217,11 @@ class Qwen35Module(HoumoModule):
             self.prefill_length = int(prefill_shape[1])
             self.embedding_size = int(prefill_shape[2])
             self.context_max_length = int(self.decode.get_input_info(self.decode.get_input_name(7)).shape[2])
-            vision_output_shape = self.vision_models[max(self.vision_gears)].get_output_info(
-                self.vision_models[max(self.vision_gears)].get_output_name(0)
-            ).shape
+            vision_output_shape = (
+                self.vision_models[max(self.vision_gears)]
+                .get_output_info(self.vision_models[max(self.vision_gears)].get_output_name(0))
+                .shape
+            )
             if int(vision_output_shape[-1]) != self.embedding_size:
                 raise RuntimeError(
                     f"visual embedding size {vision_output_shape[-1]} differs from LLM embedding size {self.embedding_size}"
@@ -359,9 +365,7 @@ class Qwen35Module(HoumoModule):
         if pixel_values.ndim != 2 or int(pixel_values.shape[0]) != sum(split_sizes):
             raise ValueError("dynamic visual pixel_values and image_grid_thw are inconsistent")
         if int(pixel_values.shape[1]) != self.vision_patch_dim:
-            raise ValueError(
-                f"dynamic visual patch width must be {self.vision_patch_dim}, got {pixel_values.shape[1]}"
-            )
+            raise ValueError(f"dynamic visual patch width must be {self.vision_patch_dim}, got {pixel_values.shape[1]}")
         prepared = self._prepare_vision_batch(pixel_values, grids, split_sizes)
         outputs = [None] * len(prepared)
         for gear in self.vision_gears:
@@ -380,8 +384,12 @@ class Qwen35Module(HoumoModule):
             model = self.vision_models[gear]
             dtype = torch.from_numpy(np.empty((), dtype=model.get_input_info("position_weights").dtype)).dtype
             values, valid_image_tokens = _build_vision_inputs(
-                image, grid, self.vision_patch_capacities[gear], dtype,
-                self.num_position_embeddings, self.visual_rope_cache_length,
+                image,
+                grid,
+                self.vision_patch_capacities[gear],
+                dtype,
+                self.num_position_embeddings,
+                self.visual_rope_cache_length,
             )
             prepared.append((gear, model, values, valid_image_tokens))
         return prepared
