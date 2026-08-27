@@ -34,6 +34,7 @@ from funaudiochat_module import FunAudioChatModule
 from funaudiochat_process import (
     AUDIO_BOS_ID,
     AUDIO_EOS_ID,
+    AUDIO_TOKENS_PER_SECOND,
     FLOW_CFG_RATE,
     FLOW_STEPS,
     GROUP_SIZE,
@@ -68,7 +69,6 @@ class FunAudioChatEngine(HoumoEngine):
         device: int = 0,
         ndevice: int = 1,
         batch: int = 1,
-        static_audio_samples: int = 126799,
         temperature: float = 0.6,
         top_k: int = 20,
         top_p: float = 0.95,
@@ -125,7 +125,6 @@ class FunAudioChatEngine(HoumoEngine):
                 hift_mel_capacity=self.module.hift_mel_capacity,
                 load_s2s=load_s2s,
                 load_vad=stage == "e2e",
-                static_audio_samples=static_audio_samples,
                 perf=self.perf,
             )
         self.state = FunAudioChatState()
@@ -323,6 +322,35 @@ class FunAudioChatEngine(HoumoEngine):
         segments, stats = self.process.vad_postprocess(scores, request.waveform)
         return VadResult(request.waveform, request.sample_rate, segments, stats)
 
+    def _split_vad_segment(self, segment, start_ms: int, end_ms: int, sample_rate: int):
+        """Split a VAD segment into independent turns accepted by the audio encoder HMM."""
+        speech_capacity = int(self.module.audio_encoder_shapes["speech_ids"][1])
+        group_size = int(self.process.processor.audio_group_size)
+        usable_capacity = speech_capacity - speech_capacity % group_size
+        max_samples = min(
+            self.process.static_audio_samples,
+            int(usable_capacity * sample_rate / AUDIO_TOKENS_PER_SECOND),
+        )
+        if max_samples <= 0:
+            raise ValueError("audio encoder speech capacity must be greater than zero")
+        if len(segment) <= max_samples:
+            return [(segment, start_ms, end_ms)]
+
+        base_sample = int(start_ms * sample_rate / 1000)
+        chunks = []
+        for offset in range(0, len(segment), max_samples):
+            chunk = segment[offset : offset + max_samples]
+            chunk_start = base_sample + offset
+            chunk_end = chunk_start + len(chunk)
+            chunks.append(
+                (
+                    chunk,
+                    int(chunk_start * 1000 / sample_rate),
+                    int(chunk_end * 1000 / sample_rate),
+                )
+            )
+        return chunks
+
     def print_perf(self) -> None:
         self.perf.print_summary()
 
@@ -365,19 +393,22 @@ class FunAudioChatEngine(HoumoEngine):
             yield vad_perf
         if not vad.segments:
             raise RuntimeError("VAD did not detect any speech segments")
-        for index, (start_ms, end_ms) in enumerate(vad.segments):
+        turn_index = 0
+        for start_ms, end_ms in vad.segments:
             start = int(start_ms * vad.sample_rate / 1000)
             end = int(end_ms * vad.sample_rate / 1000)
             segment = vad.waveform[start:end]
-            if len(segment) > self.process.static_audio_samples:
-                raise ValueError(f"VAD segment {index} has {len(segment)} samples, exceeding static audio capacity")
-            result = self._run_timed("lalm.e2e_s2s", self._run_s2s, segment, system_prompt, max_new_tokens)
-            response = self._run_token2wav(result.speech_ids)
-            turn_perf = PerformanceResult(f"E2E Turn {index}", self.perf.summary()) if self.perf.enabled else None
-            self.perf.reset()
-            yield TurnResult(index, start_ms, end_ms, segment, result.text, result.speech_ids, response, SAMPLE_RATE)
-            if turn_perf is not None:
-                yield turn_perf
+            for chunk, chunk_start_ms, chunk_end_ms in self._split_vad_segment(
+                segment, start_ms, end_ms, vad.sample_rate
+            ):
+                result = self._run_timed("lalm.e2e_s2s", self._run_s2s, chunk, system_prompt, max_new_tokens)
+                response = self._run_token2wav(result.speech_ids)
+                turn_perf = PerformanceResult(f"E2E Turn {turn_index}", self.perf.summary()) if self.perf.enabled else None
+                self.perf.reset()
+                yield TurnResult(turn_index, chunk_start_ms, chunk_end_ms, chunk, result.text, result.speech_ids, response, SAMPLE_RATE)
+                if turn_perf is not None:
+                    yield turn_perf
+                turn_index += 1
 
 
 __all__ = ["FunAudioChatEngine"]

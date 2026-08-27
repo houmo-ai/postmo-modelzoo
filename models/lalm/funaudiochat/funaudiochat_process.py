@@ -50,7 +50,6 @@ from funaudiochat_types import (
     VadPreparedRequest,
 )
 
-DEFAULT_STATIC_AUDIO_SAMPLES = 126799
 DEFAULT_SYSTEM_PROMPT = "You are asked to generate text tokens."
 SPOKEN_PROMPT = (
     "You are asked to generate both text and speech tokens at the same time. "
@@ -70,6 +69,7 @@ SAMPLES_PER_TOKEN = 960
 TOKEN_MEL_RATIO = 2
 FLOW_STEPS = 10
 FLOW_CFG_RATE = 0.7
+AUDIO_TOKENS_PER_SECOND = 25
 
 
 def require_file(path: str | Path, label: str) -> Path:
@@ -218,7 +218,6 @@ class FunAudioChatProcess(ModelProcess):
         hift_mel_capacity: int,
         load_s2s: bool,
         load_vad: bool,
-        static_audio_samples: int,
         perf: PerfTracker,
     ):
         self.perf = perf
@@ -236,7 +235,14 @@ class FunAudioChatProcess(ModelProcess):
         self.prefill_length = prefill_length
         self.hidden_size = hidden_size
         self.audio_encoder_shapes = audio_encoder_shapes
-        self.static_audio_samples = static_audio_samples
+        speech_capacity = int(self.audio_encoder_shapes["speech_ids"][1])
+        group_size = int(self.processor.audio_group_size)
+        usable_capacity = speech_capacity - speech_capacity % group_size
+        self.static_audio_samples = int(
+            usable_capacity * self.processor.audio_sampling_rate / AUDIO_TOKENS_PER_SECOND
+        )
+        if self.static_audio_samples <= 0:
+            raise ValueError("audio encoder speech capacity must be greater than zero")
         self.audio_token_id = int(self.processor.audio_token_id)
         self.max_chunk_tokens = min(
             flow_token_capacity,
@@ -602,7 +608,6 @@ class FunAudioChatProcess(ModelProcess):
 __all__ = [
     "AUDIO_BOS_ID",
     "AUDIO_EOS_ID",
-    "DEFAULT_STATIC_AUDIO_SAMPLES",
     "DEFAULT_SYSTEM_PROMPT",
     "FLOW_CFG_RATE",
     "FLOW_STEPS",

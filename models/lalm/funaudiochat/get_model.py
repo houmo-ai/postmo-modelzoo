@@ -129,6 +129,7 @@ if __name__ == "__main__":
     if ret_dict.get("ret", False) is False:
         exit(1)
 
-    token2wav_path = "models/xh2-v1.5.0/funaudiochat/hmm_xh2_funaudiochat-vad-token2wav.zip"
-    save_path = get_file_from_jfrog(token2wav_path, args.download_dir, args.extract_dir)
-    print(f"token2wav_path dependencies downloaded to {save_path} and extracted to: {args.extract_dir}")
+    if args.file_type == "hmm":
+        token2wav_path = "models/dataset/hmm_xh2_funaudiochat-vad-token2wav.zip"
+        save_path = get_file_from_jfrog(token2wav_path, args.download_dir, args.extract_dir)
+        print(f"token2wav_path dependencies downloaded to {save_path} and extracted to: {args.extract_dir}")

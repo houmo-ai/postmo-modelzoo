@@ -1,6 +1,6 @@
 # Fun-Audio-Chat
 
-本示例展示如何使用 Fun-Audio-Chat-8B 的预编译芯片模型，在后摩芯片设备上完成音频理解、语音对话和端到端语音交互。当前目录暂不提供量化和编译流程，仅支持使用已有的 HMM 模型进行 Python 演示。
+本示例展示如何使用 Fun-Audio-Chat-8B 在后摩芯片设备上完成音频理解、语音对话和端到端语音交互。目录提供原始模型下载和 Merak PTQ/HMONNX 导出入口；token2wav/VAD 仍使用单独发布的辅助 HMM 资源。
 
 [TOC]
 
@@ -27,11 +27,11 @@ Fun-Audio-Chat 是面向低延迟语音交互的大型音频语言模型，支�
 - `model_name=funaudiochat`
 - `model_size=8b`
 - `quant_type=w8a8`
-- `context_length=256`
-- `prefill_length=256`
 - `ncore=2`
 - `ndevice=1`
 - `batch=1`
+
+Merak workflow 配置 `workflows/xh2a/other_models/funaudiochat/funaudiochat.yaml` 默认使用 `context_length=256` 和 `input_sequence_length=256`。
 
 `demo.py` 默认使用以下资源：
 
@@ -52,15 +52,15 @@ Fun-Audio-Chat 是面向低延迟语音交互的大型音频语言模型，支�
 
 **量化硬件要求：**
 
-- `Fun-Audio-Chat-8B`: 暂无数据。当前目录暂不提供量化脚本。
+- `Fun-Audio-Chat-8B`: 需要与 `xhmodel_merak` 及其 `configs_merak` 匹配的 CUDA/GPU 环境。具体显存要求以实际 workflow 为准。
 
 **编译时 host 内存要求：**
 
-- `Fun-Audio-Chat-8B`: 暂无数据。当前目录暂不提供编译脚本。
+- `Fun-Audio-Chat-8B`: 暂无数据
 
 ## 2 快速开始
 
-当前示例仅提供使用预编译 HMM 模型的 Python 推理方式。芯片模型只能在 Linux 环境下运行，量化和编译流程暂未纳入当前示例。
+当前示例通过 Python 脚本完成 PTQ/HMONNX 导出、HMM 编译和推理。芯片模型只能在 Linux 环境下量化和编译；如果只验证推理，可以直接下载预编译 HMM。
 
 ### 2.1 环境准备
 
@@ -90,17 +90,65 @@ export HOUMO_TARGET=xh2
 python3 get_model.py --type raw --source_type modelscope
 ```
 
-`get_model.py` 默认将模型下载到当前目录，并将 HMM 资源解压到 `output/xh2/`。原始模型下载仅用于查看或后续开发，当前目录没有与之配套的量化和编译脚本。
+`get_model.py` 默认将原始模型下载到当前目录，并将 HMM 资源解压到 `output/xh2/`。`raw` 下载不会自动下载辅助 HMM；`hmm` 下载主模型 HMM 时会同时下载辅助 token2wav/VAD 归档。
 
 获取预编译模型时，脚本还会自动获取 `hmm_xh2_funaudiochat-vad-token2wav.zip`，并将其中的 VAD、token2wav 辅助模型解压到 `output/xh2/`。如果只使用 `s2t` 模式，可以不加载 token2wav 相关模型；`s2s` 和 `e2e` 模式需要对应的辅助模型资源。
 
 ### 2.3 量化
 
-当前目录暂不提供 `ptq.py`，暂不考虑量化，因此本章节没有可执行的量化命令。
+量化需要使用 GPU，并在宿主机安装与 CUDA 12.8 兼容的 CUDA 和驱动。量化还依赖外部安装的 `xhmodel_merak` 和对应的 `configs_merak`，`config.yaml` 中的 `workflow_config` 必须能在该配置包中找到。启动 Docker 时需要映射 GPU，并指定可用的 GPU ID：
+
+```bash
+docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbor.houmo.ai/toolchain/release:Dadao-xh2-x.y.z-ubuntu24.04-x86.64 /bin/bash
+```
+
+进入 Docker 后配置环境变量，进入当前模型目录，再执行 `ptq.py`：
+
+```bash
+source env.sh
+cd models/lalm/funaudiochat
+export HOUMO_TARGET=xh2
+python3 ptq.py \
+    --model-dir Fun-Audio-Chat-8B \
+    --model-name funaudiochat \
+    --model-size 8b \
+    --dump-golden
+```
+
+默认输出目录为 `output/xh2/hmquant/`。PTQ workflow 需要生成以下六个主组件目录：
+
+```text
+audio_encoder/
+prefill/
+decode/
+audio_tower/
+audio_decoder_prefill/
+audio_decoder_decode/
+```
+
+文本/音频 embedding 等 CPU 侧资产会整理到同一输出目录。token2wav 和 VAD 不属于这六个主组件，仍由独立辅助归档提供。
 
 ### 2.4 编译
 
-当前目录暂不提供 `build.py`，暂不考虑编译。演示默认直接加载 `output/xh2/` 下已经准备好的 HMM 文件。
+`build.py` 消费 `output/xh2/hmquant/` 下的六个主组件并生成与 `demo.py` 默认文件名一致的 HMM：
+
+```bash
+export HOUMO_TARGET=xh2
+python3 build.py \
+    --model_dir output/xh2/hmquant \
+    --output_dir output/xh2 \
+    --ndevice 1 \
+    --enable_common_subgraph
+```
+
+默认输出名称分别为：
+
+- `funaudiochat-8b_audio_tower.hmm`
+- `funaudiochat-8b_audio_encoder.hmm`
+- `funaudiochat-8b_prefill.hmm`
+- `funaudiochat-8b_decode.hmm`
+- `funaudiochat-8b_audio_decoder_prefill.hmm`
+- `funaudiochat-8b_audio_decoder_decode.hmm`
 
 ### 2.5 演示
 
@@ -110,7 +158,7 @@ python3 get_model.py --type raw --source_type modelscope
 - `s2s`: Speech-to-Speech，输出文本和语音，并保存一个 WAV 文件。
 - `e2e`: 先使用 VAD 切分输入音频，再逐段进行语音对话，保存每一轮的输入音频、响应音频和 JSON 结果。
 
-输入音频需要是单声道音频。脚本会将输入重采样到 16 kHz；`s2s` 和 `e2e` 的单段输入长度不能超过默认的 `126799` 个采样点，约 7.9 秒。生成语音采样率为 24 kHz。
+输入音频需要是单声道音频。脚本会将输入重采样到 16 kHz。音频输入容量由已加载 `audio_encoder.hmm` 的 `speech_ids` 静态 shape 自动推导；`s2s` 超过该容量时会报错，`e2e` 会根据 VAD 分段，并在单个分段超过该容量时自动连续切分。生成语音采样率为 24 kHz。
 
 使用默认输入音频运行文本识别：
 
@@ -145,9 +193,13 @@ python3 demo.py --stage e2e --audio_path /path/to/questions.wav --e2e_output_dir
 - `--output_wav`: `s2s` 模式的响应 WAV 路径，默认 `result/turn_000_response.wav`。
 - `--e2e_output_dir`: `e2e` 模式的输出目录，默认 `result/`。
 
+Demo 不再通过命令行配置音频静态长度。程序读取 `audio_encoder.hmm` 的 `speech_ids` 输入长度，并结合 25 Hz 音频 token 速率自动换算最大 16 kHz 音频采样点数。例如，`speech_ids` 长度为 80 时容量约为 3.2 秒，长度为 200 时容量约为 8 秒。
+
+E2E 的切分长度由 `audio_encoder.hmm` 的 `speech_ids` 输入 shape 和音频 token 速率共同决定，不在 Python 中硬编码 HMM 的静态长度。超过静态容量的 VAD 分段会被拆成多个独立子段，每个子段分别执行一次完整的 S2S 推理，并作为独立 turn 写入输出文件和 `results.json`。
+
 ## 3 一键评估
 
-当前目录的 `test.sh` 暂时只支持 demo。默认会准备 Python 虚拟环境、下载预编译模型，并依次运行 `s2t`、`s2s` 和 `e2e` 演示：
+当前目录的 `test.sh` 支持 `quant`、`build`、`demo` 和 `all`。默认执行 `demo`，准备 Python 虚拟环境、下载预编译模型，并依次运行 `s2t`、`s2s` 和 `e2e`。`all` 会先导出量化结果、编译主模型 HMM，再准备 demo 所需的辅助 HMM 资源并运行三种演示：
 
 ```bash
 bash test.sh
@@ -157,7 +209,8 @@ bash test.sh
 
 ```bash
 Usage: test.sh [options]
-  -s, --step              运行步骤，当前仅支持 demo，默认 demo。
+  -s, --step              运行步骤，可选 quant、build、demo、all，默认 demo。
+                          支持逗号分隔或重复传入，例如 -s quant,build,demo。
   -name, --model_name     模型名称，默认 funaudiochat。
   -size, --model_size     模型规格，默认 8b。
   --ndevice               NPU 数量，默认 1。
@@ -170,8 +223,20 @@ Usage: test.sh [options]
 示例：
 
 ```bash
+# 仅运行 quant，会先下载原始模型再量化
+bash test.sh -s quant
+
+# 仅运行 build，要求 output/xh2/hmquant 中已有量化结果
+bash test.sh -s build
+
 # 依次运行 s2t、s2s 和 e2e 演示
 bash test.sh
+
+# 完整流程：下载原始模型、量化、编译并运行演示
+bash test.sh -s all
+
+# 组合执行量化、编译和演示
+bash test.sh -s quant,build,demo
 
 # 仅运行 s2t 演示
 bash test.sh --demo_mode s2t
@@ -186,13 +251,13 @@ bash test.sh --demo_mode e2e
 bash test.sh --skip_download --demo_mode s2t
 ```
 
-`quant`、`build` 和 `all` 步骤当前不可用；传入这些步骤时脚本会直接报错退出。
+PTQ 依赖 GPU 和对应的 Merak 环境；编译依赖 x86_64 host 上的 XH2 编译环境。仅验证推理时保持默认 `demo` 步骤即可。
 
 ## 4 参考结果
 
 ### 4.1 演示结果
 
-以下结果来自当前目录已有的 `result/results.json`。输入音频为 `/hmdd/imodelzoo/data/audio/questions.wav`，VAD 检测到 3 个语音片段：
+以下结果来自使用可完整容纳各 VAD 分段的音频编码器运行 `questions.wav`。VAD 检测到 3 个语音片段：
 
 ```text
 turn 0: 0 ms - 3100 ms
@@ -213,6 +278,8 @@ speech_token_count: 260
 - `result/turn_000_input.wav`、`result/turn_001_input.wav`、`result/turn_002_input.wav`
 - `result/turn_000_response.wav`、`result/turn_001_response.wav`、`result/turn_002_response.wav`
 - `result/results.json`
+
+如果加载的 `audio_encoder.hmm` 静态容量小于某个 VAD 分段，该分段会继续拆成多个独立 turn，因此实际 turn 数和输出文件数可能多于 VAD 分段数。例如 `speech_ids` 长度为 80 时，`3620-7120 ms` 分段会拆成 `3620-6820 ms` 和 `6820-7120 ms`。
 
 ### 4.2 性能结果
 

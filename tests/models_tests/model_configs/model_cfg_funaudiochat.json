@@ -12,18 +12,40 @@
         "xh2": [2]
     },
     "support_flow": {
-        "xh2": ["get_model", "demo"]
+        "xh2": ["get_model", "quant", "compile", "demo"]
     },
     "support_hmatc": null,
     "get_model_params": {
         "xh2": {
-            "type": ["hmm"],
-            "download_dir": ["cached_models"],
-            "extract_dir": ["cached_models/funaudiochat_hmm"],
-            "source_type": [null],
+            "type": ["raw", "hmm"],
+            "download_dir": ["cached_models", "cached_models"],
+            "extract_dir": [null, "cached_models/hmm_xh2_funaudiochat"],
+            "source_type": ["modelscope", null],
+            "model_name": ["funaudiochat", "funaudiochat"],
+            "model_size": ["8b", "8b"],
+            "ndevice": [null, "1"],
+            "ncore": [null, "2"]
+        }
+    },
+    "quant_params": {
+        "xh2": {
             "model_name": ["funaudiochat"],
             "model_size": ["8b"],
-            "ndevice": ["1"]
+            "model_dir": ["cached_models/Fun-Audio-Chat-8B"],
+            "output_dir": ["cached_results/hmquant_xh2_funaudiochat"],
+            "context_length": ["256"],
+            "dump_golden": [true]
+        }
+    },
+    "compile_params": {
+        "xh2": {
+            "model_dir": ["cached_results/hmquant_xh2_funaudiochat"],
+            "output_dir": ["cached_results/hmm_xh2_funaudiochat"],
+            "batch": ["1"],
+            "ndevice": ["1"],
+            "ncore": ["2"],
+            "jobs": ["24"],
+            "enable_common_subgraph": [true]
         }
     },
     "test_sh_params": [
@@ -32,15 +54,110 @@
     "enable_demo_test": true,
     "demo_params": {
         "xh2": {
-            "tokenizer_dir": ["cached_models/Fun-Audio-Chat-8B"],
-            "embedding_path": ["cached_models/funaudiochat_hmm/hmquant/quant_embedding.pt"],
-            "audio_embedding_path": ["cached_models/funaudiochat_hmm/hmquant/quant_audio_embedding.pt"],
-            "audio_encoder_path": ["cached_models/funaudiochat_hmm/funaudiochat-8b_audio_encoder.hmm"],
-            "prefill_path": ["cached_models/funaudiochat_hmm/funaudiochat-8b_prefill.hmm"],
-            "decode_path": ["cached_models/funaudiochat_hmm/funaudiochat-8b_decode.hmm"],
-            "ndevice": ["1"],
-            "stage": ["s2t"],
-            "perf": [true]
+            "tokenizer_dir": [
+                "cached_models/Fun-Audio-Chat-8B",
+                "cached_models/Fun-Audio-Chat-8B",
+                "cached_models/Fun-Audio-Chat-8B"
+            ],
+            "embedding_path": [
+                "cached_models/hmm_xh2_funaudiochat/hmquant/quant_embedding.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/quant_embedding.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/quant_embedding.pt"
+            ],
+            "audio_embedding_path": [
+                "cached_models/hmm_xh2_funaudiochat/hmquant/quant_audio_embedding.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/quant_audio_embedding.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/quant_audio_embedding.pt"
+            ],
+            "pre_matching_path": [
+                "cached_models/hmm_xh2_funaudiochat/hmquant/audio_decoder_pre_matching.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/audio_decoder_pre_matching.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/audio_decoder_pre_matching.pt"
+            ],
+            "flow_input_embedding_path": [
+                "cached_models/hmm_xh2_funaudiochat/hmquant/flow_input_embedding.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/flow_input_embedding.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/flow_input_embedding.pt"
+            ],
+            "speaker_info_path": [
+                "cached_models/hmm_xh2_funaudiochat/hmquant/new_spk2info.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/new_spk2info.pt",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/new_spk2info.pt"
+            ],
+            "audio_encoder_path": [
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_encoder.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_encoder.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_encoder.hmm"
+            ],
+            "prefill_path": [
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_prefill.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_prefill.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_prefill.hmm"
+            ],
+            "decode_path": [
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_decode.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_decode.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_decode.hmm"
+            ],
+            "audio_tower_path": [
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_tower.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_tower.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_tower.hmm"
+            ],
+            "audio_decoder_prefill_path": [
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_decoder_prefill.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_decoder_prefill.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_decoder_prefill.hmm"
+            ],
+            "audio_decoder_decode_path": [
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_decoder_decode.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_decoder_decode.hmm",
+                "cached_models/hmm_xh2_funaudiochat/funaudiochat-8b_audio_decoder_decode.hmm"
+            ],
+            "flow_encoder_path": [
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_encoder.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_encoder.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_encoder.hmm"
+            ],
+            "flow_spk_path": [
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_spk.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_spk.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_spk.hmm"
+            ],
+            "flow_decoder_path": [
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_decoder.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_decoder.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_flow_decoder.hmm"
+            ],
+            "hift_part1_path": [
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_hift_part1.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_hift_part1.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_hift_part1.hmm"
+            ],
+            "hift_part2_path": [
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_hift_part2.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_hift_part2.hmm",
+                "cached_models/hmm_xh2_funaudiochat/cosyvoice3-0.5b-2512_hift_part2.hmm"
+            ],
+            "vad_path": [
+                "cached_models/hmm_xh2_funaudiochat/fsmd_vad.hmm",
+                "cached_models/hmm_xh2_funaudiochat/fsmd_vad.hmm",
+                "cached_models/hmm_xh2_funaudiochat/fsmd_vad.hmm"
+            ],
+            "config_path": [
+                "cached_models/hmm_xh2_funaudiochat/hmquant/config.yaml",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/config.yaml",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/config.yaml"
+            ],
+            "cmvn_path": [
+                "cached_models/hmm_xh2_funaudiochat/hmquant/am.mvn",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/am.mvn",
+                "cached_models/hmm_xh2_funaudiochat/hmquant/am.mvn"
+            ],
+            "ndevice": ["1", "1", "1"],
+            "batch": ["1", "1", "1"],
+            "stage": ["s2t", "s2s", "e2e"],
+            "perf": [true, true, true]
         }
     }
 }

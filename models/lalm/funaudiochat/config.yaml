@@ -9,8 +9,6 @@ model_configs:
       model_size: "8b"
       ncore: 2
       quant_type: "w8a8"
-      context_length: "256"
       ndevice: 1
       batch: 1
-      prefill_length: 256
-      workflow_config: "workflows/xh2a/llm_models/funaudiochat/8b/funaudiochat_8b_full.yaml"
+      workflow_config: "workflows/xh2a/other_models/funaudiochat/funaudiochat.yaml"

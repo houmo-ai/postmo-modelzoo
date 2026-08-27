@@ -166,7 +166,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen3-vl-embedding      | embedding    | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | siglip2                 | embedding    | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
 | yolov8m-pose            | estimation   | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
-| funaudiochat            | lalm         | xh2    | ❌️   | ❌️    | ✅️  | ✅️   | ❌️  | ✅️      |
+| funaudiochat            | lalm         | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | deepseek-r1-qwen3-8b    | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | gpt-oss                 | llm          | xh2    | ❌️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | qwen-agentworld         | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |

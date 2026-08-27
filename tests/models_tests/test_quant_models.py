@@ -152,6 +152,19 @@ def test_asr_emotion2vec_quant(setup_logging) -> None:
     _quant_func("emotion2vec", setup_logging)
 
 
+@pytest.mark.funaudiochat
+@pytest.mark.ndevice_1
+@pytest.mark.dev_mem_12g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_lalm_funaudiochat_quant",
+    depends_on=["test_get_models.py::test_lalm_funaudiochat_get_model"],
+)
+def test_lalm_funaudiochat_quant(setup_logging) -> None:
+    """test_lalm_funaudiochat_quant"""
+    _quant_func("funaudiochat", setup_logging)
+
+
 @pytest.mark.gemma4
 @pytest.mark.ndevice_2
 @pytest.mark.dev_mem_48g
