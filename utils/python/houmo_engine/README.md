@@ -20,9 +20,8 @@ houmo_engine/
 
 ## 当前支持模型
 
-- `Qwen35Engine`：Qwen3.5 文本和图片生成。
-- `Qwen36MtpEngine`：Qwen3.6 MTP 推测生成。
 - `Qwen3AsrEngine`：Qwen3-ASR 音频输入生成。
+- `Qwen3TtsEngine`：Qwen3-TTS 音频生成。
 
 所有模型统一使用一个公开推理方法：
 
@@ -38,19 +37,16 @@ generate(...)
 
 ```text
 HoumoEngine
-├── Qwen35Engine
-├── Qwen36MtpEngine
-└── Qwen3AsrEngine
+├── Qwen3AsrEngine
+└── Qwen3TtsEngine
 
 ModelProcess
-├── Qwen35Process
-├── Qwen36MtpProcess
-└── Qwen3AsrProcess
+├── Qwen3AsrProcess
+└── Qwen3TtsProcess
 
 HoumoModule
-├── Qwen35Module
-├── Qwen36MtpModule
-└── Qwen3AsrModule
+├── Qwen3AsrModule
+└── Qwen3TtsModule
 ```
 
 如果后续多个模型出现稳定且可复用的任务级公共实现，再从真实重复代码中提取对应中间层。
@@ -186,9 +182,8 @@ sys.path.insert(0, str(engine_src))
 具体 Engine 从 package 根目录延迟导入：
 
 ```python
-from houmo_engine import Qwen35Engine
-from houmo_engine import Qwen36MtpEngine
 from houmo_engine import Qwen3AsrEngine
+from houmo_engine import Qwen3TtsEngine
 ```
 
 基础接口和层间类型可以按需导入：
@@ -221,8 +216,6 @@ copy_tensor_roi(
 当前基于新框架的 Demo 位于：
 
 ```text
-models/llm/qwen3.5/python/demo.py
-models/llm/qwen3.5/python/demo_mtp.py
 models/asr/qwen3-asr/python/demo.py
 ```
 

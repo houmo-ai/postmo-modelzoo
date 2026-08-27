@@ -30,22 +30,12 @@ __all__ = [
     "HoumoEngine",
     "HoumoModule",
     "ModelProcess",
-    "Qwen35Engine",
-    "Qwen36MtpEngine",
     "Qwen3AsrEngine",
     "Qwen3TtsEngine",
 ]
 
 
 def __getattr__(name):
-    if name == "Qwen35Engine":
-        from .engine.qwen3_5 import Qwen35Engine
-
-        return Qwen35Engine
-    if name == "Qwen36MtpEngine":
-        from .engine.qwen3_6_mtp import Qwen36MtpEngine
-
-        return Qwen36MtpEngine
     if name == "Qwen3AsrEngine":
         from .engine.qwen3_asr import Qwen3AsrEngine
 

@@ -5,14 +5,9 @@
 当前实现是本规范的唯一基准：
 
 - 基础接口：`core/`
-- Qwen3.5 Engine：`engine/qwen3_5.py`
-- Qwen3.5 Process：`process/qwen3_5/process.py`
-- Qwen3.5 Module：`module/qwen3_5.py`
-- Qwen3.6 MTP Engine：`engine/qwen3_6_mtp.py`
 - Qwen3-ASR Engine：`engine/qwen3_asr.py`
+- Qwen3-TTS Engine：`engine/qwen3_tts.py`
 - 层间类型：`core/types.py`
-- Qwen3.5 Demo：`../../../models/llm/qwen3.5/python/demo.py`
-- Qwen3.6 MTP Demo：`../../../models/llm/qwen3.5/python/demo_mtp.py`
 - Qwen3-ASR Demo：`../../../models/asr/qwen3-asr/python/demo.py`
 
 ## 一、首版集成约束
@@ -49,19 +44,16 @@ sys.path.insert(0, str(engine_src))
 
 ```text
 HoumoEngine
-├── Qwen35Engine
-├── Qwen36MtpEngine
-└── Qwen3AsrEngine
+├── Qwen3AsrEngine
+└── Qwen3TtsEngine
 
 ModelProcess
-├── Qwen35Process
-├── Qwen36MtpProcess
-└── Qwen3AsrProcess
+├── Qwen3AsrProcess
+└── Qwen3TtsProcess
 
 HoumoModule
-├── Qwen35Module
-├── Qwen36MtpModule
-└── Qwen3AsrModule
+├── Qwen3AsrModule
+└── Qwen3TtsModule
 ```
 
 禁止增加仅用于分类、没有公共实现或额外契约的空中间层。只有在至少两个模型已经出现稳定且可复用的真实实现时，才能从重复代码中提取新的基类。
@@ -324,9 +316,8 @@ engine/<model_name>.py
 类名必须明确表达模型：
 
 ```text
-Qwen35Engine
-Qwen36MtpEngine
 Qwen3AsrEngine
+Qwen3TtsEngine
 ```
 
 ### 5.1 初始化
@@ -718,9 +709,8 @@ class StageOutputs:
 同一模型三层类型必须对应：
 
 ```text
-Qwen35Engine / Qwen35Process / Qwen35Module
-Qwen36MtpEngine / Qwen36MtpProcess / Qwen36MtpModule
 Qwen3AsrEngine / Qwen3AsrProcess / Qwen3AsrModule
+Qwen3TtsEngine / Qwen3TtsProcess / Qwen3TtsModule
 ```
 
 禁止含义不明确的公开名称，例如 `Runner`、`VLMEngine`、`ASREngine`。

@@ -18,14 +18,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from .qwen3_5 import Qwen35Engine
-from .qwen3_6_mtp import Qwen36MtpEngine
 from .qwen3_asr import Qwen3AsrEngine
 from .qwen3_tts import Qwen3TtsEngine
 
 __all__ = [
-    "Qwen35Engine",
-    "Qwen36MtpEngine",
     "Qwen3AsrEngine",
     "Qwen3TtsEngine",
 ]

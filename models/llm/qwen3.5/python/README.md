@@ -74,7 +74,7 @@ python3 demo_prefix_caching.py --help
 
 ## 3 标准生成示例
 
-`demo.py` 使用公共 `Qwen35Engine`，支持文本和图片生成。默认输入示例图片，并执行一次视觉问答。
+`demo.py` 使用模型目录本地的 `qwen_engine.Qwen35Engine`，支持文本和图片生成。默认输入示例图片，并执行一次视觉问答。
 
 ### 3.1 基本运行
 
@@ -132,7 +132,7 @@ python3 demo.py --it true --history true
 
 ## 4 MTP 推测生成示例
 
-`demo_mtp.py` 使用 `Qwen36MtpEngine`，通过 MTP draft/verify 流程进行文本生成。该示例只接受 `model_name=qwen3.6`，不处理图片输入。
+`demo_mtp.py` 使用模型目录本地的 `qwen_mtp_engine.Qwen36MtpEngine`，通过 MTP draft/verify 流程进行文本生成。模型名称和尺寸从 `config.yaml` 读取，不处理图片输入。
 
 运行前需要准备标准 prefill/decode 模型和 MTP prefill/decode 模型。
 

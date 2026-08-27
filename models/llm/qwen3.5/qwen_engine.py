@@ -18,12 +18,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from ..core import HoumoEngine
-from ..core.types import GenerationState, Stage
-from ..module.qwen3_5 import Qwen35Module
-from ..perf import PerfTracker
-from ..process.qwen3_5 import Qwen35Process
-from ..sampling import GreedySampler, GreedySamplingParams
+from houmo_engine import HoumoEngine
+from houmo_engine.core.types import GenerationState, Stage
+from houmo_engine.perf import PerfTracker
+from houmo_engine.sampling import GreedySampler, GreedySamplingParams
+
+from qwen_module import Qwen35Module
+from qwen_process import Qwen35Process
+
+E2E_METRIC = "llm.e2e"
+TTFT_METRIC = "llm.ttft"
 
 
 class Qwen35Engine(HoumoEngine):
@@ -141,6 +145,28 @@ class Qwen35Engine(HoumoEngine):
         self.state.context_length += 1
         return token
 
+    def _emit(self, text: str):
+        if not text:
+            return
+        self.perf.end(E2E_METRIC)
+        try:
+            yield text
+        finally:
+            self.perf.start(E2E_METRIC)
+
+    def _decode_until_stop(self, token: int, max_new_tokens: int | None, counters: dict[str, int]):
+        while token not in self.stop_token_ids:
+            if max_new_tokens is not None and len(self.state.generated_ids) >= max_new_tokens:
+                break
+            if self.state.context_length >= self.context_max_length:
+                break
+            token = self._decode(token)
+            counters["decode_tokens"] += 1
+            if token in self.stop_token_ids:
+                break
+            self.state.generated_ids.append(token)
+            yield from self._emit(self.process.postprocess(self.state))
+
     def generate(
         self,
         prompt: str,
@@ -174,46 +200,20 @@ class Qwen35Engine(HoumoEngine):
         decode_tokens = 0
         ttft_active = True
         e2e_active = True
-        self.perf.start("llm.e2e")
-        self.perf.start("llm.ttft")
+        self.perf.start(E2E_METRIC)
+        self.perf.start(TTFT_METRIC)
         try:
             request = self.process.preprocess(prompt, images, system_prompt)
             self._vision(request)
             token, input_tokens = self._prefill(request)
             self.state.generated_ids.append(token)
-            self.perf.end("llm.ttft")
+            self.perf.end(TTFT_METRIC)
             ttft_active = False
-            delta = self.process.postprocess(self.state)
-            if delta:
-                self.perf.end("llm.e2e")
-                e2e_active = False
-                yield delta
-                self.perf.start("llm.e2e")
-                e2e_active = True
-            while token not in self.stop_token_ids:
-                if max_new_tokens is not None and len(self.state.generated_ids) >= max_new_tokens:
-                    break
-                if self.state.context_length >= self.context_max_length:
-                    break
-                token = self._decode(token)
-                decode_tokens += 1
-                if token in self.stop_token_ids:
-                    break
-                self.state.generated_ids.append(token)
-                delta = self.process.postprocess(self.state)
-                if delta:
-                    self.perf.end("llm.e2e")
-                    e2e_active = False
-                    yield delta
-                    self.perf.start("llm.e2e")
-                    e2e_active = True
-            remainder = self.process.postprocess(self.state, final=True)
-            if remainder:
-                self.perf.end("llm.e2e")
-                e2e_active = False
-                yield remainder
-                self.perf.start("llm.e2e")
-                e2e_active = True
+            yield from self._emit(self.process.postprocess(self.state))
+            counters = {"decode_tokens": 0}
+            yield from self._decode_until_stop(token, max_new_tokens, counters)
+            decode_tokens = counters["decode_tokens"]
+            yield from self._emit(self.process.postprocess(self.state, final=True))
             self.perf.set_metrics(
                 "llm",
                 input_tokens=input_tokens,
@@ -223,6 +223,6 @@ class Qwen35Engine(HoumoEngine):
             )
         finally:
             if ttft_active:
-                self.perf.end("llm.ttft")
+                self.perf.end(TTFT_METRIC)
             if e2e_active:
-                self.perf.end("llm.e2e")
+                self.perf.end(E2E_METRIC)

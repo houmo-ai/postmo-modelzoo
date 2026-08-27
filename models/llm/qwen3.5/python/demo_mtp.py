@@ -28,6 +28,7 @@ MODEL_DIR = Path(__file__).resolve().parents[1]
 IMODELZOO_ROOT = Path(__file__).resolve().parents[4]
 HOUMO_EXAMPLES_PATH = Path(os.getenv("HOUMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
 ENGINE_SRC = HOUMO_EXAMPLES_PATH / "utils" / "python"
+sys.path.insert(0, str(MODEL_DIR))
 sys.path.insert(0, str(ENGINE_SRC))
 
 from houmo_engine.sampling import GreedySamplingParams
@@ -55,7 +56,7 @@ class HmQwen36Mtp:
         perf: bool = False,
         debug: bool = False,
     ):
-        from houmo_engine import Qwen36MtpEngine
+        from qwen_mtp_engine import Qwen36MtpEngine
 
         self.engine = Qwen36MtpEngine(
             prefill_path=prefill_path,
@@ -259,7 +260,7 @@ def get_args() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
+def _load_model_config(args: argparse.Namespace):
     import yaml
 
     with Path(args.config_path).open("r", encoding="utf-8") as stream:
@@ -267,12 +268,12 @@ def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
     args.model_name = args.model_name or config["default_model_name"]
     args.model_size = args.model_size or config["default_model_size"]
     try:
-        model_config = config["model_configs"][args.model_name][args.model_size]
+        return config["model_configs"][args.model_name][args.model_size]
     except KeyError as error:
         raise ValueError(f"unsupported model configuration: {args.model_name}-{args.model_size}") from error
-    if args.model_name != "qwen3.6":
-        raise ValueError("Qwen3.6 MTP example requires --model_name qwen3.6")
 
+
+def _resolve_model_paths(args: argparse.Namespace, model_config) -> None:
     args.ndevice = args.ndevice or int(model_config.get("ndevice", 1))
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.prefill_path is None:
@@ -299,6 +300,11 @@ def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
             value = getattr(args, name)
             if value.endswith(".hmm"):
                 setattr(args, name, value.replace(".hmm", ".hmms"))
+
+
+def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
+    model_config = _load_model_config(args)
+    _resolve_model_paths(args, model_config)
     return args
 
 

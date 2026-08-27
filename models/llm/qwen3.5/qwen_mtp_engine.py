@@ -18,27 +18,19 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from dataclasses import dataclass
-
 import numpy as np
 
-from ..core import HoumoEngine
-from ..core.types import Stage
-from ..module.qwen3_6_mtp import Qwen36MtpModule
-from ..perf import PerfTracker
-from ..process.qwen3_6_mtp import (
-    Qwen36MtpGenerationState,
-    Qwen36MtpProcess,
-)
-from ..sampling import GreedySampler, GreedySamplingParams
+from houmo_engine import HoumoEngine
+from houmo_engine.core.types import Stage
+from houmo_engine.perf import PerfTracker
+from houmo_engine.sampling import GreedySampler, GreedySamplingParams
 
+from qwen_module import Qwen36MtpModule
+from qwen_process import Qwen36MtpProcess
+from qwen_types import Qwen36MtpGenerationState, VerifyResult
 
-@dataclass
-class _VerifyResult:
-    draft_tokens: list[int]
-    accepted_count: int
-    next_token: int
-    next_hidden: np.ndarray
+E2E_METRIC = "llm_mtp.e2e"
+TTFT_METRIC = "llm_mtp.ttft"
 
 
 class Qwen36MtpEngine(HoumoEngine):
@@ -174,7 +166,7 @@ class Qwen36MtpEngine(HoumoEngine):
                 drafts.append(token)
         return drafts
 
-    def _verify(self, draft_tokens: list[int]) -> _VerifyResult:
+    def _verify(self, draft_tokens: list[int]) -> VerifyResult:
         if self.state.pending_token is None:
             raise RuntimeError("verify requires a pending token")
         verify_tokens = [self.state.pending_token, *draft_tokens]
@@ -204,12 +196,88 @@ class Qwen36MtpEngine(HoumoEngine):
                 previous_tokens=[*self.state.generated_ids, *draft_tokens],
             )
         next_hidden = hidden[:, accepted_count : accepted_count + 1, :].copy()
-        return _VerifyResult(
+        return VerifyResult(
             draft_tokens=draft_tokens,
             accepted_count=accepted_count,
             next_token=next_token,
             next_hidden=next_hidden,
         )
+
+    def _emit(self, text: str):
+        if not text:
+            return
+        self.perf.end(E2E_METRIC)
+        try:
+            yield text
+        finally:
+            self.perf.start(E2E_METRIC)
+
+    def _stop_speculation(self, output_tokens: int, max_new_tokens: int | None) -> bool:
+        if max_new_tokens is not None and output_tokens >= max_new_tokens:
+            self.state.finish_reason = "length"
+            return True
+        if self.state.context_length + self.module.verify_length > self.context_max_length:
+            self.state.finish_reason = "context"
+            return True
+        return False
+
+    def _visible_tokens(self, result: VerifyResult, remaining: int | None) -> list[int]:
+        candidates = [*result.draft_tokens[: result.accepted_count], result.next_token]
+        visible = candidates if remaining is None else candidates[:remaining]
+        stop_index = next((index for index, token in enumerate(visible) if token in self.stop_token_ids), None)
+        return visible if stop_index is None else visible[: stop_index + 1]
+
+    def _commit_verify_result(self, result: VerifyResult, visible: list[int]) -> None:
+        visible_accepted = min(result.accepted_count, len(visible))
+        accepted_steps = 1 + visible_accepted
+        self.module.commit_verify_cache(accepted_steps)
+        self.state.context_length += accepted_steps
+        self.state.mtp_context_length += accepted_steps
+        continues = (
+            len(visible) > result.accepted_count
+            and visible[-1] == result.next_token
+            and result.next_token not in self.stop_token_ids
+        )
+        self.state.pending_token = result.next_token if continues else None
+        self.state.draft_anchor_hidden = result.next_hidden if continues else None
+
+    def _consume_visible_tokens(self, visible: list[int], counters: dict[str, int]):
+        for token in visible:
+            counters["consumed"] += 1
+            if token in self.stop_token_ids:
+                self.state.finish_reason = "stop"
+                break
+            self.state.generated_ids.append(token)
+            yield from self._emit(self.process.postprocess(self.state))
+
+    def _finish_length_limited_round(self, visible: list[int], remaining: int | None) -> bool:
+        if remaining is None or len(visible) < remaining:
+            return False
+        self.state.finish_reason = "length"
+        self.state.pending_token = None
+        self.state.draft_anchor_hidden = None
+        return True
+
+    def _run_speculative_loop(self, max_new_tokens: int | None, counters: dict[str, int]):
+        while self.state.pending_token is not None:
+            if self._stop_speculation(counters["output_tokens"], max_new_tokens):
+                break
+            counters["speculative_rounds"] += 1
+            drafts = self._draft()
+            counters["draft_tokens_total"] += len(drafts)
+            result = self._verify(drafts)
+            counters["accepted_draft_tokens"] += result.accepted_count
+            remaining = None if max_new_tokens is None else max_new_tokens - counters["output_tokens"]
+            visible = self._visible_tokens(result, remaining)
+            self._commit_verify_result(result, visible)
+            yield from self._consume_visible_tokens(visible, counters)
+            counters["output_tokens"] += counters["consumed"]
+            counters["decode_tokens"] += counters["consumed"]
+            counters["consumed"] = 0
+            if self.state.finish_reason == "stop":
+                break
+            if self._finish_length_limited_round(visible, remaining):
+                break
 
     def generate(
         self,
@@ -240,8 +308,8 @@ class Qwen36MtpEngine(HoumoEngine):
         output_tokens = 0
         ttft_active = True
         e2e_active = True
-        self.perf.start("llm_mtp.e2e")
-        self.perf.start("llm_mtp.ttft")
+        self.perf.start(E2E_METRIC)
+        self.perf.start(TTFT_METRIC)
         try:
             request = self.process.preprocess(prompt, system_prompt)
             token = self._prefill(request)
@@ -252,101 +320,25 @@ class Qwen36MtpEngine(HoumoEngine):
                 self.state.pending_token = None
             else:
                 self.state.generated_ids.append(token)
-            self.perf.end("llm_mtp.ttft")
+            self.perf.end(TTFT_METRIC)
             ttft_active = False
 
-            delta = self.process.postprocess(self.state)
-            if delta:
-                self.perf.end("llm_mtp.e2e")
-                e2e_active = False
-                yield delta
-                self.perf.start("llm_mtp.e2e")
-                e2e_active = True
-
-            while self.state.pending_token is not None:
-                if max_new_tokens is not None and output_tokens >= max_new_tokens:
-                    self.state.finish_reason = "length"
-                    break
-                if (
-                    self.state.context_length + self.module.verify_length
-                    > self.context_max_length
-                ):
-                    self.state.finish_reason = "context"
-                    break
-
-                speculative_rounds += 1
-                drafts = self._draft()
-                draft_tokens_total += len(drafts)
-                result = self._verify(drafts)
-                accepted_draft_tokens += result.accepted_count
-
-                remaining = (
-                    None
-                    if max_new_tokens is None
-                    else max_new_tokens - output_tokens
-                )
-                candidates = [
-                    *result.draft_tokens[: result.accepted_count],
-                    result.next_token,
-                ]
-                visible = candidates if remaining is None else candidates[:remaining]
-                stop_index = next(
-                    (
-                        index
-                        for index, candidate in enumerate(visible)
-                        if candidate in self.stop_token_ids
-                    ),
-                    None,
-                )
-                if stop_index is not None:
-                    visible = visible[: stop_index + 1]
-
-                visible_accepted = min(result.accepted_count, len(visible))
-                accepted_steps = 1 + visible_accepted
-                self.module.commit_verify_cache(accepted_steps)
-                self.state.context_length += accepted_steps
-                self.state.mtp_context_length += accepted_steps
-
-                continues = (
-                    len(visible) > result.accepted_count
-                    and visible[-1] == result.next_token
-                    and result.next_token not in self.stop_token_ids
-                )
-                self.state.pending_token = result.next_token if continues else None
-                self.state.draft_anchor_hidden = (
-                    result.next_hidden if continues else None
-                )
-
-                for candidate in visible:
-                    output_tokens += 1
-                    decode_tokens += 1
-                    if candidate in self.stop_token_ids:
-                        self.state.finish_reason = "stop"
-                        break
-                    self.state.generated_ids.append(candidate)
-                    delta = self.process.postprocess(self.state)
-                    if delta:
-                        self.perf.end("llm_mtp.e2e")
-                        e2e_active = False
-                        yield delta
-                        self.perf.start("llm_mtp.e2e")
-                        e2e_active = True
-
-                if self.state.finish_reason == "stop":
-                    break
-                if remaining is not None and len(visible) >= remaining:
-                    self.state.finish_reason = "length"
-                    self.state.pending_token = None
-                    self.state.draft_anchor_hidden = None
-                    break
-
-            remainder = self.process.postprocess(self.state, final=True)
-            if remainder:
-                self.perf.end("llm_mtp.e2e")
-                e2e_active = False
-                yield remainder
-                self.perf.start("llm_mtp.e2e")
-                e2e_active = True
+            yield from self._emit(self.process.postprocess(self.state))
+            counters = {
+                "consumed": 0,
+                "output_tokens": output_tokens,
+                "decode_tokens": decode_tokens,
+                "draft_tokens_total": draft_tokens_total,
+                "accepted_draft_tokens": accepted_draft_tokens,
+                "speculative_rounds": speculative_rounds,
+            }
+            yield from self._run_speculative_loop(max_new_tokens, counters)
+            output_tokens = counters["output_tokens"]
+            decode_tokens = counters["decode_tokens"]
+            draft_tokens_total = counters["draft_tokens_total"]
+            accepted_draft_tokens = counters["accepted_draft_tokens"]
+            speculative_rounds = counters["speculative_rounds"]
+            yield from self._emit(self.process.postprocess(self.state, final=True))
             self.perf.set_metrics(
                 "llm_mtp",
                 input_tokens=int(request.input_ids.size),
@@ -361,9 +353,9 @@ class Qwen36MtpEngine(HoumoEngine):
             )
         finally:
             if ttft_active:
-                self.perf.end("llm_mtp.ttft")
+                self.perf.end(TTFT_METRIC)
             if e2e_active:
-                self.perf.end("llm_mtp.e2e")
+                self.perf.end(E2E_METRIC)
 
 
 __all__ = ["Qwen36MtpEngine"]

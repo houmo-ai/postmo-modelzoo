@@ -29,6 +29,7 @@ from pathlib import Path
 MODEL_DIR = Path(__file__).resolve().parents[1]
 IMODELZOO_ROOT = Path(__file__).resolve().parents[4]
 HOUMO_EXAMPLES_PATH = Path(os.getenv("HOUMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
+sys.path.insert(0, str(MODEL_DIR))
 sys.path.insert(0, str(HOUMO_EXAMPLES_PATH / "utils" / "python"))
 
 from houmo_engine.sampling import GreedySamplingParams
@@ -172,7 +173,7 @@ def _create_prefix_caching_engine():
     import numpy as np
     import torch
 
-    from houmo_engine import Qwen35Engine
+    from qwen_engine import Qwen35Engine
     from houmo_engine.core.types import Stage, StageInputs, StageOutputs
     from houmo_engine.sampling import GreedySampler
 
