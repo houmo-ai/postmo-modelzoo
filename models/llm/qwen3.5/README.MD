@@ -1,6 +1,6 @@
-# Qwen3.5 / Qwen3.6
+# Qwen3.5 / Qwen3.6 / Qwen3.8
 
-本示例展示如何把 Qwen3.5 和 Qwen3.6 模型量化和编译，部署到后摩芯片的设备上。
+本示例展示如何把 Qwen3.5 、Qwen3.6 和Qwen3.8模型量化和编译，部署到后摩芯片的设备上。
 
 [TOC]
 
@@ -36,6 +36,10 @@
 - 来源: https://www.modelscope.cn/models/Qwen/Qwen3.6-35B-A3B
 - 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
 
+- 模型名称: Qwen3.8-27B
+- 来源: https://www.modelscope.cn/models/Qwen/Qwen3.8-27B
+- 许可: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+
 预训练模型在运行时下载，工程发布**不包含**该模型。
 
 本例只适用于xh2。
@@ -52,6 +56,7 @@
 
 - `qwen3.5`: `0.8b`、`2b`、`4b`、`9b`、`122b-a10b`
 - `qwen3.6`: `27b`、`35b-a3b`
+- `qwen3.8`: `27b`
 
 标准流程编译产物命名统一为：
 
@@ -91,7 +96,7 @@ LoRA 流程当前仅在 `qwen3.6-35b-a3b` 示例中提供，使用 `--lora` 作�
 
 ## 2 快速开始
 
-目前 Qwen3.5 / Qwen3.6 模型仅提供 python 脚本编译方式。芯片模型只能在 Linux 环境下量化和编译。
+目前 Qwen3.5 / Qwen3.6 /Qwen3.8 模型仅提供 python 脚本编译方式。芯片模型只能在 Linux 环境下量化和编译。
 
 ### 2.1 环境准备
 

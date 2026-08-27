@@ -81,3 +81,15 @@ model_configs:
       batch: 1
       prefill_length: 256
       workflow_config: "workflows/xh2a/llm_models/qwen3_5_moe/35b_a3b/qwen3_6_35b_a3b_full.yaml"
+  qwen3.8:
+    "27b":
+      modelscope_repo: ["Qwen/Qwen3.8-27B"]
+      model_name: "qwen3.8"
+      model_size: "27b"
+      ncore: 2
+      quant_type: "w4a8"
+      context_length: "128k"
+      ndevice: 1
+      batch: 1
+      prefill_length: 256
+      workflow_config: "workflows/xh2a/llm_models/qwen3_5/27b/qwen3_8_27b_full.yaml"

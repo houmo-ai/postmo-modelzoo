@@ -41,10 +41,13 @@ case "${MODEL_NAME}:${MODEL_SIZE}" in
     qwen3.6:35b-a3b)
         LOAD_MODE="--LazyMode"
         ;;
+    qwen3.8:27b)
+        ;;
     *)
         echo "Error: Unsupported model combination '${MODEL_NAME}-${MODEL_SIZE}'." >&2
         echo "       qwen3.5 supports: 0.8b, 2b, 4b, 9b, 122b-a10b" >&2
         echo "       qwen3.6 supports: 27b, 35b-a3b" >&2
+        echo "       qwen3.8 supports: 27b, " >&2
         exit 1
         ;;
 esac
