@@ -437,6 +437,7 @@ if __name__ == "__main__":
                     "hmonnx": find_hmonnx_file(visual_dir),
                     "hmm_name": _get_visual_model_name(model_name, model_size, visual_dir),
                     "flash_attn": vit_flash_attention,
+                    "enable_common_subgraph": True,
                 }
                 print(f'\n===> {build_kwargs["hmm_name"]} build start...')
                 Xh2Exec.build_from_hmonnx(output=output_dir, ncore=ncore, parallel_jobs=j, **build_kwargs)
