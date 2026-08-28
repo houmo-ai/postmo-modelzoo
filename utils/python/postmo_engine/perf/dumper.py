@@ -27,7 +27,13 @@ from typing import Any
 
 from .stats import PerfReport, ScopeStats
 
-_RUNTIME_OPERATIONS = ("load_model", "set_input", "run", "get_output")
+_RUNTIME_OPERATIONS = (
+    "prefill_model",
+    "decode_model",
+    "set_input",
+    "run",
+    "get_output",
+)
 _OPERATION_ORDER = {name: index for index, name in enumerate(_RUNTIME_OPERATIONS)}
 _DERIVED_KEYS = ("ttft_ms", "e2e_ms")
 
@@ -44,8 +50,12 @@ def _stats_dict(stats: ScopeStats) -> dict[str, Any]:
     return {
         "count": stats.count,
         "total_ms": stats.total_ms,
-        "min_ms": stats.min_ms if stats.count else 0.0,
-        "max_ms": stats.max_ms,
+        "min_ms": (
+            None
+            if stats.count is None
+            else stats.min_ms if stats.count else 0.0
+        ),
+        "max_ms": stats.max_ms if stats.count is not None else None,
         "avg_ms": stats.avg_ms,
     }
 

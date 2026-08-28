@@ -84,7 +84,7 @@ class PostMoBackend(ABC):
         """Load one runtime model and bind its stable performance identity.
 
         Runtime options are prepared before timing. Only the implementation's
-        actual model-load hook is measured as ``load_model``.
+        actual model-load hook is measured under ``<category>.load.<role>_model``.
         """
         model_category = self._normalize_name(model_category, name="model_category")
         model_role = self._normalize_name(model_role, name="model_role")
@@ -98,7 +98,13 @@ class PostMoBackend(ABC):
             weight_manager=weight_manager,
             dummy_inputs=normalized_dummy_inputs,
         )
-        with self._perf.scope(self._scope_path_parts(model_category, model_role, "load_model")):
+        with self._perf.scope(
+            self._scope_path_parts(
+                model_category,
+                "load",
+                f"{model_role}_model",
+            )
+        ):
             raw_model = self._load_prepared_model(normalized_path, prepared)
         return ModelHandle(self.__backend_token, raw_model, model_category, model_role)
 

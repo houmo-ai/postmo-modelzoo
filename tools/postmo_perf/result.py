@@ -23,7 +23,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from postmo_engine.perf import PerfReport, ScopeStats
+from postmo_engine.perf import PerfReport, ScopeStats, aggregate_parent_scopes
 
 
 @dataclass(frozen=True)
@@ -60,14 +60,25 @@ def average_reports(reports: list[PerfReport]) -> PerfReport:
     metrics: dict[str, dict[str, Any]] = {}
     for report in reports:
         for path, value in report.scopes.items():
-            target = scopes.setdefault(path, ScopeStats(path=path))
-            target.count += value.count
+            target = scopes.get(path)
+            if target is None:
+                scopes[path] = value.copy()
+                continue
             target.total_ms += value.total_ms
-            target.min_ms = min(target.min_ms, value.min_ms)
-            target.max_ms = max(target.max_ms, value.max_ms)
+            if target.count is None or value.count is None:
+                # Automatically aggregated parents have no comparable sample
+                # count; preserve that meaning across loop aggregation.
+                target.count = None
+                target.min_ms = None
+                target.max_ms = None
+            else:
+                target.count += value.count
+                target.min_ms = min(target.min_ms, value.min_ms)
+                target.max_ms = max(target.max_ms, value.max_ms)
         for path, values in report.metrics.items():
             metrics.setdefault(path, {}).update(values)
     aggregate = PerfReport(scopes=scopes, metrics=metrics)
+    aggregate_parent_scopes(aggregate.scopes)
     from postmo_engine.perf.metrics import derive_metrics, derive_speeds
 
     aggregate.derived = derive_metrics(aggregate)
@@ -89,11 +100,11 @@ def average_reports(reports: list[PerfReport]) -> PerfReport:
         llm["e2e_tps"] = decode_tokens * 1000 / e2e.avg_ms
     prefill_run = aggregate.scopes.get("llm.prefill.run")
     decode_run = aggregate.scopes.get("llm.decode.run")
-    if prefill_run and prefill_run.count > 0 and input_tokens:
+    if prefill_run and prefill_run.count is not None and prefill_run.count > 0 and input_tokens:
         run_ms = prefill_run.total_ms / len(reports)
         if run_ms > 0:
             llm["prefill_runtime_tps"] = input_tokens * 1000 / run_ms
-    if decode_run and decode_run.count > 0 and decode_tokens:
+    if decode_run and decode_run.count is not None and decode_run.count > 0 and decode_tokens:
         run_ms = decode_run.total_ms / len(reports)
         if run_ms > 0:
             llm["decode_runtime_tps"] = decode_tokens * 1000 / run_ms
@@ -103,5 +114,5 @@ def average_reports(reports: list[PerfReport]) -> PerfReport:
 def add_initialization_scopes(report: PerfReport, initialization: PerfReport) -> None:
     """Add one-time model-load scopes without treating them as loop samples."""
     for path, stats in initialization.scopes.items():
-        if path.endswith(".load_model"):
+        if path == "llm.load" or path.startswith("llm.load."):
             report.scopes[path] = stats.copy()

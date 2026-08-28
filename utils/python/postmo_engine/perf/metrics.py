@@ -164,6 +164,7 @@ def _derive_asr_metrics(
         for path, stats in report.scopes.items()
         if path.startswith(f"{root}.")
         and path.endswith(".infer")
+        and stats.count is not None
         and stats.count > 0
     )
     if infer_ms > 0:
@@ -200,7 +201,7 @@ def derive_metrics(report: PerfReport) -> dict[str, dict[str, float]]:
 def derive_speeds(report: PerfReport) -> dict[str, tuple[float, str]]:
     speeds: dict[str, tuple[float, str]] = {}
     for path, stats in report.scopes.items():
-        if stats.total_ms <= 0:
+        if stats.total_ms <= 0 or stats.count is None:
             continue
         segments = path.split(".")
         if len(segments) < 2:

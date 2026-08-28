@@ -49,13 +49,21 @@ class PerfRunner:
         if (process is None) != (module is None):
             raise ValueError("process and module must be provided together")
         if process is not None:
-            self.perf = getattr(module, "perf", None) or PerfTracker.create(enabled=True)
+            self.perf = getattr(module, "perf", None) or PerfTracker.create(
+                enabled=True,
+                aggregate_parents=True,
+            )
             self.backend = backend
             self.process, self.module = process, module
         else:
-            self.perf = backend.perf if backend is not None else PerfTracker.create(enabled=True)
+            self.perf = (
+                backend.perf
+                if backend is not None
+                else PerfTracker.create(enabled=True, aggregate_parents=True)
+            )
             self.backend = backend if backend is not None else TcimBackend(perf=self.perf)
             self.process, self.module = self._create_model(case.model_dir)
+        self.perf.aggregate_parents = True
         self.initialization_report = self.perf.summary()
         self.perf.reset()
         if case.input_tokens + case.output_tokens > self.module.context_max_length:

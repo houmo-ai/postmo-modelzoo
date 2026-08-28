@@ -26,16 +26,20 @@ from typing import Any
 @dataclass
 class ScopeStats:
     path: str
-    count: int = 0
+    count: int | None = 0
     total_ms: float = 0.0
-    min_ms: float = inf
-    max_ms: float = 0.0
+    min_ms: float | None = inf
+    max_ms: float | None = 0.0
 
     @property
-    def avg_ms(self) -> float:
+    def avg_ms(self) -> float | None:
+        if self.count is None:
+            return None
         return self.total_ms / self.count if self.count else 0.0
 
     def add(self, elapsed_ms: float) -> None:
+        if self.count is None or self.min_ms is None or self.max_ms is None:
+            raise RuntimeError("cannot add samples to an aggregate scope")
         self.count += 1
         self.total_ms += elapsed_ms
         self.min_ms = min(self.min_ms, elapsed_ms)

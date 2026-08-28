@@ -84,8 +84,8 @@ def _build_perf_results(result: CaseResult) -> dict[str, Any]:
     return {
         "input_token": result.input_tokens,
         "output_token": result.output_tokens,
-        "prefill_load_time": _fixed(_scope_ms(result, "llm.prefill.load_model")),
-        "decode_load_time": _fixed(_scope_ms(result, "llm.decode.load_model")),
+        "prefill_load_time": _fixed(_scope_ms(result, "llm.load.prefill_model")),
+        "decode_load_time": _fixed(_scope_ms(result, "llm.load.decode_model")),
         "vision_load_time": _fixed(0.0),
         "prefill_time": _fixed(prefill_ms),
         "decode_time": _fixed(decode_ms),

@@ -21,6 +21,20 @@
 from .stats import PerfReport
 
 _TOKENS_PER_SECOND = "tokens/s"
+_TIME_UNITS = {
+    "ms": (1.0, "ms"),
+    "s": (1_000.0, "s"),
+    "min": (60_000.0, "min"),
+    "h": (3_600_000.0, "h"),
+}
+_TIME_METRICS = {
+    "ttft_ms",
+    "tpot_ms",
+    "e2e_ms",
+    "s2s_e2e_ms",
+    "token2wav_e2e_ms",
+    "decode_active_ms",
+}
 
 _PHASE_ORDER = {
     "init": 0,
@@ -44,28 +58,45 @@ def _path_sort_key(path: str) -> tuple:
     return tuple((_PHASE_ORDER.get(segment, 100), segment) for segment in segments)
 
 
-def _timing_rows(report: PerfReport) -> list[tuple[str, ...]]:
+def _timing_rows(report: PerfReport, time_unit: str) -> list[tuple[str, ...]]:
     """Build formatted rows for scope timing statistics."""
     rows = []
     for path, stats in sorted(report.scopes.items(), key=lambda item: _path_sort_key(item[0])):
         if path.endswith((".e2e", ".ttft")) or path.startswith("lalm.e2e_"):
             continue
         display_path = _display_path(path, report.scopes)
-        minimum = stats.min_ms if stats.count else 0.0
+        minimum = (
+            None
+            if stats.count is None
+            else stats.min_ms if stats.count else 0.0
+        )
         speed = report.speeds.get(path)
         speed_text = f"{speed[0]:.2f} {speed[1]}" if speed is not None else "-"
         rows.append(
             (
                 display_path,
-                str(stats.count),
-                f"{stats.total_ms:.3f}",
-                f"{stats.avg_ms:.3f}",
-                f"{minimum:.3f}",
-                f"{stats.max_ms:.3f}",
+                _format_optional(stats.count),
+                _format_time(stats.total_ms, time_unit),
+                _format_optional_time(stats.avg_ms, time_unit),
+                _format_optional_time(minimum, time_unit),
+                _format_optional_time(stats.max_ms, time_unit),
                 speed_text,
             )
         )
     return rows
+
+
+def _format_optional(value) -> str:
+    return "-" if value is None else str(value)
+
+
+def _format_time(value: float, time_unit: str) -> str:
+    factor, _ = _TIME_UNITS[time_unit]
+    return f"{value / factor:.3f}"
+
+
+def _format_optional_time(value: float | None, time_unit: str) -> str:
+    return "-" if value is None else _format_time(value, time_unit)
 
 
 def _display_path(path: str, scopes: dict) -> str:
@@ -79,16 +110,16 @@ def _display_path(path: str, scopes: dict) -> str:
     return ".".join(segments[1:])
 
 
-def _timing_lines(timing_rows: list[tuple[str, ...]]) -> list[str]:
+def _timing_lines(timing_rows: list[tuple[str, ...]], time_unit: str) -> list[str]:
     """Render the timing table, including dynamically sized columns."""
 
     headers = (
         "Scope",
         "Count",
-        "Total(ms)",
-        "Avg(ms)",
-        "Min(ms)",
-        "Max(ms)",
+        f"Total({time_unit})",
+        f"Avg({time_unit})",
+        f"Min({time_unit})",
+        f"Max({time_unit})",
         "Speed",
     )
     widths = [len(header) for header in headers]
@@ -111,27 +142,27 @@ def _timing_lines(timing_rows: list[tuple[str, ...]]) -> list[str]:
         *(timing_line(row) for row in timing_rows),
     ]
 
-def _derived_lines(report: PerfReport) -> list[str]:
+def _derived_lines(report: PerfReport, time_unit: str) -> list[str]:
     """Render the derived performance metrics section."""
     labels = {
         "input_tokens": ("Input Tokens", ""),
         "output_tokens": ("Output Tokens", ""),
         "speech_tokens": ("Speech Tokens", ""),
         "audio_length_s": ("Audio Length", "s"),
-        "ttft_ms": ("TTFT (Time To First Token)", "ms"),
-        "tpot_ms": ("TPOT (Time Per Output Token)", "ms/token"),
-        "e2e_ms": ("E2E Latency (End-to-End)", "ms"),
+        "ttft_ms": ("TTFT (Time To First Token)", time_unit),
+        "tpot_ms": ("TPOT (Time Per Output Token)", f"{time_unit}/token"),
+        "e2e_ms": ("E2E Latency (End-to-End)", time_unit),
         "e2e_tps": ("E2E TPS (Throughput)", _TOKENS_PER_SECOND),
-        "s2s_e2e_ms": ("S2S E2E Latency", "ms"),
+        "s2s_e2e_ms": ("S2S E2E Latency", time_unit),
         "s2s_e2e_tps": ("S2S E2E TPS", _TOKENS_PER_SECOND),
-        "token2wav_e2e_ms": ("Token2Wav Latency", "ms"),
+        "token2wav_e2e_ms": ("Token2Wav Latency", time_unit),
         "output_audio_length_s": ("Output Audio Length", "s"),
         "token2wav_rtf": ("Token2Wav RTF", ""),
         "overall_rtf": ("Overall RTF (Real-Time Factor)", ""),
         "inference_rtf": ("Inference RTF (Real-Time Factor)", ""),
         "mtp_acceptance_rate": ("MTP Acceptance Rate", ""),
         "mtp_accepted_per_round": ("MTP Accepted Per Round", "tokens/round"),
-        "decode_active_ms": ("Decode Active Time", "ms"),
+        "decode_active_ms": ("Decode Active Time", time_unit),
         "decode_active_tps": ("Decode Active Speed", _TOKENS_PER_SECOND),
     }
     lines = ["", "Overall Performance Metrics"]
@@ -143,12 +174,18 @@ def _derived_lines(report: PerfReport) -> list[str]:
             if root == "lalm" and name == "output_tokens":
                 label = "Text Output Tokens"
             suffix = f" {unit}" if unit else ""
-            value_text = _format_metric_value(root, name, value, metrics)
+            value_text = _format_metric_value(root, name, value, metrics, time_unit)
             lines.append(f"{label}: {value_text}{suffix}")
     return lines
 
 
-def _format_metric_value(root: str, name: str, value: float, metrics: dict) -> str:
+def _format_metric_value(
+    root: str,
+    name: str,
+    value: float,
+    metrics: dict,
+    time_unit: str,
+) -> str:
     """Format one derived metric according to its semantic type."""
     if name in {"input_tokens", "output_tokens", "speech_tokens"}:
         return str(int(value))
@@ -158,18 +195,25 @@ def _format_metric_value(root: str, name: str, value: float, metrics: dict) -> s
         return f"{value:.2f} ({text_tokens} text + {speech_tokens} speech)"
     if name == "mtp_acceptance_rate":
         return f"{value:.2%}"
+    if name in _TIME_METRICS:
+        return _format_time(value, time_unit)
     return f"{value:.2f}"
 
 
-def format_report(report: PerfReport) -> str:
+def format_report(report: PerfReport, *, time_unit: str = "ms") -> str:
     """Render a performance report as plain text."""
+    if time_unit not in _TIME_UNITS:
+        raise ValueError(
+            f"unsupported time unit: {time_unit!r}; "
+            f"expected one of {tuple(_TIME_UNITS)}"
+        )
     roots = sorted({path.split(".", 1)[0] for path in report.scopes | report.metrics})
     title = "Performance Summary" if len(roots) != 1 else f"Performance Summary: {roots[0]}"
     lines = [title]
-    timing_rows = _timing_rows(report)
+    timing_rows = _timing_rows(report, time_unit)
     if timing_rows:
-        lines.extend(_timing_lines(timing_rows))
+        lines.extend(_timing_lines(timing_rows, time_unit))
     if report.derived:
-        lines.extend(_derived_lines(report))
+        lines.extend(_derived_lines(report, time_unit))
 
     return "\n".join(lines)

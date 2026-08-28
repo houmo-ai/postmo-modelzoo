@@ -22,11 +22,12 @@ from .dumper import dump_yaml, dumps_yaml
 from .formatter import format_report
 from .metrics import derive_metrics, derive_speeds
 from .stats import PerfReport, ScopeStats
-from .tracker import PerfTracker
+from .tracker import PerfTracker, aggregate_parent_scopes
 
 __all__ = [
     "PerfReport",
     "PerfTracker",
+    "aggregate_parent_scopes",
     "ScopeStats",
     "derive_metrics",
     "derive_speeds",

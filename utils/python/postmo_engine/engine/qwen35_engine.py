@@ -94,11 +94,19 @@ class Qwen35Engine(PostMoEngine):
         model_dir: str | Path,
         *,
         perf: bool | PerfTracker = False,
+        aggregate_parents: bool = False,
     ) -> "Qwen35Engine":
         root = Path(model_dir)
         if not root.is_dir():
             raise FileNotFoundError(f"model directory does not exist: {root}")
-        tracker = perf if isinstance(perf, PerfTracker) else PerfTracker.create(enabled=bool(perf))
+        tracker = (
+            perf
+            if isinstance(perf, PerfTracker)
+            else PerfTracker.create(
+                enabled=bool(perf),
+                aggregate_parents=aggregate_parents,
+            )
+        )
         backend = TcimBackend(perf=tracker)
         prefill_models = tuple(root.glob("*_prefill.hmm"))
         decode_models = tuple(root.glob("*_decode.hmm"))
@@ -178,10 +186,7 @@ class Qwen35Engine(PostMoEngine):
                         is_final=False,
                     )
                     resume_e2e()
-                while (
-                    stop_reason is not StopReason.EOS
-                    and len(sampled_tokens) < request.max_new_tokens
-                ):
+                while stop_reason is not StopReason.EOS and len(sampled_tokens) < request.max_new_tokens:
                     if self.module.remaining_context <= 0:
                         stop_reason = StopReason.CONTEXT_CAPACITY
                         break

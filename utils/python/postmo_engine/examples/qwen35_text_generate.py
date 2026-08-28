@@ -58,6 +58,7 @@ def main() -> None:
     engine = Qwen35Engine.from_model_dir(
         model_dir,
         perf=args.perf or args.dump is not None,
+        aggregate_parents=True,
     )
     request = EngineRequest(request_id="example-1", prompt=args.prompt, max_new_tokens=args.max_new_tokens)
     for chunk in engine.generate(request):
@@ -69,7 +70,7 @@ def main() -> None:
     if engine.last_result is not None:
         print(engine.last_result)
     if args.perf:
-        engine.perf.print_summary()
+        engine.perf.print_summary(time_unit="min")
     if args.dump is not None:
         dump_yaml(
             engine.perf.summary(),

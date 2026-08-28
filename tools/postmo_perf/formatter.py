@@ -23,13 +23,22 @@
 from .result import CaseResult
 
 
-_RUNTIME_ORDER = {name: index for index, name in enumerate(("load_model", "set_input", "run", "get_output"))}
+_RUNTIME_ORDER = {
+    name: index
+    for index, name in enumerate(
+        ("prefill_model", "decode_model", "set_input", "run", "get_output")
+    )
+}
 
 
 def _stats_line(name: str, stats) -> str:
+    count = "-" if stats.count is None else str(stats.count)
+    avg = "-" if stats.avg_ms is None else f"{stats.avg_ms:.3f}"
+    minimum = "-" if stats.min_ms is None else f"{stats.min_ms:.3f}"
+    maximum = "-" if stats.max_ms is None else f"{stats.max_ms:.3f}"
     return (
-        f"{name:<28} {stats.count:>5} {stats.total_ms:>12.3f} "
-        f"{stats.avg_ms:>10.3f} {stats.min_ms:>10.3f} {stats.max_ms:>10.3f}"
+        f"{name:<28} {count:>5} {stats.total_ms:>12.3f} "
+        f"{avg:>10} {minimum:>10} {maximum:>10}"
     )
 
 
@@ -54,7 +63,14 @@ def _runtime_lines(report) -> list[str]:
 
 def _stage_lines(report) -> list[str]:
     rows = []
-    for path in ("postmo.prefill", "postmo.decode", "postmo.e2e"):
+    for path in (
+        "postmo.prefill",
+        "postmo.decode",
+        "postmo.e2e",
+        "llm.load",
+        "llm.prefill",
+        "llm.decode",
+    ):
         stats = report.scopes.get(path)
         if stats is not None:
             rows.append((path, stats))

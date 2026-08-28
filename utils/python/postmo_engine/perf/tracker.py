@@ -32,15 +32,36 @@ from .stats import PerfReport, ScopeStats
 
 
 class PerfTracker:
-    def __init__(self, enabled: bool = True):
+    def __init__(
+        self,
+        enabled: bool = True,
+        aggregate_parents: bool = False,
+        time_unit: str = "ms",
+    ):
         self.enabled = enabled
+        self.aggregate_parents = aggregate_parents
+        if time_unit not in {"ms", "s", "min", "h"}:
+            raise ValueError(
+                f"unsupported time unit: {time_unit!r}; "
+                "expected one of ('ms', 's', 'min', 'h')"
+            )
+        self.time_unit = time_unit
         self._scopes: dict[str, ScopeStats] = {}
         self._metrics: dict[str, dict[str, Any]] = {}
         self._active: dict[str, int] = {}
 
     @classmethod
-    def create(cls, enabled: bool = False) -> "PerfTracker":
-        return cls(enabled=enabled)
+    def create(
+        cls,
+        enabled: bool = False,
+        aggregate_parents: bool = False,
+        time_unit: str = "ms",
+    ) -> "PerfTracker":
+        return cls(
+            enabled=enabled,
+            aggregate_parents=aggregate_parents,
+            time_unit=time_unit,
+        )
 
     @staticmethod
     def _validate_path(path: str) -> None:
@@ -110,21 +131,25 @@ class PerfTracker:
 
     def summary(self) -> PerfReport:
         self._check_unfinished()
+        scopes = {path: stats.copy() for path, stats in self._scopes.items()}
+        if self.aggregate_parents:
+            aggregate_parent_scopes(scopes)
         report = PerfReport(
-            scopes={path: stats.copy() for path, stats in self._scopes.items()},
+            scopes=scopes,
             metrics={path: dict(values) for path, values in self._metrics.items()},
         )
         report.derived = derive_metrics(report)
         report.speeds = derive_speeds(report)
         return report
 
-    def print_summary(self) -> None:
+    def print_summary(self, *, time_unit: str | None = None) -> None:
         if not self.enabled:
             return
+        selected_time_unit = self.time_unit if time_unit is None else time_unit
         sys.stdout.flush()
         logger.opt(raw=True, colors=True).success(
             "<green>{}</green>\n",
-            format_report(self.summary()),
+            format_report(self.summary(), time_unit=selected_time_unit),
         )
 
     def reset(self, preserve_prefixes: tuple[str, ...] = ()) -> None:
@@ -141,3 +166,30 @@ class PerfTracker:
             for path, metrics in self._metrics.items()
             if any(path == prefix or path.startswith(f"{prefix}.") for prefix in preserve_prefixes)
         }
+
+
+def aggregate_parent_scopes(scopes: dict[str, ScopeStats]) -> None:
+    """Add missing multi-level parents using direct-child total time only."""
+    paths = sorted(scopes, key=lambda path: (path.count("."), path), reverse=True)
+    for path in paths:
+        parts = path.split(".")
+        for length in range(len(parts) - 1, 1, -1):
+            parent = ".".join(parts[:length])
+            if parent in scopes:
+                continue
+            prefix = f"{parent}."
+            children = [
+                stats
+                for child_path, stats in scopes.items()
+                if child_path.startswith(prefix)
+                and "." not in child_path[len(prefix) :]
+            ]
+            if not children:
+                continue
+            scopes[parent] = ScopeStats(
+                path=parent,
+                count=None,
+                total_ms=sum(stats.total_ms for stats in children),
+                min_ms=None,
+                max_ms=None,
+            )
