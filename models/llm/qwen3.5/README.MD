@@ -111,6 +111,8 @@ pip3 install -r ../../../hmodel/gptqmodel/requirements.txt
 
 通过 `get_model.py` 下载模型，可通过参数选择下载原始模型或芯片模型。
 
+现在***不再提供***qwen3.6-27b的量化模型下载，如果需要使用请自行下载原始权重并进行量化编译
+
 ```bash
 # 下载原始模型用于量化
 python3 get_model.py --type raw --model_name qwen3.5 --model_size 9b

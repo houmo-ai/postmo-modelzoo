@@ -1043,8 +1043,26 @@ void Qwen35MLLMModel::load() {
       }
     } else if (fs::is_directory(vision_path)) {
       vision_paths.clear();
+      std::string model_prefix = fs::path(config_.decode_path).stem().string();
+      const std::array<std::string, 2> decode_suffixes = {
+          "_decode_mtp", "_decode"};
+      for (const auto& suffix : decode_suffixes) {
+        if (model_prefix.size() >= suffix.size() &&
+            model_prefix.compare(model_prefix.size() - suffix.size(),
+                                 suffix.size(), suffix) == 0) {
+          model_prefix.erase(model_prefix.size() - suffix.size());
+          break;
+        }
+      }
+      const std::string vision_prefix = model_prefix + "_visual_m";
       for (const auto& entry : fs::recursive_directory_iterator(vision_path)) {
-        if (!entry.is_regular_file() || entry.path().extension() != ".hmm") continue;
+        if (!entry.is_regular_file() || entry.path().extension() != ".hmm") {
+          continue;
+        }
+        const std::string filename = entry.path().filename().string();
+        if (filename.rfind(vision_prefix, 0) != 0) {
+          continue;
+        }
         std::regex gear_re(".*_m([0-9]+)\\.hmm$");
         std::smatch match;
         const std::string path = entry.path().string();
@@ -1060,8 +1078,13 @@ void Qwen35MLLMModel::load() {
       throw Exception("no dynamic vision HMMs found from " + vision_path);
     }
     for (const auto& [gear, path] : vision_paths) {
-      if (gear != 96 && gear != 196 && gear != 384 && gear != 704 && gear != 1536) {
+      if (gear != 96 && gear != 196 && gear != 384 && gear != 704 &&
+          gear != 1536) {
         continue;
+      }
+      if (vision_modules_.count(gear) != 0) {
+        throw Exception("duplicate dynamic vision gear m" + std::to_string(gear) +
+                        ": " + path);
       }
       auto module = std::make_shared<tcim::Module>();
       CHECK_TCIM_RET_STATUS(module->LoadModel(path, option_vision));
@@ -1089,7 +1112,7 @@ void Qwen35MLLMModel::load() {
           {"attention_mask", {1, 1, 1, expected_capacity}},
       };
       for (const auto& [name, expected_shape] : expected_shapes) {
-      const auto actual_shape = module->GetInputInfo(name).Shape();
+        const auto actual_shape = module->GetInputInfo(name).Shape();
         if (actual_shape.size() != expected_shape.size() ||
             !std::equal(actual_shape.begin(), actual_shape.end(), expected_shape.begin())) {
           throw Exception("dynamic vision input shape mismatch for " + name + ": " + path);
