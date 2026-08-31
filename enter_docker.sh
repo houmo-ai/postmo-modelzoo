@@ -11,7 +11,7 @@ else
   PRINT_RED "please specify a version like v1.0.0"; exit -1
 fi
 
-IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-convert-xh2-${VERSION}-ubuntu24.04-x86.64"
+IMAGE_NAME="harbor.houmo.ai/toolchain/release:Dadao-xh2-${VERSION}-ubuntu24.04-x86.64"
 CONTAINER_NAME="$(whoami).HoumoDadao_xh2_${VERSION}"
 CONTAINER_HOME="/container/$(whoami)"
 # 自适应挂载：检查宿主路径是否存在，存在则映射
