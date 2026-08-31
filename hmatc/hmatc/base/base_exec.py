@@ -344,6 +344,10 @@ class BaseExec(object, metaclass=abc.ABCMeta):
             logger.error("model_impl_module or model_impl_cls is None")
             return None
         model_impl_module_path = f"{model_impl_module}.py"
+        if not os.path.isabs(model_impl_module_path):
+            model_impl_module_path = os.path.join(
+                self.config_dir, model_impl_module_path
+            )
         if not os.path.exists(model_impl_module_path):
             logger.error(f"model_impl_module not exists -> {model_impl_module_path}")
             return None

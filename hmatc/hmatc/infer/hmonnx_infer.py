@@ -18,6 +18,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 import os
+import threading
 import time
 import numpy as np
 import torch
@@ -27,12 +28,34 @@ from ..base.base_infer import BaseInfer
 from ..utils import logger
 from ..utils.utils import torch_to_numpy_dtype, gen_random_data
 
-try:
-    from xhquant.api import xhquant_init
+_xhquant_init_lock = threading.Lock()
+_xhquant_initialized_pid = None
 
-    xhquant_init(logger=logger)
-except ImportError:
-    logger.fatal("Please install xhquant first.")
+
+def ensure_xhquant_initialized():
+    """Initialize xhquant at most once in the current process."""
+    global _xhquant_initialized_pid
+
+    current_pid = os.getpid()
+    if _xhquant_initialized_pid == current_pid:
+        return
+
+    with _xhquant_init_lock:
+        if _xhquant_initialized_pid == current_pid:
+            return
+        from xhquant.api import xhquant_init
+
+        xhquant_init(logger=logger)
+        _xhquant_initialized_pid = current_pid
+
+
+def is_hmonnx_available():
+    """Return whether the optional HMONNX inference backend is installed."""
+    try:
+        from xhquant.api import HMONNXInference  # noqa: F401
+    except (ImportError, ModuleNotFoundError):
+        return False
+    return True
 
 
 class HmonnxInfer(BaseInfer, ABC):
@@ -68,6 +91,7 @@ class HmonnxInfer(BaseInfer, ABC):
         if not os.path.exists(model_path):
             logger.fatal(f"model path: {model_path} not exists.")
         try:
+            ensure_xhquant_initialized()
             from xhquant.api import HMONNXInference
         except ImportError:
             logger.fatal("Please install xhquant first.")

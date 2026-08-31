@@ -25,9 +25,6 @@ from typing import Dict, Any
 from ..utils import logger
 from ..utils.utils import SUPPORT_BACKEND
 from ..dataloaders.loaders import validate_sample
-from ..infer.xh2_infer import Xh2Infer
-from ..infer.onnx_infer import OnnxInfer
-from ..infer.hmonnx_infer import HmonnxInfer
 
 COLORS = [
     (0, 0, 255),
@@ -68,10 +65,16 @@ class BaseModel(object, metaclass=abc.ABCMeta):
         if self.backend not in SUPPORT_BACKEND:
             logger.fatal(f"backend not in {SUPPORT_BACKEND}")
         if self.backend == "onnx":
+            from ..infer.onnx_infer import OnnxInfer
+
             self.engine = OnnxInfer()
         elif self.backend == "xh2":
+            from ..infer.xh2_infer import Xh2Infer
+
             self.engine = Xh2Infer()
         elif self.backend == "hmonnx":
+            from ..infer.hmonnx_infer import HmonnxInfer
+
             self.engine = HmonnxInfer()
         else:
             logger.fatal(f"Not support backend: {self.backend}")

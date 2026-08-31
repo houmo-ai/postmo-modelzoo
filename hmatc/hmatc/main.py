@@ -208,6 +208,22 @@ def main():
     cfg = read_yaml_to_dict(cfg_path)
     if cfg is None:
         logger.fatal("Config file is empty")
+    if cfg.get("kind") == "package":
+        if current_command != "eval":
+            logger.fatal("Package configs currently support only the eval command")
+        cfg["_config_dir"] = os.path.dirname(os.path.abspath(cfg_path))
+        cfg["target"] = target
+        save_dir = cfg.get("package", {}).get("save_dir", "output")
+        if not os.path.isabs(save_dir):
+            save_dir = os.path.join(cfg["_config_dir"], save_dir)
+        log_dir = os.path.join(save_dir, target, "logs")
+        set_logger(current_command, log_dir, "hmatc", log_level)
+        backend = "onnx" if args.onnx else "hmonnx" if args.hmonnx else target
+        from .exec.package_exec import PackageExec
+
+        package_exec = PackageExec(cfg, cfg_path, target)
+        package_exec.evaluate(backend=backend, device_id=args.device_id)
+        return
     cfg_version = cfg.get("version", 1)
     if cfg_version not in [1, 2]:
         logger.fatal("Unsupported config version")

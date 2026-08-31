@@ -288,13 +288,13 @@ class Xh2Exec(BaseExec):
 
         try:
             from xhquant.api import (
-                xhquant_init,
                 DeviceType,
                 HMONNXGoldenInference,
                 convert_onnx_to_hmonnx,
             )
+            from ..infer.hmonnx_infer import ensure_xhquant_initialized
 
-            xhquant_init(logger=logger)
+            ensure_xhquant_initialized()
             os.environ.setdefault("PYDEVD_DISABLE_FILE_VALIDATION", "1")
         except ImportError as e:
             logger.fatal(
@@ -649,7 +649,7 @@ class Xh2Exec(BaseExec):
         return {"outputs": outputs_result}
 
     def compare(self, data_path: str, device_id=0):
-        """Compare outputs from ONNX, HmQuant and XH2 inference."""
+        """Compare ONNX and XH2 outputs, including HMONNX when available."""
         self._log_section(f"Compare: {self.model_name}")
 
         t_start = time.time()
@@ -660,16 +660,28 @@ class Xh2Exec(BaseExec):
         # Load models
         logger.info("Loading models:")
         from ..infer.onnx_infer import OnnxInfer
-        from ..infer.hmonnx_infer import HmonnxInfer
+        from ..infer.hmonnx_infer import HmonnxInfer, is_hmonnx_available
         from ..infer.xh2_infer import Xh2Infer
 
         onnx_infer = OnnxInfer()
         onnx_infer.load(self.model_path)
         logger.info(f"  onnx: {self.model_path}")
 
-        hmonnx_infer = HmonnxInfer()
-        hmonnx_infer.load(self.quant_onnx_model_path)
-        logger.info(f"  hmonnx: {self.quant_onnx_model_path}")
+        hmonnx_infer = None
+        if not os.path.exists(self.quant_onnx_model_path):
+            logger.warning(
+                f"HMONNX model not found: {self.quant_onnx_model_path}; "
+                "skipping HMONNX comparisons."
+            )
+        elif is_hmonnx_available():
+            hmonnx_infer = HmonnxInfer()
+            hmonnx_infer.load(self.quant_onnx_model_path)
+            logger.info(f"  hmonnx: {self.quant_onnx_model_path}")
+        else:
+            logger.warning(
+                "HMONNX inference backend is unavailable; "
+                "skipping HMONNX comparisons."
+            )
 
         xh2_infer = Xh2Infer()
         xh2_infer.load(self.hmm_path)
@@ -699,16 +711,24 @@ class Xh2Exec(BaseExec):
         logger.info("Running inference:")
         logger.info("  ONNX inference...")
         onnx_outputs = onnx_infer.run(onnx_in_datas)
-        logger.info("  Hmonnx inference...")
-        hmonnx_outputs = hmonnx_infer.run(hmonnx_in_datas)
+        hmonnx_outputs = None
+        if hmonnx_infer is not None:
+            logger.info("  Hmonnx inference...")
+            hmonnx_outputs = hmonnx_infer.run(hmonnx_in_datas)
         logger.info("  Hmm inference...")
         xh2_outputs, xh2_outputs_dequanted = xh2_infer.run(xh2_in_datas)
         self.save_profile_data(xh2_outputs)
 
         # Compare results
-        table = PrettyTable(
-            ["name", "onnx vs hmquant", "onnx vs xh2", "hmquant vs xh2"]
-        )
+        headers = ["name", "onnx vs xh2"]
+        if hmonnx_infer is not None:
+            headers = [
+                "name",
+                "onnx vs hmquant",
+                "onnx vs xh2",
+                "hmquant vs xh2",
+            ]
+        table = PrettyTable(headers)
         table.title = "Cosine Distance"
         outputs_result = {}
 
@@ -719,33 +739,37 @@ class Xh2Exec(BaseExec):
                 repeats=onnx_batch // onnx_outputs[output_name].shape[0],
                 axis=0,
             )
-            hmquant_batch = hmonnx_infer.outputs_batch[output_name]
-            hmquant_out = np.repeat(
-                hmonnx_outputs[output_name],
-                repeats=hmquant_batch // hmonnx_outputs[output_name].shape[0],
-                axis=0,
-            )
             xh2_out = np.split(
                 xh2_outputs_dequanted[output_name], self.build_batch, axis=0
             )[0]
 
-            onnx_vs_hmquant = cosine_distance(onnx_out, hmquant_out)
             onnx_vs_xh2 = cosine_distance(onnx_out, xh2_out)
-            hmquant_vs_xh2 = cosine_distance(hmquant_out, xh2_out)
+            row = [output_name, f"{onnx_vs_xh2:.6f}"]
+            output_result = {"onnx_vs_xh2": float(onnx_vs_xh2)}
 
-            table.add_row(
-                [
+            if hmonnx_infer is not None:
+                hmquant_batch = hmonnx_infer.outputs_batch[output_name]
+                hmquant_out = np.repeat(
+                    hmonnx_outputs[output_name],
+                    repeats=hmquant_batch // hmonnx_outputs[output_name].shape[0],
+                    axis=0,
+                )
+                onnx_vs_hmquant = cosine_distance(onnx_out, hmquant_out)
+                hmquant_vs_xh2 = cosine_distance(hmquant_out, xh2_out)
+                row = [
                     output_name,
                     f"{onnx_vs_hmquant:.6f}",
                     f"{onnx_vs_xh2:.6f}",
                     f"{hmquant_vs_xh2:.6f}",
                 ]
-            )
-            outputs_result[output_name] = {
-                "onnx_vs_hmquant": float(onnx_vs_hmquant),
-                "onnx_vs_xh2": float(onnx_vs_xh2),
-                "hmquant_vs_xh2": float(hmquant_vs_xh2),
-            }
+                output_result = {
+                    "onnx_vs_hmquant": float(onnx_vs_hmquant),
+                    "onnx_vs_xh2": float(onnx_vs_xh2),
+                    "hmquant_vs_xh2": float(hmquant_vs_xh2),
+                }
+
+            table.add_row(row)
+            outputs_result[output_name] = output_result
 
         span = time.time() - t_start
         logger.info(f"\n{table}")
@@ -779,7 +803,6 @@ class Xh2Exec(BaseExec):
             onnx_data = inputs[input_name]
             hmonnx_data = hmonnx_inputs[input_name]
             onnx_batch = onnx_infer.inputs_batch[input_name]
-            hmonnx_batch = hmonnx_infer.inputs_batch[input_name]
             hmm_batch = xh2_infer.inputs_batch[input_name]
 
             onnx_in_datas[input_name] = np.repeat(
@@ -789,14 +812,22 @@ class Xh2Exec(BaseExec):
             )
 
             if resizer_mode == 0:
+                hmonnx_batch = (
+                    hmonnx_infer.inputs_batch[input_name]
+                    if hmonnx_infer is not None
+                    else onnx_batch
+                )
                 if onnx_batch != hmm_batch or onnx_batch != hmonnx_batch:
-                    logger.fatal(
+                    message = (
                         "Batch size mismatch, "
-                        f"expected onnx: {onnx_batch}, got hmm: {hmm_batch} "
-                        f"and hmonnx: {hmonnx_batch}"
+                        f"expected onnx: {onnx_batch}, got hmm: {hmm_batch}"
                     )
+                    if hmonnx_infer is not None:
+                        message += f" and hmonnx: {hmonnx_batch}"
+                    logger.fatal(message)
                 hmonnx_data = self._cast_runtime_input(hmonnx_data)
-                hmonnx_in_datas[input_name] = torch.from_numpy(hmonnx_data.copy())
+                if hmonnx_infer is not None:
+                    hmonnx_in_datas[input_name] = torch.from_numpy(hmonnx_data.copy())
                 xh2_in_datas[input_name] = np.repeat(
                     hmonnx_data,
                     repeats=hmm_batch // hmonnx_data.shape[0],
@@ -804,15 +835,17 @@ class Xh2Exec(BaseExec):
                 )
                 continue
 
-            if onnx_batch != hmonnx_batch:
-                logger.fatal(
-                    "Batch size mismatch, "
-                    f"expected onnx: {onnx_batch}, got hmonnx: {hmonnx_batch}"
-                )
-            hmonnx_tensor = torch.from_numpy(hmonnx_data).to(torch.float16)
-            hmonnx_in_datas[input_name] = hmonnx_tensor.repeat_interleave(
-                hmonnx_batch, dim=0
-            ).contiguous()
+            if hmonnx_infer is not None:
+                hmonnx_batch = hmonnx_infer.inputs_batch[input_name]
+                if onnx_batch != hmonnx_batch:
+                    logger.fatal(
+                        "Batch size mismatch, "
+                        f"expected onnx: {onnx_batch}, got hmonnx: {hmonnx_batch}"
+                    )
+                hmonnx_tensor = torch.from_numpy(hmonnx_data).to(torch.float16)
+                hmonnx_in_datas[input_name] = hmonnx_tensor.repeat_interleave(
+                    hmonnx_batch, dim=0
+                ).contiguous()
 
             fmt = xh2_infer.inputs_format[input_name]
             xh2_data = hmonnx_data.astype(np.float16).flatten()
@@ -828,11 +861,12 @@ class Xh2Exec(BaseExec):
                     )
                 resizer_name = f"resizer_crop_{input_name}"
                 dyn_tensor = torch.from_numpy(dyn_info[input_name])
-                hmonnx_dyn_batch = hmonnx_infer.inputs_batch[resizer_name]
                 hmm_dyn_batch = xh2_infer.inputs_batch[resizer_name]
-                hmonnx_in_datas[resizer_name] = dyn_tensor.repeat_interleave(
-                    hmonnx_dyn_batch, dim=0
-                )
+                if hmonnx_infer is not None:
+                    hmonnx_dyn_batch = hmonnx_infer.inputs_batch[resizer_name]
+                    hmonnx_in_datas[resizer_name] = dyn_tensor.repeat_interleave(
+                        hmonnx_dyn_batch, dim=0
+                    )
                 xh2_in_datas[resizer_name] = dyn_tensor.repeat_interleave(
                     hmm_dyn_batch, dim=0
                 ).numpy()
@@ -1347,7 +1381,17 @@ class Xh2Exec(BaseExec):
     ):
         """Generate golden data from hmonnx model."""
         if not os.path.exists(hmonnx):
-            logger.error(f"Not found hmonnx model: {hmonnx}")
+            logger.warning(
+                f"HMONNX model not found: {hmonnx}; skipping golden generation."
+            )
+            return
+        from ..infer.hmonnx_infer import HmonnxInfer, is_hmonnx_available
+
+        if not is_hmonnx_available():
+            logger.warning(
+                "HMONNX inference backend is unavailable; "
+                "skipping golden generation."
+            )
             return
         if not os.path.exists(output):
             os.makedirs(output)
@@ -1355,8 +1399,6 @@ class Xh2Exec(BaseExec):
         try:
             if enable_layers:
                 hmonnx = BaseExec.add_node_output_as_graph_output(hmonnx, target)
-
-            from ..infer.hmonnx_infer import HmonnxInfer
 
             model = HmonnxInfer()
             model.load(hmonnx)

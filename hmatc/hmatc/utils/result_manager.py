@@ -66,9 +66,9 @@ result:
     data_path: str
     outputs:
       <output_name>:
-        onnx_vs_hmquant: str (6 decimal places)
+        onnx_vs_hmquant: str (6 decimal places, omitted when HMONNX is unavailable)
         onnx_vs_xh2: str (6 decimal places)
-        hmquant_vs_xh2: str (6 decimal places)
+        hmquant_vs_xh2: str (6 decimal places, omitted when HMONNX is unavailable)
 
   perf:
     success: bool

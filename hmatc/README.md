@@ -87,6 +87,40 @@ hmatc eval -c config.yml         # 芯片评估
 hmatc eval -c config.yml --onnx  # ONNX评估
 ```
 
+对于由多个单模型组成的逻辑模型，每个组件仍使用独立模型配置，
+由 `package.yml` 声明组件和评估 pipeline：
+
+```yaml
+schema_version: 1
+kind: package
+
+package:
+  name: logical_model
+  save_dir: output
+
+components:
+  - name: first
+    config: first.yml
+  - name: second
+    config: second.yml
+
+pipeline:
+  module: pipeline
+  class: LogicalModelPipeline
+
+eval:
+  data_dir: dataset
+  dataset_module: dataset
+  dataset_cls: LogicalModelDataset
+```
+
+```bash
+hmatc eval -c package.yml         # 芯片端到端评估
+hmatc eval -c package.yml --onnx  # ONNX端到端评估
+```
+
+`package.yml` 当前只用于 `eval`；组件编译由 release 构建脚本逐个执行。
+
 ### 大模型评测
 
 大模型评测沿用 `hmatc eval` 命令，但不使用 `-c/--config`。模型适配实现内置于 HMATC，由 `--model-name` 选择模型族，`--model-size` 选择具体规格，`--model` 指向模型产物根目录。数据集编排和指标计算仍由 EvalScope 完成。
