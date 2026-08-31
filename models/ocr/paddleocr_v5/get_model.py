@@ -67,7 +67,6 @@ if __name__ == "__main__":
     target = HOUMO_TARGET.lower()
     det_raw_path = "models/raw/onnx/paddleocr_v5_det_sim.onnx"
     rec_raw_path = "models/raw/onnx/paddleocr_v5_rec_sim.onnx"
-    det_input_path = "http://10.10.1.53:8082/artifactory/toolchain/support/models/paddleocr_v5/paddleocr_v5_det_input.npy"
     batch = 1
     ncore = 1
     opt_level = "O2"
@@ -80,7 +79,6 @@ if __name__ == "__main__":
     if model_type in ["raw"]:
         get_file_from_jfrog(det_raw_path, model_dir)
         get_file_from_jfrog(rec_raw_path, model_dir)
-        get_file_from_jfrog(det_input_path, model_dir)
 
     if model_type in ["hmm"] and not get_file_from_jfrog(
         hmm_path, model_dir, build_model_dir
