@@ -8,9 +8,9 @@ model_configs:
       model_name: "minicpm-v-4.5"
       model_size: "8b"
       ncore: 2
-      quant_type: "w8a8h1_sefp"
+      quant_type: "w4a8h0_ssfp"
       context_length: "40k"
       ndevice: 1
       batch: 1
       prefill_length: 256
-      workflow_config: "workflows/xh2a/llm_models/minicpm_v_4_5/8b/minicpm_v_4_5_xh2a_w8a8.yaml"
+      workflow_config: "workflows/xh2a/llm_models/minicpm_v_4_5/8b/minicpm_v_4_5_xh2a_w4a8_gptq.yaml"

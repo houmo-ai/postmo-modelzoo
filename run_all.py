@@ -259,6 +259,7 @@ def main(allArgs=None):
 def setup_environment():
     HOUMO_EXAMPLES_PATH = os.path.abspath(os.getenv("HOUMO_EXAMPLES_PATH", "."))
     hmatc_dir = os.path.join(script_dir, "hmatc")
+    datasets_dir = os.path.join(HOUMO_EXAMPLES_PATH, "data", "datasets")
     llm_perf_dir = os.path.join(HOUMO_EXAMPLES_PATH, "tools", "llm_perf")
     llm_perf_bin = os.path.join(HOUMO_EXAMPLES_PATH, "tools", "bin", "llm_perf")
     hmeval_install = os.path.join(
@@ -268,6 +269,8 @@ def setup_environment():
     # install hmatc
     run_command(["chmod", "+x", "install.sh"], cwd=hmatc_dir)
     run_command(["./install.sh"], cwd=hmatc_dir)
+    # download datasets
+    run_command(["python3", "get_datasets.py", "--remove-archive"], cwd=datasets_dir)
     # install llm_perf
     run_command(["bash", "build_linux.sh"], cwd=llm_perf_dir)
     run_command(["cp", llm_perf_bin, os.path.join(HOUMO_PATH, "bin")])

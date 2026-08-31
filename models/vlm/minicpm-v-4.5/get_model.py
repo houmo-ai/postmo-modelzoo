@@ -25,7 +25,6 @@ import os
 
 from hmatc.utils.utils import first_not_none, get_houmo_version, get_model_configs, hmatc_get_file
 
-
 HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
@@ -70,7 +69,7 @@ def main() -> None:
             "context_len": first_not_none(args.context_length, model_config.get("context_length", "40k")),
             "prefill_len": first_not_none(args.prefill_length, model_config.get("prefill_length", 256)),
             "batch": first_not_none(args.batch, model_config.get("batch", 1)),
-            "quant_type": first_not_none(args.quant_type, model_config.get("quant_type", "w8a8h1_sefp")),
+            "quant_type": first_not_none(args.quant_type, model_config.get("quant_type", "w4a8h0_ssfp")),
         },
         "modelscope_repo": {"repo_ids": model_config.get("modelscope_repo", [])},
     }

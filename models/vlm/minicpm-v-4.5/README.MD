@@ -1,6 +1,6 @@
 # MiniCPM-V 4.5
 
-本目录提供 MiniCPM-V 4.5 的模型下载、W8A8 量化和 HMONNX 导出流程。MiniCPM-V 4.5 使用独立的 Qwen3 文本底座 workflow，不与 MiniCPM-V 4.6 的 Qwen3.5 workflow 混用。
+本目录提供 MiniCPM-V 4.5 的模型下载、W4A8 量化和 HMONNX 导出流程。MiniCPM-V 4.5 使用独立的 Qwen3 文本底座 workflow，不与 MiniCPM-V 4.6 的 Qwen3.5 workflow 混用。
 
 本例使用的第三方预训练模型信息如下：
 
@@ -26,12 +26,13 @@ python3 get_model.py --type raw --source_type modelscope
 python3 ptq.py
 ```
 
-默认使用 xh2modelzoo 的 `minicpm_v_4_5_xh2a_w8a8.yaml` workflow，输出到 `output/${HOUMO_TARGET}/hmquant/`。
+默认使用 xh2modelzoo 的 `minicpm_v_4_5_xh2a_w4a8_gptq.yaml` workflow，量化类型为 `w4a8h0_ssfp`，输出到 `output/${HOUMO_TARGET}/hmquant/`。
 
-当前 workflow 会直接在 `hmquant` 根目录生成 `prefill`、`decode`、
-`vision_1x` 和 `vision_6x`，无需由 `ptq.py` 额外搬移、重命名产物或修改
-`export_meta_info.json`。`ptq.py` 会在导出后校验该目录布局，确保产物可直接交给
-`build.py` 编译。
+当前 workflow 可能先在 `hmquant` 根目录下生成带量化版本和日期的模型子目录。
+`ptq.py` 会在导出后将该子目录中的 `prefill`、`decode`、`vision_1x`、`vision_6x`
+及相关元数据提升到 `hmquant` 根目录，并校验目录布局，确保产物可直接交给
+`build.py` 编译。使用 `--overwrite` 时会同时清理旧的导出目录和 `_quant` 中间量化目录，
+避免复用其他量化配置的缓存。
 
 `ptq.py` 还会读取最终保留的 ONNX 图中的 `external_data.location`，自动删除
 不再被任何 ONNX 引用的原始导出权重文件，并保留 `_with_act.onnx` 实际引用的

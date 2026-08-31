@@ -99,8 +99,24 @@ def _validate_export_layout(output_dir: Path) -> None:
         )
 
 
+def _move_export_to_output_root(work_dir: Path, output_dir: Path) -> Path:
+    work_dir = work_dir.resolve()
+    output_dir = output_dir.resolve()
+    if work_dir != output_dir:
+        if work_dir.parent != output_dir:
+            raise ValueError(f"Unexpected workflow output directory: {work_dir}")
+
+        for source in work_dir.iterdir():
+            destination = output_dir / source.name
+            if destination.exists():
+                raise FileExistsError(f"Export artifact already exists: {destination}; rerun with --overwrite")
+            shutil.move(str(source), str(destination))
+        work_dir.rmdir()
+    return output_dir / "export_meta_info.json"
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the MiniCPM-V 4.5 Merak W8A8 export workflow.")
+    parser = argparse.ArgumentParser(description="Run the MiniCPM-V 4.5 Merak export workflow.")
     parser.add_argument("--model-dir", default="MiniCPM-V-4_5")
     parser.add_argument("--config-path", default=str(DEFAULT_CONFIG_PATH))
     parser.add_argument(
@@ -118,19 +134,22 @@ def main() -> None:
     from xhmodel_merak.workflows import AutoWorkflow
 
     output_path = Path(args.output_dir)
+    quant_output_path = Path(f"{args.output_dir}_quant")
     if args.overwrite and output_path.exists():
         shutil.rmtree(output_path)
+    if args.overwrite and quant_output_path.exists():
+        shutil.rmtree(quant_output_path)
     workflow = AutoWorkflow.from_config(
         model_dir=args.model_dir,
         config_path=str(_workflow_config_path(args.config_path)),
     )
-    quant_result = workflow.quant(output_dir=f"{args.output_dir}_quant", device=args.device)
+    quant_result = workflow.quant(output_dir=str(quant_output_path), device=args.device)
     export_result = workflow.export(quant_result=quant_result, output_dir=args.output_dir, device=args.device)
     if args.dump_golden:
         print(f"golden_dir: {workflow.dump_golden(export_result=export_result, device=args.device)}")
-    meta_path = Path(export_result.work_dir) / "export_meta_info.json"
-    _validate_export_layout(meta_path.parent)
-    _cleanup_unreferenced_external_data(meta_path.parent)
+    meta_path = _move_export_to_output_root(Path(export_result.work_dir), output_path)
+    _validate_export_layout(output_path)
+    _cleanup_unreferenced_external_data(output_path)
     print(meta_path)
 
 

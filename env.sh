@@ -88,7 +88,9 @@ PRINT_GREEN "PYTHONPATH=$PYTHONPATH"
 PRINT_GREEN "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 PRINT_GREEN "PATH=$PATH"
 
-(
-    cd "$HOUMO_EXAMPLES_PATH/data/datasets" || exit 1
-    python3 get_datasets.py --remove-archive
-)
+if [[ "$1" == "--download_datasets" ]]; then
+  (
+      cd "$HOUMO_EXAMPLES_PATH/data/datasets" || exit 1
+      python3 get_datasets.py --remove-archive
+  )
+fi
