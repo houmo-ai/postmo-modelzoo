@@ -60,10 +60,15 @@ def get_args(argv=None):
 
 
 def find_model(model_dir, component, required=False):
+    def matches_component(path):
+        model_prefix, separator, name = path.stem.partition("_")
+        return bool(model_prefix and separator and name == component)
+
     matches = sorted(
         path
         for suffix in (".hmm", ".hmms")
-        for path in model_dir.glob(f"*_{component}{suffix}")
+        for path in model_dir.glob(f"*{suffix}")
+        if matches_component(path)
     )
     if len(matches) > 1:
         raise ValueError(
@@ -99,7 +104,10 @@ def resolve_model_files(model_dir):
         tokenizer=require_path(hmquant_dir / "hf_config", "Tokenizer directory"),
         visual=find_model(model_dir, "visual"),
         audio=audio,
-        assistant=find_model(model_dir, "assistant"),
+        assistant=(
+            find_model(model_dir, "mtp_draft_decode")
+            or find_model(model_dir, "assistant")
+        ),
         ple=ple,
     )
 

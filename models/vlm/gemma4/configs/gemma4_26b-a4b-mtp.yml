@@ -21,7 +21,6 @@ build:
   enable_common_subgraph: false
   prefill_chunk_length: 320
   context_length: 262144
-  cpp_backend: v1
   components:
     visual:
       enable_common_subgraph: true
