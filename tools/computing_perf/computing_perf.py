@@ -474,6 +474,7 @@ if __name__ == "__main__":
             "opt_level": "O2",
             "io_layout": "any",
             "enable_xh2_sparse_feature": enable_xh2_sparse_feature,
+            "codegen_backend": "cpp-v1",
             "skip_check": True,
         }
         if args.no_load_store:

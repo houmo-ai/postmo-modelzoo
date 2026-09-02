@@ -323,6 +323,7 @@ if __name__ == "__main__":
             ncore=1,
             opt_level="O2",
             io_layout="any",
+            codegen_backend="cpp-v1",
             emit_cpp_extra_args=f"only-emit-op-list=hmint.{'load' if args.type == 'r' else 'store'}",
         )
         json_path = os.path.join(output_dir, "model.json")
