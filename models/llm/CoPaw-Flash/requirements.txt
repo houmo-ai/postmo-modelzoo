@@ -1,6 +1,0 @@
---extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
-transformers==5.2.0
-pypcre==0.2.15
-defuser
-optimum
-qwen-vl-utils

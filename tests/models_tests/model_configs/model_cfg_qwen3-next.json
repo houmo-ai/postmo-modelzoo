@@ -1,5 +1,5 @@
 {
-    "obsolete": false,
+    "obsolete": true,
     "model_dir": "models/llm/qwen3-next",
     "model_type": "llm",
     "dependencies": {
@@ -19,7 +19,7 @@
         "xh2": {
             "x86_64": {
                 "prefill": 72.68,
-                "decode": 20.30,
+                "decode": 20.3,
                 "end2end": 20.05
             }
         }

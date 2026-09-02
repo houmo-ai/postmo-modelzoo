@@ -1,5 +1,5 @@
 {
-    "obsolete": false,
+    "obsolete": true,
     "model_dir": "models/ocr/PPOCRv3/det",
     "model_type": "cv",
     "dependencies": {
@@ -21,8 +21,8 @@
         "xh2": ["hmquant", "hmbuild", "hmdemo", "hmcompare", "hmperf"]
     },
     "validation": {
-        "xh1": {"compile_cosine_threshold": 0.76},
-        "xh2": {"compile_cosine_threshold": 0.76}
+        "xh1": { "compile_cosine_threshold": 0.76 },
+        "xh2": { "compile_cosine_threshold": 0.76 }
     },
     "perf_metrics": {
         "xh1": {

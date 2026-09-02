@@ -400,30 +400,6 @@ ocr_lprnet:
         args: all
   test:
     - ocr_lprnet_test
-ocr_ppocrv3_det:
-  include:
-    - models/ocr/PPOCRv3/det
-  exclude:
-    - models/ocr/PPOCRv3/det/README.MD
-  example_case:
-    - ocr_ppocrv3_det_test:
-        test_type: models_tests
-        script: ppocrv3_det
-        args: all
-  test:
-    - ocr_ppocrv3_det_test
-ocr_ppocrv3_rec:
-  include:
-    - models/ocr/PPOCRv3/rec
-  exclude:
-    - models/ocr/PPOCRv3/rec/README.MD
-  example_case:
-    - ocr_ppocrv3_rec_test:
-        test_type: models_tests
-        script: ppocrv3_rec
-        args: all
-  test:
-    - ocr_ppocrv3_rec_test
 ocr_paddleocr_v5:
   include:
     - models/ocr/paddleocr_v5
@@ -448,18 +424,6 @@ ocr_glm-ocr:
         args: all
   test:
     - ocr_glm-ocr_test
-ocr_paddleocr-vl:
-  include:
-    - models/ocr/paddleocr-vl
-  exclude:
-    - models/ocr/paddleocr-vl/README.MD
-  example_case:
-    - ocr_paddleocr-vl_test:
-        test_type: models_tests
-        script: paddleocr_vl
-        args: all
-  test:
-    - ocr_paddleocr-vl_test
 ocr_paddleocr-vl-1.6:
   include:
     - models/ocr/paddleocr-vl-1.6
@@ -505,18 +469,6 @@ reranker_qwen3-reranker:
 #####################################################
 # ====================== llm ====================== #
 #####################################################
-llm_qwen3:
-  include:
-    - models/llm/qwen3
-  exclude:
-    - models/llm/qwen3/README.MD
-  example_case:
-    - llm_qwen3_test:
-        test_type: models_tests
-        script: qwen3
-        args: all
-  test:
-    - llm_qwen3_test
 llm_qwen3.5:
   include:
     - models/llm/qwen3.5
@@ -541,66 +493,6 @@ llm_qwen3.5_tool_test:
         args: all
   test:
     - llm_qwen3.5_tool_test
-llm_qwen2.5:
-  include:
-    - models/llm/qwen2.5
-  exclude:
-    - models/llm/qwen2.5/README.MD
-  example_case:
-    - llm_qwen2.5_test:
-        test_type: models_tests
-        script: qwen2dot5
-        args: all
-  test:
-    - llm_qwen2.5_test
-llm_qwen3_30b_a3b:
-  include:
-    - models/llm/qwen3-30b-a3b
-  exclude:
-    - models/llm/qwen3-30b-a3b/README.MD
-  example_case:
-    - llm_qwen3_30b_a3b_test:
-        test_type: models_tests
-        script: qwen3_30b_a3b
-        args: all
-  test:
-    - llm_qwen3_30b_a3b_test
-llm_deepseek_r1_qwen3_8b:
-  include:
-    - models/llm/deepseek-r1-qwen3-8b
-  exclude:
-    - models/llm/deepseek-r1-qwen3-8b/README.MD
-  example_case:
-    - llm_deepseek_r1_qwen3_8b_test:
-        test_type: models_tests
-        script: deepseek_r1_qwen3_8b
-        args: all
-  test:
-    - llm_deepseek_r1_qwen3_8b_test
-llm_gpt-oss:
-  include:
-    - models/llm/gpt-oss
-  exclude:
-    - models/llm/gpt-oss/README.MD
-  example_case:
-    - llm_gpt-oss_test:
-        test_type: models_tests
-        script: gpt_oss
-        args: all
-  test:
-    - llm_gpt-oss_test
-llm_qwen3-next:
-  include:
-    - models/llm/qwen3-next
-  exclude:
-    - models/llm/qwen3-next/README.MD
-  example_case:
-    - llm_qwen3-next_test:
-        test_type: models_tests
-        script: qwen3_next
-        args: all
-  test:
-    - llm_qwen3-next_test
 llm_qwen-agentworld:
   include:
     - models/llm/qwen-agentworld
@@ -613,46 +505,10 @@ llm_qwen-agentworld:
         args: all
   test:
     - llm_qwen-agentworld_test
-llm_copaw-flash:
-  include:
-    - models/llm/CoPaw-Flash
-  exclude:
-    - models/llm/CoPaw-Flash/README.MD
-  example_case:
-    - llm_copaw-flash_test:
-        test_type: models_tests
-        script: copaw_flash
-        args: all
-  test:
-    - llm_copaw-flash_test
 
 #####################################################
 # ====================== vlm ====================== #
 #####################################################
-vlm_qwen2.5-vl:
-  include:
-    - models/vlm/qwen2.5-vl
-  exclude:
-    - models/vlm/qwen2.5-vl/README.MD
-  example_case:
-    - vlm_qwen2.5-vl_test:
-        test_type: models_tests
-        script: qwen2dot5_vl
-        args: all
-  test:
-    - vlm_qwen2.5-vl_test
-vlm_qwen3-vl:
-  include:
-    - models/vlm/qwen3-vl
-  exclude:
-    - models/vlm/qwen3-vl/README.MD
-  example_case:
-    - vlm_qwen3-vl_test:
-        test_type: models_tests
-        script: qwen3_vl
-        args: all
-  test:
-    - vlm_qwen3-vl_test
 vlm_minicpm-v-4.6:
   include:
     - models/vlm/minicpm-v-4.6
@@ -689,7 +545,6 @@ vlm_gemma4:
         args: all
   test:
     - vlm_gemma4_test
-
 vlm_ornith1.0:
   include:
     - models/vlm/ornith1.0
@@ -786,18 +641,6 @@ lalm_funaudiochat:
 #####################################################
 # ===================== omni ===================== #
 #####################################################
-omni_minicpmo:
-  include:
-    - models/omni/minicpmo
-  exclude:
-    - models/omni/minicpmo/README.MD
-  example_case:
-    - omni_minicpmo_test:
-        test_type: models_tests
-        script: minicpmo
-        args: all
-  test:
-    - omni_minicpmo_test
 omni_qwen3_omni:
   include:
     - models/omni/qwen3-omni
@@ -998,8 +841,6 @@ models_tests:
     - vlm_gemma4_test
     - diffusion_z_image_turbo_test
     - ocr_glm-ocr_test
-    # - llm_qwen3_test
-    # - vlm_qwen3-vl_test
 
 #####################################################
 # tests
@@ -1025,10 +866,5 @@ all:
     - diffusion_z_image_turbo_test
     - omni_qwen3_omni_test
     # - segmentation_yolov8m_seg_test
-    # - llm_qwen3_test
-    # - vlm_qwen3-vl_test
-    - llm_gpt-oss_test
-    - llm_qwen3-next_test
     # - llm_qwen3.5_test
-    # - llm_qwen3_30b_a3b_test
     # - vlm_gemma4_test

@@ -92,7 +92,7 @@ parser
 - 确认测试断言真实结果、产物或错误，而非只断言命令成功退出。
 - 检查 model-specific HMATC 配置、backend、platform 和 skip 条件是否仍有效。
 - 搜索受影响的 `hmatc ...` 命令、Python import 和配置字段，检查模型 Demo、API 示例和 README。
-- 当本次变更同时涉及或导致 `models/<category>/<example>/`、`apis/converts/<example>/`、`apis/inferences/<example>/` 或 `apis/scenes/<example>/` 新增、修改或删除时，按 `imodelzoo-code-review` 的根 README 示例登记与删除同步规则检查仓库根 `README.md` 的 `## 模型示例` 或 `## API 示例`；未登记或删除残留定为 P0。仅 HMATC 内部变更且没有对应示例目录变更时，不要凭空报告根 README 登记问题。
+- 当本次变更同时涉及或导致 `models/<category>/<example>/`、`apis/converts/<example>/`、`apis/inferences/<example>/` 或 `apis/scenes/<example>/` 新增、修改或删除时，按 `imodelzoo-code-review` 的根 README 示例登记与删除同步规则检查仓库根 `README.md` 的 `## 模型示例` 或 `## API 示例`；未登记或删除残留按该规则定为 P0，其中 README `support` 已标明停止维护的模型适用其目录缺失和历史登记例外。仅 HMATC 内部变更且没有对应示例目录变更时，不要凭空报告根 README 登记问题。
 - 公共行为变化应在测试设计中至少覆盖一个代表性小模型的端到端链路；Reviewer 只检查该覆盖是否存在且能够触发目标路径，不声称执行了该链路。
 
 ## Packaging 与依赖

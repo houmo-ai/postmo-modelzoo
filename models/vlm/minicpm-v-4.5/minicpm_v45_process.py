@@ -127,14 +127,10 @@ def _temporal_group_inputs(
         raise ValueError(f"video group must contain 1..{group_capacity} frames")
     pixels = np.zeros((group_capacity, 3, PATCH_SIZE, patch_capacity * PATCH_SIZE), dtype=np.float16)
     position_ids = np.zeros((group_capacity, patch_capacity), dtype=np.int32)
-    attention_bias = np.full(
-        (group_capacity, 1, 1, patch_capacity), np.finfo(np.float16).min, dtype=np.float16
-    )
+    attention_bias = np.full((group_capacity, 1, 1, patch_capacity), np.finfo(np.float16).min, dtype=np.float16)
     pos_embed = np.zeros((group_capacity, patch_capacity, embedding_dim), dtype=np.float16)
     temporal_embed = np.zeros_like(pos_embed)
-    key_bias = np.full(
-        (1, 1, 1, group_capacity * patch_capacity), np.finfo(np.float16).min, dtype=np.float16
-    )
+    key_bias = np.full((1, 1, 1, group_capacity * patch_capacity), np.finfo(np.float16).min, dtype=np.float16)
     temporal_cache = _temporal_pos_embed_cache(embedding_dim, max(max(temporal_ids, default=0) + 1, 1))
     for frame_index, ((packed, size), temporal_id) in enumerate(zip(pixel_slices, temporal_ids, strict=True)):
         height, width = map(int, size)
@@ -146,9 +142,9 @@ def _temporal_group_inputs(
         cols = np.floor(np.arange(width) * POSITIONS_PER_SIDE / width).astype(np.int32)
         position_ids[frame_index, :count] = (rows[:, None] * POSITIONS_PER_SIDE + cols[None, :]).reshape(-1)
         attention_bias[frame_index, 0, 0, :count] = 0
-        pos_embed[frame_index, :count] = _sincos_position_embedding(
-            height, width, embedding_dim
-        ).reshape(count, embedding_dim)
+        pos_embed[frame_index, :count] = _sincos_position_embedding(height, width, embedding_dim).reshape(
+            count, embedding_dim
+        )
         if temporal_id >= 0:
             temporal_embed[frame_index] = temporal_cache[int(temporal_id)].numpy()
         start = frame_index * patch_capacity
@@ -182,8 +178,9 @@ def _sincos_position_embedding(height: int, width: int, dim: int) -> np.ndarray:
     omega = 1.0 / (10000 ** (np.arange(half, dtype=np.float32) / half))
     yy = np.concatenate((np.sin(y[..., None] * omega), np.cos(y[..., None] * omega)), -1)
     xx = np.concatenate((np.sin(x[..., None] * omega), np.cos(x[..., None] * omega)), -1)
-    return np.concatenate((np.broadcast_to(xx, (height, width, half * 2)),
-                           np.broadcast_to(yy, (height, width, half * 2))), -1)
+    return np.concatenate(
+        (np.broadcast_to(xx, (height, width, half * 2)), np.broadcast_to(yy, (height, width, half * 2))), -1
+    )
 
 
 class MiniCPMV45ImagePreprocessor:
@@ -212,16 +209,20 @@ class MiniCPMV45ImagePreprocessor:
         bias[..., :count] = 0
         pos = np.zeros((1, TOKEN_CAPACITY, 4096), dtype=np.float16)
         pos[0, :count] = _sincos_position_embedding(height, width, 4096).reshape(count, 4096)
-        return {"pixel_values": padded, "position_ids": self._position_ids(height, width),
-                "attention_bias": bias, "resampler_pos_embed": pos,
-                "resampler_key_bias": bias.copy()}, 64
+        return {
+            "pixel_values": padded,
+            "position_ids": self._position_ids(height, width),
+            "attention_bias": bias,
+            "resampler_pos_embed": pos,
+            "resampler_key_bias": bias.copy(),
+        }, 64
 
     def split_units(self, pixels: np.ndarray, sizes: np.ndarray):
         result, offset = [], 0
         for size in sizes:
             height, width = map(int, size)
             length = height * width * PATCH_SIZE
-            result.append((pixels[..., offset:offset + length], size))
+            result.append((pixels[..., offset : offset + length], size))
             offset += length
         if offset != pixels.shape[-1]:
             raise ValueError("packed pixels and target sizes do not match")
@@ -229,20 +230,29 @@ class MiniCPMV45ImagePreprocessor:
 
 
 class MiniCPMV45Process(ModelProcess):
-    def __init__(self, tokenizer_dir: Path, embedding_path: Path, *, prefill_length: int,
-                 embedding_dim: int, max_slice_nums: int, video_group_capacity: int,
-                 perf: PerfTracker):
+    def __init__(
+        self,
+        tokenizer_dir: Path,
+        embedding_path: Path,
+        *,
+        prefill_length: int,
+        embedding_dim: int,
+        max_slice_nums: int,
+        video_group_capacity: int,
+        perf: PerfTracker,
+    ):
         self.perf = perf
         self.prefill_length = prefill_length
         self.embedding_dim = embedding_dim
         self.max_slice_nums = max_slice_nums
         self.video_group_capacity = video_group_capacity
-        processor_root = Path(os.getenv("HOUMO_EXAMPLES_PATH") or "/hmdd/imodelzoo") / "models" / "omni" / "minicpmo"
-        sys.path.insert(0, str(processor_root))
         from image_processing_minicpmv import MiniCPMVImageProcessor
+
         with self.perf.scope("llm.init.processor_load"):
             self.tokenizer = _load_tokenizer(Path(tokenizer_dir))
-        self.image_processor = MiniCPMVImageProcessor(max_slice_nums=max_slice_nums, scale_resolution=448, patch_size=PATCH_SIZE)
+        self.image_processor = MiniCPMVImageProcessor(
+            max_slice_nums=max_slice_nums, scale_resolution=448, patch_size=PATCH_SIZE
+        )
         with self.perf.scope("llm.init.embedding_load"):
             self.embedding_weight = _load_embedding(Path(embedding_path), embedding_dim)
         self.image_token_id = int(self.tokenizer.convert_tokens_to_ids("<unk>"))
@@ -256,7 +266,9 @@ class MiniCPMV45Process(ModelProcess):
         with self.perf.scope("llm.vision.preprocess" if request.images or request.videos else "llm.preprocess"):
             static_images = [Image.open(path).convert("RGB") for path in request.images]
             if static_images:
-                image_inputs = self.image_processor(static_images, max_slice_nums=self.max_slice_nums, return_tensors="pt")
+                image_inputs = self.image_processor(
+                    static_images, max_slice_nums=self.max_slice_nums, return_tensors="pt"
+                )
                 static_pixels = torch.cat(image_inputs["pixel_values"][0], dim=-1).unsqueeze(0)
                 static_sizes = image_inputs["tgt_sizes"][0]
                 static_units = MiniCPMV45ImagePreprocessor().split_units(
@@ -264,14 +276,28 @@ class MiniCPMV45Process(ModelProcess):
                 )
                 for index, (unit_pixels, size) in enumerate(static_units):
                     values, effective = MiniCPMV45ImagePreprocessor().build_unit_inputs(unit_pixels, size)
-                    vision_units.append(StageInputs(
-                        tuple(values[name] for name in ("pixel_values", "position_ids", "attention_bias", "resampler_pos_embed", "resampler_key_bias")),
-                        {"effective_tokens": effective, "profile": "vision_1x"},
-                    ))
-                image_content += "\n".join(
-                    self.image_processor.get_slice_image_placeholder(image.size, index, self.max_slice_nums)
-                    for index, image in enumerate(static_images)
-                ) + "\n"
+                    vision_units.append(
+                        StageInputs(
+                            tuple(
+                                values[name]
+                                for name in (
+                                    "pixel_values",
+                                    "position_ids",
+                                    "attention_bias",
+                                    "resampler_pos_embed",
+                                    "resampler_key_bias",
+                                )
+                            ),
+                            {"effective_tokens": effective, "profile": "vision_1x"},
+                        )
+                    )
+                image_content += (
+                    "\n".join(
+                        self.image_processor.get_slice_image_placeholder(image.size, index, self.max_slice_nums)
+                        for index, image in enumerate(static_images)
+                    )
+                    + "\n"
+                )
                 image_count += len(static_units)
             if request.videos:
                 video_frames = []
@@ -283,23 +309,39 @@ class MiniCPMV45Process(ModelProcess):
                 video_inputs = self.image_processor(video_frames, max_slice_nums=1, return_tensors="pt")
                 video_pixels = torch.cat(video_inputs["pixel_values"][0], dim=-1).unsqueeze(0)
                 video_sizes = video_inputs["tgt_sizes"][0]
-                video_units = MiniCPMV45ImagePreprocessor().split_units(video_pixels.detach().cpu().numpy(), video_sizes.detach().cpu().numpy())
+                video_units = MiniCPMV45ImagePreprocessor().split_units(
+                    video_pixels.detach().cpu().numpy(), video_sizes.detach().cpu().numpy()
+                )
                 offset = 0
                 for group in video_groups:
                     group_units = video_units[offset : offset + len(group)]
                     offset += len(group)
-                    values, effective = _temporal_group_inputs(group_units, group, 1600, self.video_group_capacity, self.embedding_dim)
+                    values, effective = _temporal_group_inputs(
+                        group_units, group, 1600, self.video_group_capacity, self.embedding_dim
+                    )
                     vision_units.append(StageInputs(values, {"effective_tokens": effective, "profile": "vision_6x"}))
-                    image_content += self.image_processor.get_slice_image_placeholder(video_frames[offset - len(group)].size, 0, 1, use_image_id=False) + "\n"
+                    image_content += (
+                        self.image_processor.get_slice_image_placeholder(
+                            video_frames[offset - len(group)].size, 0, 1, use_image_id=False
+                        )
+                        + "\n"
+                    )
                 image_count += len(video_groups)
-            messages = ([{"role": "system", "content": request.system_prompt}] if request.system_prompt else [])
-            messages.append({"role": "user", "content": f"{image_content}\n{request.prompt}" if image_content else request.prompt})
-            text = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+            messages = [{"role": "system", "content": request.system_prompt}] if request.system_prompt else []
+            messages.append(
+                {"role": "user", "content": f"{image_content}\n{request.prompt}" if image_content else request.prompt}
+            )
+            text = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
+            )
             inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False)
             input_ids = inputs["input_ids"]
             token_embeds = F.embedding(input_ids, self.embedding_weight)
         return PreparedMiniCPMV45Request(
-            input_ids, token_embeds, None, None,
+            input_ids,
+            token_embeds,
+            None,
+            None,
             int(input_ids.shape[1]),
             image_count,
             None,
@@ -324,10 +366,16 @@ class MiniCPMV45Process(ModelProcess):
             for unit_pixels, size in units:
                 values, effective = MiniCPMV45ImagePreprocessor().build_unit_inputs(unit_pixels, size)
                 yield StageInputs(
-                    tuple(values[name] for name in (
-                        "pixel_values", "position_ids", "attention_bias",
-                        "resampler_pos_embed", "resampler_key_bias",
-                    )),
+                    tuple(
+                        values[name]
+                        for name in (
+                            "pixel_values",
+                            "position_ids",
+                            "attention_bias",
+                            "resampler_pos_embed",
+                            "resampler_key_bias",
+                        )
+                    ),
                     {"effective_tokens": effective},
                 )
             return
@@ -348,10 +396,12 @@ class MiniCPMV45Process(ModelProcess):
 
     def prepare_prefill(self, request: PrefillRequest, start: int) -> StageInputs:
         current = min(self.prefill_length, request.token_embeds.shape[1] - start)
-        chunk = request.token_embeds[:, start:start + current]
+        chunk = request.token_embeds[:, start : start + current]
         padded = torch.zeros((1, self.prefill_length, self.embedding_dim), dtype=chunk.dtype)
         padded[:, :current] = chunk
-        return StageInputs((padded, np.array([start], np.int32), np.array([current], np.int32)), {"current_length": current})
+        return StageInputs(
+            (padded, np.array([start], np.int32), np.array([current], np.int32)), {"current_length": current}
+        )
 
     def prepare_decode(self, token: int, position: int) -> StageInputs:
         embed = F.embedding(torch.tensor([[token]], dtype=torch.long), self.embedding_weight)
@@ -359,10 +409,12 @@ class MiniCPMV45Process(ModelProcess):
 
     def postprocess(self, state, *, final: bool = False) -> str:
         with self.perf.scope("llm.text.postprocess"):
-            text = self.tokenizer.decode(state.generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            text = self.tokenizer.decode(
+                state.generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
             if not final and text.endswith("\\"):
                 text = text[:-1]
             text = text.replace("\\n", "\n")
-        delta = text[len(state.emitted_text):] if text.startswith(state.emitted_text) else ""
+        delta = text[len(state.emitted_text) :] if text.startswith(state.emitted_text) else ""
         state.emitted_text = text
         return delta

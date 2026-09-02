@@ -1,5 +1,5 @@
 {
-    "obsolete": false,
+    "obsolete": true,
     "model_dir": "models/llm/CoPaw-Flash",
     "model_type": "llm",
     "dependencies": {

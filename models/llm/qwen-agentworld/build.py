@@ -77,9 +77,7 @@ def _validate_adjust_flash_attention(flash_val: int, context_length: int) -> int
     ViT (visual) FlashAttention switch.
     """
     if flash_val not in [0, 1, 2]:
-        raise ValueError(
-            f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{flash_val}"
-        )
+        raise ValueError(f"Prefill&Decode FlashAttention values only support 0/1/2, current value:{flash_val}")
 
     if context_length < 2048:
         flash_val = 0
@@ -199,33 +197,23 @@ def get_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
     args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    args.prefill_length = first_not_none(
-        args.prefill_length, model_config.get("prefill_length", 256)
-    )
+    args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
     if args.context_length is None:
-        args.context_length = parse_context_length(
-            model_config.get("context_length", "256k")
-        )
-    args.flash_attention = _validate_adjust_flash_attention(
-        args.flash_attention, args.context_length
-    )
+        args.context_length = parse_context_length(model_config.get("context_length", "256k"))
+    args.flash_attention = _validate_adjust_flash_attention(args.flash_attention, args.context_length)
     return args
 
 
 def _load_golden_output(model_dir, output_name, batch) -> tuple[np.ndarray, str]:
     """Load and tile golden output data for comparison."""
-    output_files = glob.glob(
-        f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True
-    )
+    output_files = glob.glob(f"{model_dir}/**/hmquant_*{sanitize_name(output_name)}*.npy", recursive=True)
     output_data_path = os.path.abspath(output_files[0]) if output_files else ""
     if not os.path.exists(output_data_path):
         return None, output_data_path
@@ -238,16 +226,12 @@ def _compare_output(output_name, output_data, golden_output) -> bool:
     """Compare model output with golden data, return True if acceptable."""
     if golden_output.shape != output_data.shape:
         print(
-            f"[compare] golden output [{output_name}] shape not match "
-            f"{golden_output.shape} vs {output_data.shape}"
+            f"[compare] golden output [{output_name}] shape not match " f"{golden_output.shape} vs {output_data.shape}"
         )
         return False
     cosine_dist = cosine_distance(golden_output, output_data)
     is_match = (golden_output == output_data).all()
-    print(
-        f"[compare] golden output [{output_name}] match={is_match}, "
-        f"similarity={cosine_dist:.6f}"
-    )
+    print(f"[compare] golden output [{output_name}] match={is_match}, " f"similarity={cosine_dist:.6f}")
     if is_match:
         return True
     if cosine_dist < GOLDEN_THRESH:
@@ -284,17 +268,11 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
         input_data_path = os.path.abspath(input_files[0]) if input_files else ""
         input_data = np.load(input_data_path).astype(input_info.dtype)
         input_data = np.concatenate([input_data for i in range(batch)], axis=0)
-        print(
-            f"golden input[{input_name}] shape = {input_data.shape}, "
-            f"dtype = {input_data.dtype}"
-        )
+        print(f"golden input[{input_name}] shape = {input_data.shape}, " f"dtype = {input_data.dtype}")
         start = time.time()
         module.set_input(input_name, input_data)
         profile["set_input"] += time.time() - start
-    print(
-        f'{model_name} set {input_num} inputs completed in '
-        f'{profile["set_input"]*1000:.3f} ms.'
-    )
+    print(f"{model_name} set {input_num} inputs completed in " f'{profile["set_input"]*1000:.3f} ms.')
 
     # infer model
     start = time.time()
@@ -317,26 +295,15 @@ def test(model_name, model_dir, output_dir, profile, batch=1):
         start = time.time()
         output_data = module.get_output(output_name).numpy()
         profile["get_output"] += time.time() - start
-        print(
-            f"output[{output_name}] shape = {output_data.shape}, "
-            f"dtype = {output_data.dtype}"
-        )
-        golden_output, golden_path = _load_golden_output(
-            model_dir, output_name, batch
-        )
+        print(f"output[{output_name}] shape = {output_data.shape}, " f"dtype = {output_data.dtype}")
+        golden_output, golden_path = _load_golden_output(model_dir, output_name, batch)
         if golden_output is None:
             result_check = False
-            print(
-                f"[warning] compare canceled while golden data not found "
-                f"-> {golden_path}"
-            )
+            print(f"[warning] compare canceled while golden data not found " f"-> {golden_path}")
             continue
         if not _compare_output(output_name, output_data, golden_output):
             result_check = False
-    print(
-        f'{model_name} get {output_num} ouputs completed in '
-        f'{profile["get_output"]*1000:.3f} ms.'
-    )
+    print(f"{model_name} get {output_num} ouputs completed in " f'{profile["get_output"]*1000:.3f} ms.')
     if not result_check:
         print("[error] result check failed.")
         exit(-1)
@@ -356,22 +323,14 @@ if __name__ == "__main__":
     llm_flash_attention = args.flash_attention
     profile = {}
 
-    decode_dirs = sorted(
-        path
-        for path in glob.glob(os.path.join(model_dir, "*decode*"))
-        if os.path.isdir(path)
-    )
+    decode_dirs = sorted(path for path in glob.glob(os.path.join(model_dir, "*decode*")) if os.path.isdir(path))
     if not decode_dirs:
-        raise FileNotFoundError(
-            f'No subdirectory containing "decode" found under: {model_dir}'
-        )
+        raise FileNotFoundError(f'No subdirectory containing "decode" found under: {model_dir}')
     decode_dir = os.path.abspath(decode_dirs[0])
     prefill_dir = os.path.join(model_dir, "prefill")
 
     if args.stage == "build" or args.stage == "all":
-        assert (
-            get_platform() == "x86_64"
-        ), f"Only supported for compilation on the x86_64 platform."
+        assert get_platform() == "x86_64", f"Only supported for compilation on the x86_64 platform."
 
         Xh2Exec.build_from_hmonnx(
             is_prefill=True,
@@ -385,7 +344,6 @@ if __name__ == "__main__":
             ncore=ncore,
             enable_common_subgraph=args.enable_common_subgraph,
             enable_xh2_stable_output=args.enable_xh2_stable_output,
-            cpp_backend="v2",
             llm_opt=True,
             parallel_jobs=j,
         )
@@ -400,7 +358,6 @@ if __name__ == "__main__":
             ndevice=ndevice,
             ncore=ncore,
             enable_xh2_stable_output=args.enable_xh2_stable_output,
-            cpp_backend="v2",
             llm_opt=True,
             parallel_jobs=j,
         )

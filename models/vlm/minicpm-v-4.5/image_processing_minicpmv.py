@@ -20,7 +20,7 @@
 #
 # File: image_processing_minicpmv.py
 # Description:
-#   Image input preprocessing for minicpmo multi-modal tasks.
+#   Image input preprocessing for MiniCPM-V 4.5 multimodal tasks.
 
 import math
 from typing import Any
@@ -377,7 +377,6 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
             return [images]
         return images
 
-
     def _process_image_group(self, images, max_slice_nums):
         """Process a single image group"""
         if not images:
@@ -415,4 +414,3 @@ class MiniCPMVImageProcessor(BaseImageProcessor):
 
         tgt_sizes = np.vstack(tgt_sizes) if tgt_sizes else []
         return new_images, image_sizes, tgt_sizes
-

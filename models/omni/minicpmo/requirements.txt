@@ -1,6 +1,0 @@
---extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple
-vector_quantize_pytorch
-compressed_tensors==0.12.2
-transformers==4.44.2
-vocos
-moviepy
