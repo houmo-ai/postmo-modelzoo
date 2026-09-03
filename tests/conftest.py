@@ -92,6 +92,7 @@ def pytest_configure(config):
         "dev_mem_12g",
         "dev_mem_24g",
         "dev_mem_48g",
+        "dev_mem_96g",
         "unit: test framework logic without device or model dependencies",
     ]
     for markers in shared_markers:

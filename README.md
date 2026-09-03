@@ -176,6 +176,7 @@ linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/w
 | qwen3-next              | llm          | xh2    | ❌️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.4.0  |
 | qwen3.5                 | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | CoPaw-Flash-9B          | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | v1.4.0  |
+| laguna-s-2.1            | llm          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | glm-ocr                 | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |
 | lprnet                  | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ✅️  | ✅️      |
 | mineru2.5               | ocr          | xh2    | ✅️   | ✅️    | ✅️  | ✅️   | ❌️  | ✅️      |

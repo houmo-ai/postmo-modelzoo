@@ -386,6 +386,19 @@ def test_llm_qwen_agentworld_quant(setup_logging) -> None:
     _quant_func("qwen-agentworld", setup_logging)
 
 
+@pytest.mark.laguna_s_2dot1
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_96g
+@pytest.mark.quant
+@pytest.mark.dependency(
+    name="test_quant_models.py::test_llm_laguna_s_2dot1_quant",
+    depends_on=["test_get_models.py::test_llm_laguna_s_2dot1_get_model"],
+)
+def test_llm_laguna_s_2dot1_quant(setup_logging) -> None:
+    """test_llm_laguna_s_2dot1_quant"""
+    _quant_func("laguna-s-2.1", setup_logging)
+
+
 @pytest.mark.qwen2dot5_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

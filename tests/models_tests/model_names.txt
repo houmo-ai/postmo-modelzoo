@@ -42,6 +42,7 @@ qwen3_vl_embedding
 qwen3dot5
 qwen3dot5_tool_test
 qwen_agentworld
+laguna_s_2dot1
 resnet50
 sam2
 sam3

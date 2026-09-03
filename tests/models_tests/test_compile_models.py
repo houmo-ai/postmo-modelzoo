@@ -230,6 +230,19 @@ def test_llm_gpt_oss_compile(setup_logging) -> None:
     _compile_func("gpt-oss", setup_logging)
 
 
+@pytest.mark.laguna_s_2dot1
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_96g
+@pytest.mark.compile
+@pytest.mark.dependency(
+    name="test_compile_models.py::test_llm_laguna_s_2dot1_compile",
+    depends_on=["test_quant_models.py::test_llm_laguna_s_2dot1_quant"],
+)
+def test_llm_laguna_s_2dot1_compile(setup_logging) -> None:
+    """test_llm_laguna_s_2dot1_compile"""
+    _compile_func("laguna-s-2.1", setup_logging)
+
+
 @pytest.mark.gte
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

@@ -325,6 +325,16 @@ def test_llm_qwen_agentworld_get_model(setup_logging) -> None:
     _get_model_func("qwen-agentworld", setup_logging)
 
 
+@pytest.mark.laguna_s_2dot1
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_96g
+@pytest.mark.get_model
+@pytest.mark.dependency(name="test_get_models.py::test_llm_laguna_s_2dot1_get_model")
+def test_llm_laguna_s_2dot1_get_model(setup_logging) -> None:
+    """test_llm_laguna_s_2dot1_get_model"""
+    _get_model_func("laguna-s-2.1", setup_logging)
+
+
 @pytest.mark.qwen2dot5_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

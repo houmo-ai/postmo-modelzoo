@@ -1,0 +1,16 @@
+default_model_name: "laguna-s-2.1"
+default_model_size: "118b-a8b"
+
+model_configs:
+  laguna-s-2.1:
+    "118b-a8b":
+      modelscope_repo: ["poolside/Laguna-S-2.1"]
+      model_name: "laguna-s-2.1"
+      model_size: "118b-a8b"
+      ncore: 2
+      quant_type: "w4a8"
+      context_length: "256k"
+      ndevice: 2
+      batch: 1
+      prefill_length: 256
+      workflow_config: "workflows/xh2a/llm_models/laguna/s_2_1/laguna_s_2_1_full_autoround_expert_w4_rest_w8_g64_xh2a_w4a8.yaml"

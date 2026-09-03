@@ -505,6 +505,18 @@ llm_qwen-agentworld:
         args: all
   test:
     - llm_qwen-agentworld_test
+llm_laguna-s-2.1:
+  include:
+    - models/llm/laguna-s-2.1
+  exclude:
+    - models/llm/laguna-s-2.1/README.MD
+  example_case:
+    - llm_laguna-s-2.1_test:
+        test_type: models_tests
+        script: laguna_s_2dot1
+        args: all
+  test:
+    - llm_laguna-s-2.1_test
 
 #####################################################
 # ====================== vlm ====================== #

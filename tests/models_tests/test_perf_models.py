@@ -152,6 +152,15 @@ def test_llm_qwen_agentworld_perf(setup_logging) -> None:
     _perf_func("qwen-agentworld", setup_logging)
 
 
+@pytest.mark.laguna_s_2dot1
+@pytest.mark.ndevice_2
+@pytest.mark.dev_mem_96g
+@pytest.mark.perf
+def test_llm_laguna_s_2dot1_perf(setup_logging) -> None:
+    """test_llm_laguna_s_2dot1_perf"""
+    _perf_func("laguna-s-2.1", setup_logging)
+
+
 @pytest.mark.qwen2dot5_vl
 @pytest.mark.ndevice_1
 @pytest.mark.dev_mem_12g

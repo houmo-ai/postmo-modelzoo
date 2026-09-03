@@ -27,6 +27,15 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 - 排除文件可作为理解其他源码的只读上下文，但不要对其内容产生 finding。
 - 用户明确要求评审某个排除路径时，以用户要求为准，但不将例外扩展到其他排除路径。
 
+## 专项 skill 路由
+
+当变更涉及 `utils/python/postmo_engine/**` 或直接耦合的 PostMo Engine
+`examples/**` 生产入口、Engine/Process/Module/Backend/Perf 集成时，同时加载
+`imodelzoo-postmo_engine-review`。该专项 skill 负责 PostMo Engine 的职责边界、
+Prefill/Decode 循环归属、`context_length` 所有权和 Perf 打点 contract；其明确
+违规按该专项规则定为 P0。具体路径排除和 mixed review 规则仍以
+`.github/guidance/review-guidelines.md` 为准。
+
 ## 必读上下文
 
 评审前：
@@ -159,6 +168,13 @@ iModelzoo 位于编译器、量化工具和运行时之上，主要提供可执�
 - 检查编译接口、输入 shape/dtype、动态/静态维度、产物路径和目标配置是否符合公开 API。
 - 确认下层工具或子进程失败能被显式报告，并在需要时返回非零退出码。
 - 只判断 iModelzoo 是否正确调用公开接口；不要推测编译器内部优化或 Kernel 实现问题。
+
+#### Vendored 依赖判定
+
+依赖不一定通过 `requirements.txt` 安装，也可以由仓库内源码、环境初始化或入口脚本提供。
+评审依赖删除或缺失时，必须追踪标准入口的实际导入路径、功能分支和最终调用点；源码可导入且
+未执行需要独立安装包的路径时，不得仅凭安装清单缺项形成 finding。只有标准流程确实调用缺失
+包提供的功能，且仓库没有其他有效来源时，才能报告依赖问题。
 
 ### Demo 与推理
 
