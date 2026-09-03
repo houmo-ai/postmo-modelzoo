@@ -24,7 +24,7 @@ python3 computing_perf.py
 python3 computing_perf.py --compute-mode int8
 ```
 
-如需测试不包含 load/store 开销的时间，可以添加 `--no-load-store` 参数。该参数在模型编译时仅生成 `xh2.te` 算子列表，用于构建不包含 load/store 的测试模型；脚本会在输出文件名和临时目录中追加 `no_load_store` 后缀。
+如需测试不包含 load/store 开销的时间，可以添加 `--no-load-store` 参数。该参数在模型编译时仅生成使用了 te 部件的算子，用于构建不包含 load/store 的测试模型；脚本会在输出文件名和临时目录中追加 `no_load_store` 后缀。
 
 ```bash
 # bFP16，不包含 load/store 开销
