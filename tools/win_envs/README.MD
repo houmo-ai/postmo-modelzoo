@@ -19,7 +19,7 @@
     - win11从后摩智能开发者社区[**https://developer.houmoai.com/**](https://developer.houmoai.com/)下载相关软件，参照社区文档中心完成固件烧录、驱动安装。
     - **驱动安装后需要确认windows的用户环境变量是否有HOUMO_SDK_PATH，该工具依赖此环境变量否则无法运行。**
     1. 直接使用exe安装包安装驱动，HOUMO_SDK_PATH会自动添加到用户环境变量，只需要用户确认是否正确即可。
-    2. 使用zip包安装时，**解压时解压到zip包同名目录，否则工具可能无法获取到驱动版本号**。此外，用户需要自行添加HOUMO_SDK_PATH环境变量，路径示例D:\houmo_drv_xh2_v0.6.0_windows11_x86_64\houmo_drv_xh2。
+    2. 使用zip包安装时，**解压时解压到zip包同名目录，否则工具可能无法获取到驱动版本号**。此外，用户需要自行添加HOUMO_SDK_PATH环境变量，路径示例D:/houmo_drv_xh2_v0.6.0_windows11_x86_64/houmo_drv_xh2。
     - 下载example样例，安装必要的python运行环境，**建议使用python3.9-3.13版本**。
     1. 安装后需要确认cmd终端python的版本号是否符合要求，有些用户存在多个版本的python需要确认默认的版本是否符合要求，如需查看windows的python位置，可以终端输入where python查看，建议从环境变量删除不需要的python版本。
     2. **部分用户终端python指令无效，但是py指令有效，具体处理方式为**：在cmd终端输入where py，将输出的路径从环境变量PATH删除。或者手动到对应目录删除py.exe文件。处理完成后重新开新的终端，确保py指令失效，python指令有效。
@@ -32,7 +32,7 @@
         - 下载完成后，双击下载的安装文件启动安装程序。
         - 在安装界面中，勾选 Add python.exe to PATH（非常重要，避免后续手动配置环境变量）。
         - 点击 Customize installation（可选），根据需要自定义安装路径或组件，建议默认即可。
-        - 如果需要更改安装路径，点击 Browse 并选择新路径（如 D:\Python）。
+        - 如果需要更改安装路径，点击 Browse 并选择新路径（如 D:/Python）。
         - 确认所有选项后，点击 Install 开始安装。
         - 安装完成后，点击 Disable path length limit（建议禁用路径长度限制以避免潜在问题），然后点击 Close 关闭安装程序。
         - 安装后，win+R打开终端，输入python --version确认python3.9-3.13。
@@ -64,9 +64,9 @@
     5. env.bat设置完成后，**样例目录的bat脚本需要cmd终端（非管理员模式）运行，主要原因是env.bat更改的是用户的环境变量。**
     6. 如果用户在conda环境下使用env.bat工具，执行env.bat工具之前需要先conda activate对应的python环境，这样的目的是告诉工具在特定的python环境下自动寻找部分环境变量。
     7. 以下路径如果手动设置给到的目录级别参考如下：
-        - HOUMO_SDK_PATH ： D:\houmo_drv_xh2_v0.6.0_windows11_x86_64\houmo_drv_xh2
-        - CMAKE_PATH : D:\Program Files\CMake\bin
-        - OPENCV_PATH : D:\workspace\3rdparty_learning\opencv\build
+        - HOUMO_SDK_PATH ： D:/houmo_drv_xh2_v0.6.0_windows11_x86_64/houmo_drv_xh2
+        - CMAKE_PATH : D:/Program Files/CMake/bin
+        - OPENCV_PATH : D:/workspace/3rdparty_learning/opencv/build
 ## 2.配置说明
 
 ### 2.1 env.json字段说明

@@ -27,6 +27,11 @@ import ctypes
 from typing import Dict, Any
 
 
+def normalize_windows_path(path: str) -> str:
+    """Use forward slashes for paths stored in environment variables."""
+    return path.replace(chr(92), "/")
+
+
 def has_chinese_in_path(path: str) -> bool:
 	for char in path:
 		if '\u4e00' <= char <= '\u9fff':
@@ -41,6 +46,7 @@ def find_tcim_path():
 
 	tcim_package_path = os.path.dirname(spec.origin)
 	if os.path.exists(tcim_package_path):
+		tcim_package_path = normalize_windows_path(tcim_package_path)
 		print(f"✅ Found tcim_package_path at path:\n{tcim_package_path}")
 		return tcim_package_path
 	else:
@@ -127,6 +133,8 @@ class EnvManager:
 
                 # Restore variables from backup
                 for name, value in values.items():
+                    if isinstance(value, str):
+                        value = normalize_windows_path(value)
                     # Handle empty values correctly
                     reg_type = winreg.REG_EXPAND_SZ if "%" in str(value) else winreg.REG_SZ
                     try:
@@ -161,6 +169,7 @@ class EnvManager:
         """
         if value == "" :
             return None
+        value = normalize_windows_path(value)
         reg_path = self.user_reg_path
         try:
             root = winreg.HKEY_CURRENT_USER
@@ -216,12 +225,16 @@ class EnvManager:
         # Validate path format
         if new_path == "":
             return None
-        new_path = new_path.rstrip('\\')  # Remove trailing backslash if present
+        new_path = normalize_windows_path(new_path).rstrip('/')
 
         # Get current PATH value
         reg_path = self.user_reg_path
         current_vars = self._enum_reg_values(reg_path)
-        current_path = current_vars.get("Path", "")
+        current_path = ";".join(
+            normalize_windows_path(path)
+            for path in current_vars.get("Path", "").split(";")
+            if path.strip()
+        )
 
         # Check if path already exists
         path_list = [p.strip() for p in current_path.split(";") if p.strip()]
@@ -252,7 +265,10 @@ class EnvManager:
             0,
             winreg.KEY_READ | winreg.KEY_WOW64_64KEY
         ) as key:
-            user_path = winreg.QueryValueEx(key, "PATH")[0].split(';')
+            user_path = [
+                normalize_windows_path(path)
+                for path in winreg.QueryValueEx(key, "PATH")[0].split(';')
+            ]
             winreg.CloseKey(key)
             return user_path
 
@@ -266,7 +282,8 @@ class EnvManager:
 
         new_path_list = []
         for path in path_list:
-            normalized_path = os.path.normpath(path)
+            normalized_path = normalize_windows_path(os.path.normpath(path))
+            remove_path = normalize_windows_path(os.path.normpath(remove_path))
             if normalized_path != remove_path and normalized_path not in new_path_list:
                 new_path_list.append(path)
             else:
@@ -319,11 +336,13 @@ class EnvManager:
                 if key == "CMAKE_PATH":
                     self.remove_env_from_path(val)
                 if key == "HOUMO_SDK_PATH":
-                    xh2a_dll_path = os.path.join(val, "hal\\lib")
+                    xh2a_dll_path = normalize_windows_path(os.path.join(val, "hal", "lib"))
                     self.remove_env_from_path(xh2a_dll_path)
                 if key == "TCIM_RUNTIME_PATH":
-                    tcim_dll_path = os.path.join(val, "bin")
-                    python_exe_path = os.path.abspath(os.path.join(val, "../../Scripts"))
+                    tcim_dll_path = normalize_windows_path(os.path.join(val, "bin"))
+                    python_exe_path = normalize_windows_path(
+                        os.path.abspath(os.path.join(val, "../../Scripts"))
+                    )
                     self.remove_env_from_path(tcim_dll_path)
                     self.remove_env_from_path(python_exe_path)
         self.refresh_envs()
@@ -351,7 +370,3 @@ class EnvManager:
         except Exception as e:
             print(f"Read File : {e}")
             return None
-
-
-
-

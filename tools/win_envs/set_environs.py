@@ -77,10 +77,12 @@ class WinEnvironsGenerater:
         self.initial_env = self.env_manager.get_initial() if len(self.initial_env.keys()) == 0 else self.initial_env
         var_name = f"{key} [Required] " if need else f"{key} [Optional] "
         if key in self.initial_env.keys():
-            self.all_environments[key] = os.getenv(key)
+            self.all_environments[key] = normalize_windows_path(os.getenv(key, ""))
             assert os.path.exists(self.all_environments[key]), f"{var_name} invalid, path not exists!"
         if self.all_environments[key] == "" and key not in self.initial_env.keys():
-            self.all_environments[key] = input(f"Manual Set {var_name} abspath:").strip()
+            self.all_environments[key] = normalize_windows_path(
+                input(f"Manual Set {var_name} abspath:").strip()
+            )
             if need:
                 assert self.all_environments[key] != "", f"{var_name} not find, please set it!"
                 assert os.path.exists(self.all_environments[key]), f"{var_name} invalid, path not exists!"
@@ -129,14 +131,18 @@ class WinEnvironsGenerater:
         self.all_environments["TCIM_BACKEND"] = (
             "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
         )
-        self.all_environments["HOUMO_EXAMPLES_PATH"] = os.path.abspath(
-            os.path.join(os.path.abspath(__file__), "../../../")
+        self.all_environments["HOUMO_EXAMPLES_PATH"] = normalize_windows_path(
+            os.path.abspath(os.path.join(os.path.abspath(__file__), "../../../"))
         )
-        self.all_environments["PYTHON_DIR"] = os.path.abspath(os.path.join(sys.executable, "../"))
+        self.all_environments["PYTHON_DIR"] = normalize_windows_path(
+            os.path.abspath(os.path.join(sys.executable, "../"))
+        )
         self.all_environments["TCIM_RUNTIME_PATH"] = tcim_package_path
 
         if shutil.which("cmake") is not None:
-            self.all_environments["CMAKE_PATH"] = os.path.abspath(os.path.join(shutil.which("cmake"), "../"))
+            self.all_environments["CMAKE_PATH"] = normalize_windows_path(
+                os.path.abspath(os.path.join(shutil.which("cmake"), "../"))
+            )
         else:
             self.nullEnvManualSet("CMAKE_PATH", need=False)
 
@@ -169,9 +175,15 @@ class WinEnvironsGenerater:
             print(f"[ERROR] {e}, Failed to import tcim_lite, please install runtime sdk!")
             exit()
 
-        tcim_dll_path = os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "bin")
-        utils_lib_path = os.path.join(self.all_environments["HOUMO_EXAMPLES_PATH"], "utils", "lib")
-        xh2a_dll_path = os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal\\lib")
+        tcim_dll_path = normalize_windows_path(
+            os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "bin")
+        )
+        utils_lib_path = normalize_windows_path(
+            os.path.join(self.all_environments["HOUMO_EXAMPLES_PATH"], "utils", "lib")
+        )
+        xh2a_dll_path = normalize_windows_path(
+            os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal", "lib")
+        )
         env_paths = self.env_manager.get_user_path()
         for env in env_paths:
             if env == "":
@@ -194,7 +206,9 @@ class WinEnvironsGenerater:
 
         if tcim_dll_path not in self.all_environments["PATH"] and tcim_dll_path != "":
             self.all_environments["PATH"] = f"{tcim_dll_path};" + self.all_environments["PATH"]
-            python_exe_path = os.path.abspath(os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "../../Scripts"))
+            python_exe_path = normalize_windows_path(
+                os.path.abspath(os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "../../Scripts"))
+            )
             if python_exe_path not in self.all_environments["PATH"] and python_exe_path != "":
                 self.all_environments["PATH"] = f"{python_exe_path};" + self.all_environments["PATH"]
 
