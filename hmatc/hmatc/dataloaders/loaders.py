@@ -36,7 +36,13 @@ class BaseDataLoader:
     """Base class for model input data loaders."""
 
     def __init__(
-        self, data_dir=None, model_cfg=None, inputs_cfg=None, stage=None, num=0, dataset=None
+        self,
+        data_dir=None,
+        model_cfg=None,
+        inputs_cfg=None,
+        stage=None,
+        num=0,
+        dataset=None,
     ):
         self.data_dir = data_dir
         self.model_cfg = model_cfg or {}
@@ -80,7 +86,13 @@ class NpzDataLoader(BaseDataLoader):
     """Load preprocessed model inputs from .npz files."""
 
     def __init__(
-        self, data_dir=None, model_cfg=None, inputs_cfg=None, stage=None, num=0, dataset=None
+        self,
+        data_dir=None,
+        model_cfg=None,
+        inputs_cfg=None,
+        stage=None,
+        num=0,
+        dataset=None,
     ):
         super().__init__(data_dir, model_cfg, inputs_cfg, stage, num, dataset)
         self.files = _find_files(data_dir, [".npz"])
@@ -118,7 +130,13 @@ class ImageDataLoader(BaseDataLoader):
     """Load single-input image data and apply configured preprocessing."""
 
     def __init__(
-        self, data_dir=None, model_cfg=None, inputs_cfg=None, stage=None, num=0, dataset=None
+        self,
+        data_dir=None,
+        model_cfg=None,
+        inputs_cfg=None,
+        stage=None,
+        num=0,
+        dataset=None,
     ):
         super().__init__(data_dir, model_cfg, inputs_cfg, stage, num, dataset)
         if len(self.inputs_cfg) != 1:
@@ -148,6 +166,11 @@ class ImageDataLoader(BaseDataLoader):
             hmonnx_data, dyn_info = preprocess_resizer_input(image, self.input_cfg)
             if dyn_info is not None and _to_numpy(dyn_info).size > 0:
                 meta["dyn_info"][self.input_name] = _to_numpy(dyn_info)
+        if self.stage == "quant":
+            data = _repeat_to_model_batch(data, self.input_cfg, self.input_name)
+            hmonnx_data = _repeat_to_model_batch(
+                hmonnx_data, self.input_cfg, self.input_name
+            )
         return {
             "inputs": {self.input_name: data},
             "hmonnx_inputs": {self.input_name: hmonnx_data},
@@ -237,7 +260,11 @@ def _normalize_dataset_record(record, dataset, index):
         normalized = {"path": record}
 
     image_ids = getattr(dataset, "image_ids", None)
-    if "image_id" not in normalized and image_ids is not None and index < len(image_ids):
+    if (
+        "image_id" not in normalized
+        and image_ids is not None
+        and index < len(image_ids)
+    ):
         normalized["image_id"] = image_ids[index]
 
     labels = getattr(dataset, "labels", None)
@@ -392,6 +419,21 @@ def _to_numpy(value):
     return value
 
 
+def _repeat_to_model_batch(data, input_cfg, input_name):
+    """Repeat a single calibration image to the model's native batch size."""
+    data = _to_numpy(data)
+    expected_batch = input_cfg["shape"][0]
+    actual_batch = data.shape[0]
+    if actual_batch == expected_batch:
+        return data
+    if actual_batch != 1:
+        logger.fatal(
+            f"Calibration input '{input_name}' batch mismatch: "
+            f"got {actual_batch}, expected {expected_batch}"
+        )
+    return np.repeat(data, expected_batch, axis=0)
+
+
 def _ensure_hwc_uint8(data):
     data = _to_numpy(data)
     if data.dtype != np.uint8:
@@ -414,9 +456,10 @@ def random_resizer_input(input_cfg):
     resizer_input_size = resizer_cfg.get("resizer_input_size", [height, width])
     resizer_input_h, resizer_input_w = resizer_input_size
     random_bgr = torch.from_numpy(
-        gen_random_data([batch, channels, resizer_input_h, resizer_input_w], "uint8")
+        gen_random_data([1, channels, resizer_input_h, resizer_input_w], "uint8")
     )
     random_yuv = convert_bgr_to_yuv(random_bgr, to_yuv_format, to_NCHW=True).numpy()
+    random_yuv = np.repeat(random_yuv, batch, axis=0)
 
     if resizer_mode == 1:
         dyn_info = np.array(

@@ -158,18 +158,24 @@ def convert_bgr_to_yuv(im, fmt="YUV420SP", to_NCHW=False):
     Returns:
         Converted image in YUV format
     """
+    if im.ndim != 4:
+        raise ValueError(f"Expected NCHW image tensor, got shape {list(im.shape)}")
+
     n, c, h, w = im.shape
     if fmt == "YUV400":
-        assert len(im.shape) == 2
-        h, w = im.shape
-        yuv_im = im.view(h, w, 1)  # HWC
+        if c != 1:
+            raise ValueError(f"YUV400 expects one input channel, got {c}")
+        yuv_im = im.permute(0, 2, 3, 1).contiguous()
     else:
-        im_chw = torch.squeeze(im, dim=0).type(torch.float32)  # CHW
-        yuv_im = BGR2YUV(fmt=fmt)(im_chw)
-        yuv_im = yuv_im.type(torch.uint8)  # HWC
+        if c != 3:
+            raise ValueError(f"{fmt} expects three input channels, got {c}")
+        converter = BGR2YUV(fmt=fmt)
+        yuv_im = torch.stack(
+            [converter(image.type(torch.float32)) for image in im], dim=0
+        ).type(torch.uint8)
     if to_NCHW:
-        yuv_im = yuv_im.view(n, c, h, w)
-    return yuv_im
+        return yuv_im.reshape(n, c, h, w)
+    return yuv_im[0] if n == 1 else yuv_im
 
 
 def default_preprocess(

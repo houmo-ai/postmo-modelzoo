@@ -236,7 +236,14 @@ class Xh2Exec(BaseExec):
         dynamic_inputs = []
 
         for input_name in self.inputs_cfg:
-            in_datas.append(torch.from_numpy(inputs[input_name]))
+            value = inputs[input_name]
+            expected_batch = self.inputs_cfg[input_name]["shape"][0]
+            if value.shape[0] != expected_batch:
+                raise ValueError(
+                    f"Quantization input '{input_name}' batch mismatch: "
+                    f"got {value.shape[0]}, expected {expected_batch}"
+                )
+            in_datas.append(torch.from_numpy(value))
             if input_name in dyn_info:
                 value = dyn_info[input_name]
                 if isinstance(value, np.ndarray):
