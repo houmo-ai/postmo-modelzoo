@@ -372,7 +372,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-load-store",
         action="store_true",
-        help="only emit xh2.te ops when building the model.",
+        help="only emit ops using te when building the model.",
     )
     args = parser.parse_args()
 
@@ -475,10 +475,11 @@ if __name__ == "__main__":
             "io_layout": "any",
             "enable_xh2_sparse_feature": enable_xh2_sparse_feature,
             "codegen_backend": "cpp-v1",
+            "march": "v1",
             "skip_check": True,
         }
         if args.no_load_store:
-            build_kwargs["emit_cpp_extra_args"] = "only-emit-op-list=xh2.te"
+            build_kwargs["emit_cpp_extra_args"] = "only-emit-op-list=xh2.te,xh2.pipelined_conv2d"
         tcim.build_from_hmonnx(hmonnx_model, **build_kwargs)
         shutil.copyfile(os.path.join(build_tmp_dir, "model.json"), json_path)
         print("Model built successfully.")
