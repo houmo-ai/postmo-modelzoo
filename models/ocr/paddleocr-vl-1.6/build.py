@@ -297,6 +297,7 @@ if __name__ == "__main__":
                 ncore=ncore,
                 flash_attn=vit_flash_attention,
                 parallel_jobs=j,
+                enable_common_subgraph=True,
             )
             Xh2Exec.build_from_hmonnx(
                 hmonnx=find_hmonnx_file(prefill_dir),
