@@ -151,3 +151,17 @@ def prepare_cpp_assets(
     if not convert_all_embeddings(str(input_path), str(output_path)):
         raise RuntimeError("Failed to convert all Qwen3-TTS embedding files")
     export_tokenizer(model_dir)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Convert Qwen3-TTS embedding files to binary format.")
+    parser.add_argument("--input_dir", required=True, help="Directory containing embedding .pt files")
+    parser.add_argument("--output_dir", default=None, help="Directory for generated .bin files")
+    args = parser.parse_args()
+
+    output_dir = args.output_dir or args.input_dir
+    return 0 if convert_all_embeddings(args.input_dir, output_dir) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
