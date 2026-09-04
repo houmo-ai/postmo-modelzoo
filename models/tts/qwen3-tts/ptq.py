@@ -22,6 +22,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import multiprocessing as mp
+
+mp.set_start_method("spawn", force=True)
+
 import os
 import argparse
 import json
@@ -29,6 +33,7 @@ import math
 import shutil
 import time
 import types
+import traceback
 from pathlib import Path
 from typing import cast
 
@@ -117,9 +122,7 @@ def get_tts_model_type(model_name: str, model_size: str) -> str:
 
     if model_key == "qwen3-tts" and normalized.endswith("-base"):
         return "base"
-    if model_key == "qwen3-tts" and (
-        normalized.endswith("-customvoice") or normalized.endswith("-custom-voice")
-    ):
+    if model_key == "qwen3-tts" and (normalized.endswith("-customvoice") or normalized.endswith("-custom-voice")):
         return "custom_voice"
 
     raise ValueError(
@@ -135,16 +138,13 @@ def is_base_model(model_name: str, model_size: str) -> bool:
 
 def parse_models_arg(models_str: str) -> list[str]:
     """
-    解析 --models 参数，返回要量化的模型列表。
-
+    Parse --models and return the exporters to run.
     Args:
-        models_str: 逗号分隔的模型名称字符串，或 "all" 表示全部模型
-
+        models_str: Comma-separated exporter names, or "all" for every exporter.
     Returns:
-        要量化的模型名称列表
-
+        Exporter names to run.
     Raises:
-        ValueError: 如果指定的模型名称不在支持列表中
+        ValueError: If an exporter name is not supported.
     """
     if models_str.lower() == "all":
         return SUPPORTED_MODELS.copy()
@@ -152,10 +152,7 @@ def parse_models_arg(models_str: str) -> list[str]:
     models = [m.strip().lower() for m in models_str.split(",")]
     invalid_models = [m for m in models if m not in SUPPORTED_MODELS]
     if invalid_models:
-        raise ValueError(
-            f"Invalid model(s): {invalid_models}. "
-            f"Supported models are: {SUPPORTED_MODELS}"
-        )
+        raise ValueError(f"Invalid model(s): {invalid_models}. " f"Supported models are: {SUPPORTED_MODELS}")
     return models
 
 
@@ -167,14 +164,14 @@ def export_golden(
     logger,
 ) -> None:
     """
-    使用 HMONNXGoldenInference 对 ONNX/HMONNX 模型生成 golden 数据。
+    Generate golden data for an ONNX/HMONNX model with HMONNXGoldenInference.
 
     Args:
-        onnx_path: ONNX 或 HMONNX 模型文件路径
-        inputs: 输入张量元组
-        golden_dir: golden 数据输出目录
-        exec_device: 执行设备 ("cuda" 或 "cpu")
-        logger: 日志记录器
+        onnx_path: Path to the ONNX or HMONNX model.
+        inputs: Tuple of input tensors.
+        golden_dir: Directory for generated golden data.
+        exec_device: Execution device ("cuda" or "cpu").
+        logger: Logger instance.
     """
 
     def _flatten_inputs(input_args):
@@ -201,9 +198,7 @@ def export_golden(
     logger.info(f"Generating golden data for {onnx_path}...")
     golden_model = HMONNXGoldenInference(str(onnx_path))
     golden_model.save_golden = True
-    golden_model.exec_device = torch.device(
-        exec_device if torch.cuda.is_available() else "cpu"
-    )
+    golden_model.exec_device = torch.device(exec_device if torch.cuda.is_available() else "cpu")
     golden_model.golden_dir = str(golden_dir)
 
     with torch.no_grad():
@@ -219,13 +214,13 @@ def copy_embedding_file(
     logger,
 ) -> None:
     """
-    复制 embedding 文件到 output_dir 根目录并重命名。
+    Copy an embedding file to the output root with a new name.
 
     Args:
-        src_path: 源文件路径
-        output_dir: 目标输出目录
-        dst_name: 目标文件名
-        logger: 日志记录器
+        src_path: Source file path.
+        output_dir: Destination output directory.
+        dst_name: Destination file name.
+        logger: Logger instance.
     """
     if src_path.exists():
         dst = Path(output_dir) / dst_name
@@ -240,13 +235,13 @@ def copy_golden_files(
     logger,
 ) -> None:
     """
-    复制 golden 数据文件到 output_dir 下。
+    Copy golden data files into a subdirectory under output_dir.
 
     Args:
-        src_dir: 源目录（包含 .npy 文件）
-        output_dir: 目标输出目录
-        dst_subdir: 目标子目录名（通常为 "step_0"）
-        logger: 日志记录器
+        src_dir: Source directory containing .npy files.
+        output_dir: Destination output directory.
+        dst_subdir: Destination subdirectory, usually "step_0".
+        logger: Logger instance.
     """
     if not src_dir.exists():
         logger.warning(f"Golden source directory not found: {src_dir}")
@@ -271,20 +266,20 @@ def generate_hmquant_filename(
     phase: str = None,
 ) -> str:
     """
-    生成 hmquant 格式的文件名。
+    Generate a file name in the hmquant naming convention.
 
-    格式: hmquant_<model_name>-<model_size>_<quant_type>_<length_info>_<sub_model_name>_<phase>.onnx
+    Format: hmquant_<model_name>-<model_size>_<quant_type>_<length_info>_<sub_model_name>_<phase>.onnx
 
     Args:
-        model_name: 模型名称，如 "qwen3-tts"
-        model_size: 模型大小，如 "0.6B"
-        quant_type: 量化类型，如 "int8"
-        sub_model_name: 子模型名称，如 "talker", "code_predictor"
-        length_info: 长度信息，如 "seq256", "seq1"（可选）
-        phase: 阶段，如 "prefill", "decode"（可选）
+        model_name: Model name, such as "qwen3-tts".
+        model_size: Model size, such as "0.6B".
+        quant_type: Quantization type, such as "int8".
+        sub_model_name: Sub-model name, such as "talker" or "code_predictor".
+        length_info: Optional length information, such as "seq256" or "seq1".
+        phase: Optional phase, such as "prefill" or "decode".
 
     Returns:
-        生成的文件名
+        Generated file name.
     """
     parts = [f"hmquant_{model_name}-{model_size}_{quant_type}"]
     if length_info:
@@ -303,14 +298,14 @@ def copy_onnx_model(
     logger,
 ) -> None:
     """
-    复制 ONNX 模型目录到 output_dir 下，并重命名模型文件。
+    Copy an ONNX model directory into output_dir and rename the model file.
 
     Args:
-        src_dir: 源目录（包含 onnx 文件和 external_data）
-        output_dir: 目标输出目录
-        dst_subdir: 目标子目录名
-        hmquant_filename: 目标 onnx 文件名（hmquant 格式）
-        logger: 日志记录器
+        src_dir: Source directory containing the ONNX file and external data.
+        output_dir: Destination output directory.
+        dst_subdir: Destination subdirectory.
+        hmquant_filename: Target ONNX file name in hmquant format.
+        logger: Logger instance.
     """
     if not src_dir.exists():
         logger.warning(f"Source directory not found: {src_dir}")
@@ -319,11 +314,11 @@ def copy_onnx_model(
     dst_dir = Path(output_dir) / dst_subdir
     dst_dir.mkdir(exist_ok=True, parents=True)
 
-    # 复制所有文件，并将 onnx 文件重命名为 hmquant 格式
+    # Copy all files and rename the ONNX file to the hmquant name.
     for src_file in src_dir.iterdir():
         if src_file.is_file():
             if src_file.suffix == ".onnx":
-                # 重命名 onnx 为 hmquant 格式
+                # Rename the ONNX file to the hmquant name.
                 dst_file = dst_dir / hmquant_filename
             else:
                 dst_file = dst_dir / src_file.name
@@ -347,14 +342,14 @@ def copy_hmonnx_model(
     logger,
 ) -> None:
     """
-    复制 hmonnx 模型到 output_dir 下。
+    Copy an HMONNX model directory into output_dir.
 
     Args:
-        src_dir: 源目录（hmonnx）
-        output_dir: 目标输出目录
-        dst_subdir: 目标子目录名
-        hmquant_filename: 目标 onnx 文件名（hmquant 格式）
-        logger: 日志记录器
+        src_dir: Source HMONNX directory.
+        output_dir: Destination output directory.
+        dst_subdir: Destination subdirectory.
+        hmquant_filename: Target HMONNX file name in hmquant format.
+        logger: Logger instance.
     """
     if not src_dir.exists():
         logger.warning(f"Source directory not found: {src_dir}")
@@ -363,11 +358,11 @@ def copy_hmonnx_model(
     dst_dir = Path(output_dir) / dst_subdir
     dst_dir.mkdir(exist_ok=True, parents=True)
 
-    # 复制所有文件，并将 onnx 文件重命名为 hmquant 格式
+    # Copy all files and rename the ONNX file to the hmquant name.
     for src_file in src_dir.iterdir():
         if src_file.is_file():
             if src_file.suffix == ".onnx":
-                # 重命名 onnx 为 hmquant 格式
+                # Rename the ONNX file to the hmquant name.
                 dst_file = dst_dir / hmquant_filename
             else:
                 dst_file = dst_dir / src_file.name
@@ -406,9 +401,7 @@ class SpeechTokenizerEncodeWrapper(nn.Module):
         position_ids = cache_position.unsqueeze(0)
         q_idx = torch.arange(seq_len, device=device, dtype=torch.long).unsqueeze(1)
         kv_idx = torch.arange(seq_len, device=device, dtype=torch.long).unsqueeze(0)
-        causal_mask = (
-            torch.where(kv_idx <= q_idx, 0.0, -10000.0).unsqueeze(0).unsqueeze(0)
-        )
+        causal_mask = torch.where(kv_idx <= q_idx, 0.0, -10000.0).unsqueeze(0).unsqueeze(0)
 
         for layer in self.encoder_transformer.layers:
             hidden = layer(
@@ -427,10 +420,9 @@ class SpeechTokenizerEncodeWrapper(nn.Module):
         audio_codes = audio_codes.transpose(0, 1)[:, : self.valid_num_quantizers]
         audio_codes = audio_codes.transpose(1, 2).to(torch.int32)
         valid_samples = padding_mask.to(torch.int64).sum(dim=1)
-        valid_frames = (
-            (valid_samples + self.encode_downsample_rate - 1)
-            // self.encode_downsample_rate
-        ).to(torch.int32)
+        valid_frames = ((valid_samples + self.encode_downsample_rate - 1) // self.encode_downsample_rate).to(
+            torch.int32
+        )
         return audio_codes, valid_frames
 
 
@@ -450,9 +442,7 @@ def _patch_mimi_conv1d_static_padding(module: nn.Module) -> None:
 
     def static_forward(self, hidden_states, padding_cache=None):
         if not self.causal and padding_cache is not None:
-            raise ValueError(
-                "`padding_cache` is not supported for non-causal convolutions."
-            )
+            raise ValueError("`padding_cache` is not supported for non-causal convolutions.")
         if padding_cache is not None:
             layer_padding_cache = padding_cache.update(hidden_states, self.layer_idx)
             hidden_states = torch.cat([layer_padding_cache, hidden_states], dim=2)
@@ -489,9 +479,7 @@ def _patch_mimi_codebook_matmul_distance(module: nn.Module) -> None:
         embed = self.embed.float()
         hidden_norm = hidden_states.square().sum(dim=-1, keepdim=True)
         embed_norm = embed.square().sum(dim=-1).unsqueeze(0)
-        dists = (
-            hidden_norm + embed_norm - 2.0 * hidden_states.matmul(embed.transpose(0, 1))
-        )
+        dists = hidden_norm + embed_norm - 2.0 * hidden_states.matmul(embed.transpose(0, 1))
         return dists.argmin(dim=-1)
 
     for submodule in module.modules():
@@ -537,8 +525,7 @@ def _run_generate(hf_model, args: argparse.Namespace):
     text = "基于先进的存算一体技术和存储工艺，后摩智能致力于突破芯片的性能与功耗瓶颈，加速人工智能技术的普惠落地"
     if is_base_model(args.model_name, args.model_size):
         assert Path(args.ref_audio).exists(), (
-            f"Reference audio not found: {args.ref_audio}\n"
-            f"Please provide a valid path via --ref_audio"
+            f"Reference audio not found: {args.ref_audio}\n" f"Please provide a valid path via --ref_audio"
         )
         return hf_model.generate_voice_clone(
             text=text,
@@ -574,9 +561,7 @@ def _capture_feature_dim(hf_model, hook_target, args: argparse.Namespace) -> int
     return feature_dim
 
 
-def _run_ptq(
-    xh_model, data_batch: dict, target_device: str, exec_device: str, logger
-) -> list:
+def _run_ptq(xh_model, data_batch: dict, target_device: str, exec_device: str, logger) -> list:
     """Frontend graph → quant graph → PTQ calibration. Returns flattened calib_data."""
     xh_model.convert_to_fronted_graph(data_batch)
     torch.cuda.empty_cache()
@@ -622,9 +607,7 @@ def xhmodel_export_onnx(
 
 def _resolve_tokenizer_dir(model_dir: str) -> str:
     speech_tokenizer_dir = Path(model_dir) / "speech_tokenizer"
-    return str(
-        speech_tokenizer_dir if speech_tokenizer_dir.exists() else Path(model_dir)
-    )
+    return str(speech_tokenizer_dir if speech_tokenizer_dir.exists() else Path(model_dir))
 
 
 def _export_static_onnx(
@@ -650,9 +633,7 @@ def _export_static_onnx(
             try:
                 torch.onnx.export(**export_kwargs, dynamo=True)
             except Exception as exc:
-                logger.warning(
-                    f"Dynamo ONNX export failed for {onnx_file}, retrying legacy tracer: {exc}"
-                )
+                logger.warning(f"Dynamo ONNX export failed for {onnx_file}, retrying legacy tracer: {exc}")
                 torch.onnx.export(**export_kwargs, dynamo=False)
         else:
             torch.onnx.export(**export_kwargs, dynamo=False)
@@ -688,9 +669,7 @@ def export_speech_tokenizer_encoder(args: argparse.Namespace) -> None:
     tokenizer_dir = _resolve_tokenizer_dir(cfg.hf_model_dir)
 
     logger.info(f"Loading Qwen3TTSTokenizerV2Model from {tokenizer_dir}")
-    tokenizer_model = (
-        Qwen3TTSTokenizerV2Model.from_pretrained(tokenizer_dir).float().cpu().eval()
-    )
+    tokenizer_model = Qwen3TTSTokenizerV2Model.from_pretrained(tokenizer_dir).float().cpu().eval()
     tokenizer_model.config._attn_implementation = "eager"
     tokenizer_model.encoder.config._attn_implementation = "eager"
     tokenizer_model.encoder.encoder_transformer.config._attn_implementation = "eager"
@@ -698,12 +677,8 @@ def export_speech_tokenizer_encoder(args: argparse.Namespace) -> None:
     _patch_mimi_codebook_matmul_distance(tokenizer_model.encoder.quantizer)
 
     wrapper = SpeechTokenizerEncodeWrapper(tokenizer_model).float().cpu().eval()
-    input_values = torch.zeros(
-        args.batch, args.frontend_audio_samples, dtype=torch.float32
-    )
-    padding_mask = torch.ones(
-        args.batch, args.frontend_audio_samples, dtype=torch.int32
-    )
+    input_values = torch.zeros(args.batch, args.frontend_audio_samples, dtype=torch.float32)
+    padding_mask = torch.ones(args.batch, args.frontend_audio_samples, dtype=torch.int32)
     dummy_inputs = (input_values, padding_mask)
 
     onnx_dir = work_dir / "onnx"
@@ -754,9 +729,7 @@ def export_speech_tokenizer_encoder(args: argparse.Namespace) -> None:
         "audio_samples": int(args.frontend_audio_samples),
         "input_sample_rate": int(tokenizer_model.input_sample_rate),
         "encode_downsample_rate": int(tokenizer_model.encode_downsample_rate),
-        "encoder_valid_num_quantizers": int(
-            tokenizer_model.encoder_valid_num_quantizers
-        ),
+        "encoder_valid_num_quantizers": int(tokenizer_model.encoder_valid_num_quantizers),
         "interfaces": {
             "speech_tokenizer_encode": {
                 "inputs": [
@@ -765,16 +738,13 @@ def export_speech_tokenizer_encoder(args: argparse.Namespace) -> None:
                 ],
                 "outputs": ["audio_codes: int32[B, T, 16]", "valid_frames: int32[B]"],
                 "note": (
-                    "Crop audio_codes by valid_frames. valid_frames = "
-                    "ceil(valid_samples / encode_downsample_rate)."
+                    "Crop audio_codes by valid_frames. valid_frames = " "ceil(valid_samples / encode_downsample_rate)."
                 ),
             }
         },
     }
     if args.dump_golden:
-        meta["speech_tokenizer_encode_golden_dir"] = str(
-            golden_dir.relative_to(work_dir)
-        )
+        meta["speech_tokenizer_encode_golden_dir"] = str(golden_dir.relative_to(work_dir))
     with open(work_dir / "meta.json", "w") as f:
         json.dump(meta, f, indent=4)
 
@@ -918,9 +888,7 @@ def export_speaker_encoder(args: argparse.Namespace) -> None:
             logger,
         )
         if args.dump_golden:
-            copy_golden_files(
-                golden_dir, args.output_dir, "speaker_encoder/step_0", logger
-            )
+            copy_golden_files(golden_dir, args.output_dir, "speaker_encoder/step_0", logger)
 
 
 def export_talker(args: argparse.Namespace) -> None:
@@ -1191,9 +1159,7 @@ def export_code_predictor(args: argparse.Namespace) -> None:
     assert isinstance(hf_model, XHQwen3TTSModel)
     hf_model = cast(XHQwen3TTSModel, hf_model)
 
-    feature_dim = _capture_feature_dim(
-        hf_model, hf_model.model.talker.code_predictor, args
-    )
+    feature_dim = _capture_feature_dim(hf_model, hf_model.model.talker.code_predictor, args)
 
     token_embedding = hf_model.model.talker.code_predictor.get_input_embeddings()
     token_embedding_file = Path(cfg.work_dir) / "token_embedding.pt"
@@ -1383,9 +1349,7 @@ def export_text_projection(args: argparse.Namespace) -> None:
         feature_dim = inputs[0].shape[-1]
         return inputs
 
-    text_projection_hook = (
-        hf_model.model.talker.text_projection.register_forward_pre_hook(_hook)
-    )
+    text_projection_hook = hf_model.model.talker.text_projection.register_forward_pre_hook(_hook)
 
     wavs, sr = _run_generate(hf_model, args)
     out_file = Path(work_dir) / "output_tts.wav"
@@ -1407,9 +1371,7 @@ def export_text_projection(args: argparse.Namespace) -> None:
 
     hmonnx_dir = Path(work_dir) / "hmonnx"
     hmonnx_dir.mkdir(exist_ok=True, parents=True)
-    text_projection_hmonnx_file = str(
-        hmonnx_dir / f"text_projection_{target_device}.onnx"
-    )
+    text_projection_hmonnx_file = str(hmonnx_dir / f"text_projection_{target_device}.onnx")
     convert_onnx_to_hmonnx(
         text_projection_onnx_file,
         [example_input.float().cpu()],
@@ -1430,9 +1392,7 @@ def export_text_projection(args: argparse.Namespace) -> None:
             logger,
         )
 
-    meta_info["hmonnx"] = str(
-        Path(text_projection_hmonnx_file).relative_to(Path(meta_file).parent)
-    )
+    meta_info["hmonnx"] = str(Path(text_projection_hmonnx_file).relative_to(Path(meta_file).parent))
     with open(meta_file, "w") as f:
         json.dump(meta_info, f, indent=4)
 
@@ -1460,9 +1420,7 @@ def export_text_projection(args: argparse.Namespace) -> None:
             )
 
 
-class XHQwen3TTSTokenizerV2DecoderTransformerModel(
-    Qwen3TTSTokenizerV2DecoderTransformerModel
-):
+class XHQwen3TTSTokenizerV2DecoderTransformerModel(Qwen3TTSTokenizerV2DecoderTransformerModel):
     """Export-friendly transformer: pre-computes attention masks and RoPE for static ONNX export."""
 
     def _setup(self, chunk_size=300):
@@ -1486,13 +1444,9 @@ class XHQwen3TTSTokenizerV2DecoderTransformerModel(
 
         if self.has_sliding_layers:
             sliding_attention = create_sliding_window_causal_mask(**mask_kwargs)
-            self.register_buffer(
-                "sliding_attention", sliding_attention, persistent=False
-            )
+            self.register_buffer("sliding_attention", sliding_attention, persistent=False)
 
-        hidden_states = torch.randn(
-            1, self.chunk_size, self.config.hidden_size, dtype=torch.float16
-        )
+        hidden_states = torch.randn(1, self.chunk_size, self.config.hidden_size, dtype=torch.float16)
         if torch.cuda.is_available():
             hidden_states = hidden_states.cuda()
         cos, sin = self.rotary_emb(hidden_states, position_ids.to(hidden_states.device))
@@ -1511,18 +1465,14 @@ class XHQwen3TTSTokenizerV2DecoderTransformerModel(
         position_ids = None
 
         if cache_position is None:
-            cache_position = torch.arange(
-                0, inputs_embeds.shape[1], device=inputs_embeds.device
-            )
+            cache_position = torch.arange(0, inputs_embeds.shape[1], device=inputs_embeds.device)
 
         if position_ids is None:
             position_ids = cache_position.unsqueeze(0)
 
         causal_mask_mapping = {
             "full_attention": self.full_attention,
-            "sliding_attention": (
-                self.sliding_attention if self.has_sliding_layers else None
-            ),
+            "sliding_attention": (self.sliding_attention if self.has_sliding_layers else None),
         }
         hidden_states = inputs_embeds
 
@@ -1593,9 +1543,7 @@ def export_speech_tokenizer(args: argparse.Namespace) -> None:
         input_dtype = inputs[0].dtype
         return inputs
 
-    decode_hook = (
-        hf_model.model.speech_tokenizer.model.decoder.register_forward_pre_hook(_hook)
-    )
+    decode_hook = hf_model.model.speech_tokenizer.model.decoder.register_forward_pre_hook(_hook)
     pre_transformer = hf_model.model.speech_tokenizer.model.decoder.pre_transformer
     pre_transformer.config._attn_implementation = "eager"
     wavs, sr = _run_generate(hf_model, args)
@@ -1611,9 +1559,7 @@ def export_speech_tokenizer(args: argparse.Namespace) -> None:
     for seq_len_in in tqdm(range(1, 301), desc="decoder padding shape validation"):
         dummy_input_shape = list(input_shape)
         dummy_input_shape[-1] = seq_len_in
-        dummy_input = torch.randint(
-            0, 100, dummy_input_shape, device=device, dtype=input_dtype
-        )
+        dummy_input = torch.randint(0, 100, dummy_input_shape, device=device, dtype=input_dtype)
 
         wav_out = hf_model.model.speech_tokenizer.model.decoder(dummy_input)
         actual_output_shape = list(wav_out.shape)
@@ -1637,9 +1583,7 @@ def export_speech_tokenizer(args: argparse.Namespace) -> None:
     speech_tokenizer_onnx_file = str(Path(work_dir) / "onnx" / "speech_tokenizer.onnx")
     pre_transformer = hf_model.model.speech_tokenizer.model.decoder.pre_transformer
     pre_transformer.__class__ = XHQwen3TTSTokenizerV2DecoderTransformerModel
-    pre_transformer = cast(
-        XHQwen3TTSTokenizerV2DecoderTransformerModel, pre_transformer
-    )
+    pre_transformer = cast(XHQwen3TTSTokenizerV2DecoderTransformerModel, pre_transformer)
     pre_transformer._setup()
     torch.onnx.export(
         hf_model.model.speech_tokenizer.model.decoder.float().cpu(),
@@ -1663,9 +1607,7 @@ def export_speech_tokenizer(args: argparse.Namespace) -> None:
 
     hmonnx_dir = Path(work_dir) / "hmonnx"
     hmonnx_dir.mkdir(exist_ok=True, parents=True)
-    speech_tokenizer_hmonnx_file = str(
-        hmonnx_dir / f"speech_tokenizer_{target_device}.onnx"
-    )
+    speech_tokenizer_hmonnx_file = str(hmonnx_dir / f"speech_tokenizer_{target_device}.onnx")
     convert_onnx_to_hmonnx(
         speech_tokenizer_onnx_file,
         [example_input.to(torch.int32).cpu()],
@@ -1781,15 +1723,9 @@ class StatefulDecoderPart2Transformer(torch.nn.Module):
         position_embeddings = self.trans.rotary_emb(hidden, position_ids)
 
         query_pos = (past_len + frame_idx).unsqueeze(1)
-        key_idx = torch.arange(
-            self.window_size, device=device, dtype=torch.long
-        ).unsqueeze(0)
+        key_idx = torch.arange(self.window_size, device=device, dtype=torch.long).unsqueeze(0)
         key_pos = past_len + self.chunk_size - self.window_size + key_idx
-        mask_cond = (
-            (key_pos >= 0)
-            & (key_pos <= query_pos)
-            & (key_pos > query_pos - self.window_size)
-        )
+        mask_cond = (key_pos >= 0) & (key_pos <= query_pos) & (key_pos > query_pos - self.window_size)
         attention_mask = torch.where(mask_cond, 0.0, -10000.0).unsqueeze(0).unsqueeze(0)
 
         for layer in self.trans.layers:
@@ -1836,9 +1772,7 @@ class StatefulDecoderPart3Upsample(torch.nn.Module):
         total_valid = latent_valid + valid_frames_f
         lookahead = torch.full_like(total_valid, float(self.lookahead_frames))
         is_last_f = is_last.to(torch.float32).view(1)
-        num_finalize_f = is_last_f * total_valid + (1.0 - is_last_f) * torch.clamp(
-            total_valid - lookahead, min=0.0
-        )
+        num_finalize_f = is_last_f * total_valid + (1.0 - is_last_f) * torch.clamp(total_valid - lookahead, min=0.0)
         num_finalize = num_finalize_f.to(torch.long)
         num_finalize_idx = num_finalize[0]
 
@@ -1856,19 +1790,10 @@ class StatefulDecoderPart3Upsample(torch.nn.Module):
 
         next_latent_buf = accumulated[:, :, -self.lookahead_frames :]
         batch, channels = accumulated.size(0), accumulated.size(1)
-        indices = torch.arange(
-            self.conv_history_window, device=device, dtype=torch.long
-        )
+        indices = torch.arange(self.conv_history_window, device=device, dtype=torch.long)
         latent_pad = (1.0 - has_history).to(torch.long).view(1) * self.lookahead_frames
-        target_indices = (
-            latent_pad + (num_finalize_idx - self.conv_history_window) + indices
-        )
-        gather_indices = (
-            torch.clamp(target_indices, min=0)
-            .unsqueeze(0)
-            .unsqueeze(0)
-            .expand(batch, channels, -1)
-        )
+        target_indices = latent_pad + (num_finalize_idx - self.conv_history_window) + indices
+        gather_indices = torch.clamp(target_indices, min=0).unsqueeze(0).unsqueeze(0).expand(batch, channels, -1)
         next_conv_hist = torch.gather(accumulated, 2, gather_indices)
         return final_wav, valid_samples, next_latent_buf, next_conv_hist
 
@@ -1913,7 +1838,7 @@ class StatefulDecoderCombined(torch.nn.Module):
 
 
 def export_stateful_decoder(args: argparse.Namespace) -> None:
-    """导出 stateful decoder 用于流式推理"""
+    """Export the stateful decoder used for streaming inference."""
     cfg_name = "qwen3_tts_stateful_decoder"
     chunk_size = getattr(args, "stateful_decoder_chunk_size", 12)
     head_dim = 64
@@ -1929,12 +1854,10 @@ def export_stateful_decoder(args: argparse.Namespace) -> None:
     xhquant_llm_init(log_file, args.debug)
     logger = get_root_logger()
 
-    # 加载 speech tokenizer 模型
+    # Load the speech tokenizer model used by the stateful decoder.
     model_dir = args.model_dir
     speech_tokenizer_dir = Path(model_dir) / "speech_tokenizer"
-    tokenizer_dir = str(
-        speech_tokenizer_dir if speech_tokenizer_dir.exists() else model_dir
-    )
+    tokenizer_dir = str(speech_tokenizer_dir if speech_tokenizer_dir.exists() else model_dir)
 
     logger.info(f"Loading Qwen3TTSTokenizerV2Model from {tokenizer_dir}")
     model = Qwen3TTSTokenizerV2Model.from_pretrained(tokenizer_dir).float().cpu().eval()
@@ -1946,17 +1869,10 @@ def export_stateful_decoder(args: argparse.Namespace) -> None:
         model.decoder.pre_transformer.config._attn_implementation = "eager"
         model.decoder.pre_transformer.config.head_dim = head_dim
 
-    wrapper = (
-        StatefulDecoderCombined(model.decoder, chunk_size=chunk_size)
-        .float()
-        .cpu()
-        .eval()
-    )
+    wrapper = StatefulDecoderCombined(model.decoder, chunk_size=chunk_size).float().cpu().eval()
     cfg = model.decoder.config
     num_layers = int(wrapper.num_layers)
-    num_heads = int(
-        getattr(cfg, "num_key_value_heads", getattr(cfg, "num_attention_heads", 16))
-    )
+    num_heads = int(getattr(cfg, "num_key_value_heads", getattr(cfg, "num_attention_heads", 16)))
 
     logger.info(
         f"StatefulDecoder: num_layers={num_layers}, num_heads={num_heads}, "
@@ -1973,9 +1889,7 @@ def export_stateful_decoder(args: argparse.Namespace) -> None:
     kv_valid_len_tensor = torch.tensor([0], dtype=torch.int32)
     valid_frames_tensor = torch.tensor([chunk_size], dtype=torch.int32)
     kv = [
-        torch.zeros(
-            batch, num_heads, wrapper.kv_cache_window, head_dim, dtype=torch.float32
-        )
+        torch.zeros(batch, num_heads, wrapper.kv_cache_window, head_dim, dtype=torch.float32)
         for _ in range(num_layers * 2)
     ]
     dummy_inputs = (
@@ -2123,6 +2037,38 @@ def export_stateful_decoder(args: argparse.Namespace) -> None:
             )
 
 
+EXPORT_FUNC_MAP = {
+    "speech_tokenizer_encoder": export_speech_tokenizer_encoder,
+    "speaker_encoder": export_speaker_encoder,
+    "code_predictor": export_code_predictor,
+    "talker": export_talker,
+    "speech_tokenizer": export_speech_tokenizer,
+    "text_projection": export_text_projection,
+    "stateful_decoder": export_stateful_decoder,
+}
+
+
+def _export_worker(model_name: str, args: argparse.Namespace) -> None:
+    try:
+        EXPORT_FUNC_MAP[model_name](args)
+    except Exception:
+        traceback.print_exc()
+        raise
+
+
+def _run_export_process(model_name: str, args: argparse.Namespace) -> None:
+    """Run one exporter in an isolated process to release native resources on exit."""
+    process = mp.get_context("spawn").Process(
+        target=_export_worker,
+        args=(model_name, args),
+        name=f"qwen3-tts-export-{model_name}",
+    )
+    process.start()
+    process.join()
+    if process.exitcode != 0:
+        raise RuntimeError(f"{model_name} export failed with exit code {process.exitcode}")
+
+
 def get_args() -> argparse.Namespace:
     """Parse commandline."""
     # fmt: off
@@ -2130,13 +2076,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
     parser.add_argument("--model_dir", type=str, default=None, help="HF model dir (auto-resolved from model_name/model_size if not set)")
     parser.add_argument("--work_dir", type=str, default="./work_dirs", help="Base working directory (model tag appended automatically)")
-    parser.add_argument("--output_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="输出目录，用于存放最终的量化产物。结构类似 output/xh2/hmquant")
-    parser.add_argument("--model_name", type=str, default=None, help="模型名称")
-    parser.add_argument("--model_size", type=str, default=None, help="模型大小")
+    parser.add_argument("--output_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="Output directory for final quantized artifacts")
+    parser.add_argument("--model_name", type=str, default=None, help="Model name")
+    parser.add_argument("--model_size", type=str, default=None, help="Model size")
     parser.add_argument("--batch", type=int, default=None, help="batch size")
-    parser.add_argument("--quant_type", type=str, default=None, help="量化类型，如 w8a16h1_sefp")
-    parser.add_argument("--max_sequence_length", type=int, default=2048, help="最大序列长度")
-    parser.add_argument("--input_sequence_length", type=int, default=256, help="prefill_length")
+    parser.add_argument("--quant_type", type=str, default=None, help="Quantization type, such as w8a16h1_sefp")
+    parser.add_argument("--max_sequence_length", type=int, default=2048, help="Maximum sequence length")
+    parser.add_argument("--input_sequence_length", type=int, default=256, help="Prefill sequence length")
     parser.add_argument("--code_predictor_max_sequence_length", type=int, default=18)
     parser.add_argument("--code_predictor_input_sequence_length", type=int, default=2)
     parser.add_argument("--stateful_decoder_chunk_size", type=int, default=12, help="stateful decoder chunk size (frames)")
@@ -2147,17 +2093,15 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--ref_audio", type=str, default=f"{HOUMO_EXAMPLES_PATH}/data/audio/clone_1.wav", help="Reference audio for base model voice clone")
     parser.add_argument("--ref_text", type=str, default="甚至出现交易几乎停滞的情况。", help="Reference text for base model voice clone")
     parser.add_argument("--models", type=str, default="all",
-                        help=f"指定要量化的模型，支持逗号分隔的多个模型名称: {SUPPORTED_MODELS}，或 'all' 表示全部模型")
-    parser.add_argument("--dump_golden", action="store_true", help="是否生成 golden 数据用于验证量化模型推理结果")
+                        help=f"Exporters to run, comma-separated from {SUPPORTED_MODELS}, or 'all' for every exporter")
+    parser.add_argument("--dump_golden", action="store_true", help="Generate golden data for model validation")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument("--seed", type=int, default=1024)
     # fmt: on
     args = parser.parse_args()
 
-    # 从 config.yaml 读取默认配置
-    default_model_size, default_model_name, model_configs = get_model_configs(
-        args.config_path
-    )
+    # Load model defaults from config.yaml.
+    default_model_size, default_model_name, model_configs = get_model_configs(args.config_path)
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
@@ -2172,9 +2116,7 @@ def get_args() -> argparse.Namespace:
     safe_model_tag = f"{args.model_name}_{args.model_size}".replace("/", "_")
     args.work_dir = f"{args.work_dir}_{safe_model_tag}"
 
-    args.quant_type = first_not_none(
-        args.quant_type, model_config.get("quant_type", "w8a16h1_sefp")
-    )
+    args.quant_type = first_not_none(args.quant_type, model_config.get("quant_type", "w8a16h1_sefp"))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     return args
 
@@ -2182,29 +2124,17 @@ def get_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = get_args()
 
-    # 解析要量化的模型列表
+    # Resolve the exporters selected by the user.
     requested_all = args.models.lower() == "all"
     models_to_export = parse_models_arg(args.models)
     if not is_base_model(args.model_name, args.model_size) and requested_all:
         models_to_export = [m for m in models_to_export if m not in BASE_ONLY_MODELS]
 
-    # 根据配置选择性地导出模型
-    if "speech_tokenizer_encoder" in models_to_export:
-        export_speech_tokenizer_encoder(args)
-    if "speaker_encoder" in models_to_export:
-        export_speaker_encoder(args)
-    if "code_predictor" in models_to_export:
-        export_code_predictor(args)
-    if "talker" in models_to_export:
-        export_talker(args)
-    if "speech_tokenizer" in models_to_export:
-        export_speech_tokenizer(args)
-    if "text_projection" in models_to_export:
-        export_text_projection(args)
-    if "stateful_decoder" in models_to_export:
-        export_stateful_decoder(args)
+    # Run selected exporters in isolated spawn processes to release native resources after each export.
+    for model_name in models_to_export:
+        _run_export_process(model_name, args)
 
-    # 非 debug 模式下清理 work_dir
+    # Remove temporary work files unless debug mode is enabled.
     if not args.debug:
         work_dir = Path(args.work_dir)
         if work_dir.exists():
