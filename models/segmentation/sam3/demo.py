@@ -4,7 +4,7 @@
 #
 # File: demo.py
 # Description:
-#   SAM3 segmentation demo with HMM backend.
+#   SAM3 segmentation demo with HMM and ONNX Runtime backends.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import cv2
 import numpy as np
 
 from hmatc.utils.utils import first_not_none, get_model_configs
+from eval_util import GOLD_GTS, evaluate_engine, locate_dataset
 from sam3_engine import SAM3Engine
 from sam3_processor import DEFAULT_MODEL_DIR
 
@@ -40,6 +41,15 @@ DEFAULT_CONFIG_PATH = CURRENT_DIR / "config.yml"
 SINGLE_BOX_XYWH = [480.0, 290.0, 110.0, 360.0]
 MULTI_BOX_XYWH = [SINGLE_BOX_XYWH, [370.0, 280.0, 115.0, 375.0]]
 MULTI_BOX_LABELS = [1, 0]
+RESULT_COLORS = [
+	(230, 159, 0),
+	(86, 180, 233),
+	(0, 158, 115),
+	(240, 228, 66),
+	(0, 114, 178),
+	(213, 94, 0),
+	(204, 121, 167),
+]
 
 
 def parse_bool(value: str) -> bool:
@@ -59,11 +69,42 @@ def default_image_path() -> str:
 
 def get_args() -> argparse.Namespace:
 	"""Parse commandline and resolve defaults from config.yml."""
-	parser = argparse.ArgumentParser(description="SAM3 HMM inference demo")
+	parser = argparse.ArgumentParser(description="SAM3 HMM/ONNX inference demo")
 	parser.add_argument("--config", dest="config_path", type=str, default=str(DEFAULT_CONFIG_PATH))
+	parser.add_argument(
+		"--backend",
+		type=str,
+		default="hmm",
+		choices=["hmm", "xh2", "onnx", "ort"],
+		help="inference backend; xh2 aliases hmm and ort aliases onnx",
+	)
 	parser.add_argument("--model_name", type=str, default=None, help="model name")
 	parser.add_argument("--model_size", type=str, default=None, help="model size")
-	parser.add_argument("--model", type=str, default=None, help="HMM model path")
+	parser.add_argument("--model", type=str, default=None, help="HMM or ONNX model path")
+	parser.add_argument(
+		"--eval",
+		action="store_true",
+		help="evaluate the selected subset on SA-Co Gold",
+	)
+	parser.add_argument(
+		"--dataset_path",
+		type=str,
+		default=None,
+		help="path to saco_gold or saco_gold.zip; auto-detected when omitted",
+	)
+	parser.add_argument(
+		"--subset",
+		type=str,
+		default="sa1b_nps",
+		choices=list(GOLD_GTS),
+		help="SA-Co Gold subset to evaluate",
+	)
+	parser.add_argument(
+		"--limit",
+		type=int,
+		default=200,
+		help="number of queries to evaluate; 0 means the complete subset",
+	)
 	parser.add_argument("--model_dir", type=Path, default=DEFAULT_MODEL_DIR, help="local SAM3 model directory")
 	parser.add_argument("--image", type=str, default=None, help="input image path")
 	parser.add_argument("--prompt", type=str, default="shoe", help="text prompt")
@@ -72,7 +113,7 @@ def get_args() -> argparse.Namespace:
 	parser.add_argument("--max_size_h", type=int, default=None, help="maximum image height")
 	parser.add_argument("--threshold", type=float, default=0.5, help="confidence threshold")
 	parser.add_argument("--mode", type=int, default=0, choices=[0, 1], help="0: result only, 1: all five results")
-	parser.add_argument("--output", type=str, default="demo_hmm_result.png", help="result image path")
+	parser.add_argument("--output", type=str, default=None, help="result image path")
 	parser.add_argument("--output_dir", type=str, default=None, help="directory for all five results")
 	parser.add_argument(
 		"--perf",
@@ -80,7 +121,7 @@ def get_args() -> argparse.Namespace:
 		nargs="?",
 		const=True,
 		default=True,
-		help="run HMM performance test (true/false)",
+		help="run backend performance test (true/false)",
 	)
 	parser.add_argument("--warmup", type=int, default=1, help="performance warmup count")
 	parser.add_argument("--repeat", type=int, default=1, help="performance repeat count")
@@ -94,38 +135,150 @@ def get_args() -> argparse.Namespace:
 	args.max_size_w = first_not_none(args.max_size_w, model_config.get("max_size_w", 1008))
 	args.max_size_h = first_not_none(args.max_size_h, model_config.get("max_size_h", 1008))
 	args.image = first_not_none(args.image, default_image_path())
-	hmm_name = (
+	model_shape_name = (
 		f"{args.model_name}_{args.model_size}_"
-		f"{args.max_size_w}x{args.max_size_h}.hmm"
+		f"{args.max_size_w}x{args.max_size_h}"
 	)
+	if args.backend in ("onnx", "ort"):
+		default_model = CURRENT_DIR / "work_dirs" / f"{model_shape_name}_sim.onnx"
+		default_output = "demo_onnx_result.png"
+	else:
+		default_model = CURRENT_DIR / "output" / HOUMO_TARGET / f"{model_shape_name}.hmm"
+		default_output = "demo_hmm_result.png"
 	args.model = first_not_none(
 		args.model,
-		str(CURRENT_DIR / "output" / HOUMO_TARGET / hmm_name),
+		str(default_model),
 	)
+	args.output = first_not_none(args.output, default_output)
 	return args
 
 
-def draw_results(image: np.ndarray, results, alpha: float = 0.45) -> np.ndarray:
-	"""Draw masks, boxes and scores on an image."""
+def run_evaluation(args: argparse.Namespace) -> None:
+	"""Evaluate ONNX first when available, then always evaluate the HMM model."""
+	if args.limit < 0:
+		raise ValueError("--limit must be greater than or equal to 0")
+	dataset_root = locate_dataset(args.dataset_path, CURRENT_DIR)
+	model_shape_name = (
+		f"{args.model_name}_{args.model_size}_"
+		f"{args.max_size_w}x{args.max_size_h}"
+	)
+	hmm_model = CURRENT_DIR / "output" / HOUMO_TARGET / f"{model_shape_name}.hmm"
+	if args.backend in ("hmm", "xh2") and args.model is not None:
+		hmm_model = Path(args.model)
+	if not hmm_model.is_file():
+		raise FileNotFoundError(f"HMM evaluation model not found: {hmm_model}")
+
+	onnx_model = CURRENT_DIR / "work_dirs" / f"{model_shape_name}_sim.onnx"
+	if onnx_model.is_file():
+		print(f"[info] Evaluating floating-point ONNX model: {onnx_model}")
+		onnx_engine = SAM3Engine(
+			backend="onnx",
+			model_dir=args.model_dir,
+			ndevice=args.ndevice,
+			threshold=args.threshold,
+			max_size_w=args.max_size_w,
+			max_size_h=args.max_size_h,
+		).load(str(onnx_model))
+		onnx_result = evaluate_engine(
+			onnx_engine,
+			dataset_root,
+			args.subset,
+			args.limit,
+			CURRENT_DIR / "work_dirs" / "eval_onnx",
+		)
+		print(f"[result] ONNX: {onnx_result}")
+	else:
+		print(
+			"[warning] Floating-point ONNX model does not exist.\n"
+			"[warning] Please run the quantization step to generate it.\n"
+			"[warning] The evaluation will continue with the hardware HMM model."
+		)
+
+	print(f"[info] Evaluating HMM model: {hmm_model}")
+	hmm_engine = SAM3Engine(
+		backend="hmm",
+		model_dir=args.model_dir,
+		ndevice=args.ndevice,
+		threshold=args.threshold,
+		max_size_w=args.max_size_w,
+		max_size_h=args.max_size_h,
+	).load(str(hmm_model))
+	hmm_result = evaluate_engine(
+		hmm_engine,
+		dataset_root,
+		args.subset,
+		args.limit,
+		CURRENT_DIR / "work_dirs" / "eval_hmm",
+	)
+	print(f"[result] HMM: {hmm_result}")
+
+
+def draw_results(
+	image: np.ndarray,
+	results,
+	alpha: float = 0.5,
+) -> np.ndarray:
+	"""Draw masks, matching boxes, and labeled confidence text."""
 	result = image.copy()
-	rng = np.random.default_rng(0)
 	for index, item in enumerate(results[:20]):
 		mask = item["mask"] > 0.5
-		color = rng.integers(64, 256, size=3, dtype=np.uint8)
+		color = np.asarray(
+			RESULT_COLORS[index % len(RESULT_COLORS)], dtype=np.uint8
+		)
 		result[mask] = (
 			result[mask].astype(np.float32) * (1.0 - alpha)
 			+ color.astype(np.float32) * alpha
 		).astype(np.uint8)
-		box = np.asarray(item["box"]).astype(int)
-		cv2.rectangle(result, tuple(box[:2]), tuple(box[2:]), (0, 255, 255), 2)
+		box = np.rint(item["box"]).astype(int)
+		box[[0, 2]] = np.clip(box[[0, 2]], 0, image.shape[1] - 1)
+		box[[1, 3]] = np.clip(box[[1, 3]], 0, image.shape[0] - 1)
+		box_color = tuple(int(value) for value in color)
+		cv2.rectangle(result, tuple(box[:2]), tuple(box[2:]), box_color, 2)
+
+		text = f"id={index}, prob={item['score']:.2f}"
+		font = cv2.FONT_HERSHEY_SIMPLEX
+		font_scale = max(0.3, min(0.4, min(image.shape[:2]) / 1800.0))
+		font_thickness = 1
+		(text_width, text_height), baseline = cv2.getTextSize(
+			text, font, font_scale, font_thickness
+		)
+		padding = 3
+		text_x = int(box[0])
+		text_y = int(box[1]) - 5
+		if text_y - text_height - padding < 0:
+			text_y = min(int(box[1]) + text_height + padding + 5, image.shape[0] - 1)
+		background_right = min(
+			text_x + text_width + padding * 2, image.shape[1] - 1
+		)
+		background_top = max(text_y - text_height - padding, 0)
+		background_bottom = min(text_y + baseline + padding, image.shape[0] - 1)
+		overlay = result.copy()
+		cv2.rectangle(
+			overlay,
+			(text_x, background_top),
+			(background_right, background_bottom),
+			(255, 255, 255),
+			-1,
+			cv2.LINE_8,
+		)
+		cv2.addWeighted(overlay, 0.75, result, 0.25, 0.0, result)
+		cv2.rectangle(
+			result,
+			(text_x, background_top),
+			(background_right, background_bottom),
+			(0, 0, 0),
+			1,
+			cv2.LINE_AA,
+		)
 		cv2.putText(
 			result,
-			f"{index}:{item['score']:.2f}",
-			(box[0], max(20, box[1] - 5)),
-			cv2.FONT_HERSHEY_SIMPLEX,
-			0.6,
-			(0, 255, 255),
-			2,
+			text,
+			(text_x + padding, text_y),
+			font,
+			font_scale,
+			box_color,
+			font_thickness,
+			cv2.LINE_AA,
 		)
 	return result
 
@@ -163,23 +316,30 @@ def save_image(path: Path, image: np.ndarray) -> None:
 	print(f"[info] Image saved to: {path}")
 
 
-def run_all_results(engine: SAM3Engine, image: np.ndarray, prompt: str, output_dir: Path) -> None:
+def run_all_results(
+	engine: SAM3Engine,
+	image: np.ndarray,
+	prompt: str,
+	output_dir: Path,
+) -> None:
 	"""Run text, single-box and multi-box cases and save five images."""
 	output_dir.mkdir(parents=True, exist_ok=True)
 	text_results = engine.infer(image, prompt)
 	single_results = engine.infer(image, "visual", [SINGLE_BOX_XYWH], [1])
 	multi_results = engine.infer(image, "visual", MULTI_BOX_XYWH, MULTI_BOX_LABELS)
-	save_result(output_dir / "01_text_prompt_result.png", image, text_results)
-	save_image(
-		output_dir / "02_single_box_prompt.png",
-		draw_prompt_boxes(image, [SINGLE_BOX_XYWH], [1]),
-	)
-	save_result(output_dir / "03_single_box_result.png", image, single_results)
-	save_image(
-		output_dir / "04_multi_box_prompt.png",
-		draw_prompt_boxes(image, MULTI_BOX_XYWH, MULTI_BOX_LABELS),
-	)
-	save_result(output_dir / "05_multi_box_result.png", image, multi_results)
+	images = {
+		"01_text_prompt_result.png": draw_results(image, text_results),
+		"02_single_box_prompt.png": draw_prompt_boxes(
+			image, [SINGLE_BOX_XYWH], [1]
+		),
+		"03_single_box_result.png": draw_results(image, single_results),
+		"04_multi_box_prompt.png": draw_prompt_boxes(
+			image, MULTI_BOX_XYWH, MULTI_BOX_LABELS
+		),
+		"05_multi_box_result.png": draw_results(image, multi_results),
+	}
+	for filename, result_image in images.items():
+		save_image(output_dir / filename, result_image)
 
 
 def print_performance(profile: dict[str, float], warmup: int, repeat: int) -> None:
@@ -195,12 +355,16 @@ def print_performance(profile: dict[str, float], warmup: int, repeat: int) -> No
 
 def main() -> None:
 	args = get_args()
+	if args.eval:
+		run_evaluation(args)
+		return
 	image = cv2.imread(args.image)
 	if image is None:
 		raise FileNotFoundError(f"Failed to read image: {args.image}")
 	print(f"[info] Image: {args.image}")
 	print(f"[info] Image size: {image.shape[1]}x{image.shape[0]}")
 	engine = SAM3Engine(
+		backend=args.backend,
 		model_dir=args.model_dir,
 		ndevice=args.ndevice,
 		threshold=args.threshold,

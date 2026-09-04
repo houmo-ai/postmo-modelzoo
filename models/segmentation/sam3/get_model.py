@@ -136,6 +136,7 @@ if __name__ == "__main__":
 			"max_size_w": max_size_w,
 			"max_size_h": max_size_h,
 		},
+		"raw_files": {"raw_path": "models/dataset/saco_gold.zip"},
 		"modelscope_repo": {
 			"repo_ids": model_config.get("modelscope_repo", []),
 			"local_dirs": [os.path.join(args.download_dir, default_model_dir)],

@@ -6,15 +6,16 @@
 
 ## 1 模型说明
 
-本例使用的模型实现和预训练权重来源于 Meta 的 SAM3 项目：
+本例使用的模型实现、评估器及预训练权重来源于 Meta 的 SAM3 项目：
 
 - 模型名称：SAM3
 - 默认模型规格：`sam3-0.8b`
 - ModelScope：[`facebook/sam3`](https://www.modelscope.cn/models/facebook/sam3)
 - 官方代码仓库：[`facebookresearch/sam3`](https://github.com/facebookresearch/sam3)
-- 模型许可：Meta SAM License，详见随模型下载的 `sam3/LICENSE` 以及上游仓库许可说明
+- 模型许可：[`Meta SAM License`](https://github.com/facebookresearch/sam3/blob/main/LICENSE)
+- 评估器：`cgf1_eval.py` 是基于 Meta SAM3 `sam3/eval/cgf1_eval.py` 的本地迁移版本；其版权、来源和修改说明见文件头，适用 [`Meta SAM License`](https://github.com/facebookresearch/sam3/blob/main/LICENSE)
 
-SAM3 模型和上游代码在运行时获取，工程发布默认**不包含**预训练权重。SAM3 的模型许可独立于本仓库示例代码的 Apache License 2.0；使用、下载或再分发模型及其衍生物前，请阅读并遵守上游 Meta SAM License 的全部条款。本仓库不对第三方模型的许可适用性作额外授权或保证。
+SAM3 模型和上游代码在运行时获取，工程发布默认**不包含**预训练权重。SAM3 的模型和迁移评估代码许可独立于本仓库示例代码的 Apache License 2.0；使用、下载或再分发模型、评估代码及其衍生物前，请阅读并遵守 [`Meta SAM License`](https://github.com/facebookresearch/sam3/blob/main/LICENSE) 的全部条款。本仓库不对第三方模型或评估代码的许可适用性作额外授权或保证。
 
 本例只适用于xh2。
 
@@ -34,7 +35,7 @@ SAM3 模型和上游代码在运行时获取，工程发布默认**不包含**�
 
 ### 模型架构
 
-SAM3 支持基于开放词汇文本提示以及视觉提示进行目标检测和实例分割。本示例使用 HMM 后端完成图像输入、提示处理和分割结果输出，默认文本提示为 `shoe`。
+SAM3 支持基于开放词汇文本提示以及视觉提示进行目标检测和实例分割。本示例支持 HMM 和 ONNX Runtime 后端完成图像输入、提示处理和分割结果输出，默认文本提示为 `shoe`。
 
 ### 资源要求
 
@@ -69,9 +70,9 @@ source sam3_venv/bin/activate
 pip install -r requirements.txt
 ```
 
-HMM/HMONNX 推理不依赖额外的 SAM3 源码仓库。示例通过 Transformers 从本地模型目录 `sam3/` 加载标准 CLIP tokenizer 资产，并使用本仓库独立实现的图像前处理、提示框组装和结果后处理。可通过 `demo.py --model_dir`指定其他包含完整 tokenizer 文件的本地模型目录。
+HMM/HMONNX 推理不依赖额外的 SAM3 源码仓库。示例从本地模型目录 `sam3/` 加载 tokenizer 资产，并使用本仓库实现的图像前处理、提示框组装和结果后处理。
 
-前后处理接口依据本地 SAM3 processor 配置及导出模型的输入输出约定实现，没有复制上游 `tokenizer_ve.py` 或 `visualization_utils.py` 源码。模型配置、tokenizer 资产和权重仍属于运行时获取的 SAM3 模型资产，适用上游 Meta SAM License；Transformers 作为用户安装的运行时依赖，适用其原始许可证。
+前后处理接口依据本地 SAM3 processor 配置及导出模型的输入输出约定实现，模型配置、tokenizer 资产和权重仍属于运行时获取的 SAM3 模型资产，适用上游 Meta SAM License；Transformers 作为用户安装的运行时依赖，适用其原始许可证。
 
 ### 2.2 获取模型和数据
 
@@ -95,11 +96,7 @@ python3 get_model.py --type hmm
 
 - `output/xh2/sam3_0.8b_1008x1008.hmm`
 
-演示默认使用的测试图片为：
-
-- `${HOUMO_EXAMPLES_PATH}/data/pic/sam3_test_image.jpg`
-
-如果未设置 `HOUMO_EXAMPLES_PATH`，脚本会使用仓库目录推导该图片路径；也可以通过 `demo.py --image` 显式指定输入图片。
+演示默认使用仓库中的测试图片，也可以通过 `demo.py --image` 显式指定输入图片。
 
 ### 2.3 量化
 
@@ -176,6 +173,19 @@ cd models/segmentation/sam3
 python3 demo.py --mode 1 --output_dir demo_results
 ```
 
+量化步骤生成原始 ONNX 后，可以使用 ONNX Runtime 验证相同的前后处理流程：
+
+```bash
+cd models/segmentation/sam3
+python3 demo.py --backend onnx --mode 1 --output_dir demo_onnx_results
+```
+
+ONNX Runtime 后端默认加载：
+
+- `work_dirs/sam3_0.8b_1008x1008_sim.onnx`
+
+也可以通过 `--model` 指定其他 ONNX 文件。HMM 后端仍为默认后端，`xh2` 是 `hmm` 的别名，`ort` 是 `onnx` 的别名。
+
 也可以显式关闭性能测试：
 
 ```bash
@@ -183,7 +193,25 @@ cd models/segmentation/sam3
 python3 demo.py --perf false
 ```
 
-## 3 一键评估
+### 2.6 数据集评估
+
+获取原始模型时会同时获取 `saco_gold.zip`。默认使用以下命令评估 `sa1b_nps` 子集的前 200 条数据：
+
+```bash
+cd models/segmentation/sam3
+source sam3_venv/bin/activate
+python3 demo.py \
+  --eval \
+  --subset sa1b_nps \
+  --limit 200 \
+  --perf false
+```
+
+`--limit 0` 表示评估整个子集，也可以通过 `--dataset_path` 指定数据集目录或压缩包。评估时会优先运行 `work_dirs/` 下的浮点 ONNX，再运行 HMM。若需评估浮点 ONNX，请先运行 `ptq.py` 导出 ONNX；如果浮点 ONNX 不存在，将直接运行 HMM 评估。HMM 模型不存在时评估失败。
+
+如数据集不存在，请运行python get_model.py --type raw下载数据集。
+
+## 3 一键流程
 
 当前 `test.sh` 支持下载、量化、编译和演示步骤。默认执行演示步骤；如需执行完整流程，请显式指定 `all`：
 
@@ -232,7 +260,7 @@ bash test.sh -s demo -name sam3 -size 0.8b
 
 - `demo_hmm_result.png`
 
-使用 `--mode 1 --output_dir demo_results` 时，会生成文本提示、单框提示和多框提示对应的五个结果文件。当前仓库尚未提供经过统一环境验证的 SAM3 参考图片结果，参考结果：暂无结果，待后续实测补充。
+使用 `--mode 1 --output_dir demo_hmm_results` 时，会生成文本提示、单框提示和多框提示对应的五个结果文件。
 
 ### 4.2 性能结果
 
@@ -252,6 +280,6 @@ throughput: 0.379 images/s
 
 - SAM3 官方代码仓库：<https://github.com/facebookresearch/sam3>
 - SAM3 ModelScope 模型：<https://www.modelscope.cn/models/facebook/sam3>
-- SAM3 模型许可：随模型下载的 `sam3/LICENSE`，以及上游仓库中的许可说明
+- SAM3 模型许可：<https://github.com/facebookresearch/sam3/blob/main/LICENSE>
 
 您应当自行判断是否使用上述第三方提供的软件、数据或模型，并自行承担相关风险。您还应在使用、下载或再分发 SAM3 模型及其衍生物前，阅读并遵守 Meta SAM License 的全部条款。如果您不同意上述声明或相关第三方许可，请不要使用相关软件、数据或模型。

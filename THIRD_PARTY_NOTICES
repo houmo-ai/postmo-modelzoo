@@ -21,6 +21,26 @@ Use of such components is at the user's own risk.
 
 1. Third-party open source libraries
 ----------------------------------------------------------------------
+SAM3 CGF1 evaluator
+----------------------------------------------------------------------
+
+Component Name: SAM3 CGF1 evaluator
+Original Source: https://github.com/facebookresearch/sam3
+Original File: sam3/eval/cgf1_eval.py
+License: Meta SAM License
+License URL: https://github.com/facebookresearch/sam3/blob/main/LICENSE
+
+Usage in this project:
+The evaluator is migrated and adapted into:
+    models/segmentation/sam3/cgf1_eval.py
+
+The local file retains the Meta copyright notice and identifies the HOUMO AI
+modifications. It is used only by the SAM3 SA-Co Gold evaluation flow. The
+SAM License is separate from this project's Apache License 2.0. Any copying,
+distribution, or derivative work must retain the SAM License and comply with
+its terms.
+
+----------------------------------------------------------------------
 half (half-precision floating-point library)
 ----------------------------------------------------------------------
 

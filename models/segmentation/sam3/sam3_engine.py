@@ -2,7 +2,7 @@
 #
 # File: sam3_engine.py
 # Description:
-#   SAM3 engine implementation with tcim_lite HMM backend.
+#   SAM3 engine implementation with HMM and ONNX Runtime backends.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,8 +41,14 @@ try:
 except ImportError:
 	tcim = None
 
+try:
+	import onnxruntime as ort  # type: ignore[import-not-found]
+except ImportError:
+	ort = None
+
 
 HMM_MODEL_NOT_LOADED = "HMM model has not been loaded"
+ORT_MODEL_NOT_LOADED = "ONNX model has not been loaded"
 
 
 class BaseRuntimeModel:
@@ -140,8 +146,101 @@ class HMMRuntimeModel(BaseRuntimeModel):
 		}
 
 
+class OrtRuntimeModel(BaseRuntimeModel):
+	"""ONNX Runtime wrapper with the same interface as HMMRuntimeModel."""
+
+	ORT_DTYPES = {
+		"tensor(float)": np.float32,
+		"tensor(float16)": np.float16,
+		"tensor(double)": np.float64,
+		"tensor(int64)": np.int64,
+		"tensor(int32)": np.int32,
+		"tensor(uint8)": np.uint8,
+		"tensor(bool)": np.bool_,
+	}
+
+	def __init__(self, output_names: list[str], providers=None):
+		super().__init__(output_names)
+		self.providers = providers
+		self.session = None
+		self.input_infos = {}
+		self.inputs: dict[str, np.ndarray] = {}
+		self.outputs: dict[str, np.ndarray] = {}
+
+	def load(self, model_path: str):
+		if ort is None:
+			raise ImportError(
+				"Please install onnxruntime before using the ONNX backend"
+			)
+		providers = self.providers or ["CPUExecutionProvider"]
+		self.session = ort.InferenceSession(model_path, providers=providers)
+		self.input_infos = {
+			model_input.name: model_input for model_input in self.session.get_inputs()
+		}
+		missing_outputs = set(self.output_names).difference(
+			output.name for output in self.session.get_outputs()
+		)
+		if missing_outputs:
+			raise ValueError(f"Missing ONNX outputs: {sorted(missing_outputs)}")
+		return self
+
+	@property
+	def input_names(self) -> set[str]:
+		return set(self.input_infos)
+
+	def input_shape(self, name: str) -> tuple[int, ...]:
+		return tuple(self.input_infos[name].shape)
+
+	def set_input(self, name, data):
+		if self.session is None:
+			raise RuntimeError(ORT_MODEL_NOT_LOADED)
+		input_type = self.input_infos[name].type
+		if input_type not in self.ORT_DTYPES:
+			raise TypeError(f"Unsupported ONNX input type for {name}: {input_type}")
+		self.inputs[name] = np.asarray(data, dtype=self.ORT_DTYPES[input_type])
+
+	def run(self):
+		if self.session is None:
+			raise RuntimeError(ORT_MODEL_NOT_LOADED)
+		values = self.session.run(self.output_names, self.inputs)
+		self.outputs = dict(zip(self.output_names, values))
+		self.inputs = {}
+
+	def get_output(self, name):
+		if self.session is None:
+			raise RuntimeError(ORT_MODEL_NOT_LOADED)
+		return self.outputs[name]
+
+	def infer(
+		self, inputs: dict[str, np.ndarray]
+	) -> tuple[dict[str, np.ndarray], dict[str, float]]:
+		if self.session is None:
+			raise RuntimeError(ORT_MODEL_NOT_LOADED)
+		missing = self.input_names.difference(inputs)
+		if missing:
+			raise ValueError(f"Missing ONNX inputs: {sorted(missing)}")
+
+		start = time.perf_counter()
+		for name in self.input_infos:
+			self.set_input(name, inputs[name])
+		set_input_ms = (time.perf_counter() - start) * 1000.0
+
+		start = time.perf_counter()
+		self.run()
+		infer_ms = (time.perf_counter() - start) * 1000.0
+
+		start = time.perf_counter()
+		outputs = {name: self.get_output(name) for name in self.output_names}
+		get_output_ms = (time.perf_counter() - start) * 1000.0
+		return outputs, {
+			"set_input_ms": set_input_ms,
+			"infer_ms": infer_ms,
+			"get_output_ms": get_output_ms,
+		}
+
+
 class SAM3Engine:
-	"""SAM3 image-grounding engine supporting old and new HMM interfaces."""
+	"""SAM3 image-grounding engine supporting HMM and ONNX backends."""
 
 	OUTPUTS = [
 		"pred_logits",
@@ -166,21 +265,24 @@ class SAM3Engine:
 		self.threshold = threshold
 		self.max_size_w = max_size_w
 		self.max_size_h = max_size_h
-		self.model: HMMRuntimeModel | None = None
+		self.model: HMMRuntimeModel | OrtRuntimeModel | None = None
 		self.tokenizer = None
 		self.last_profile: dict[str, float] = {}
 
 	def load(self, model_path: str):
-		if self.backend not in ("hmm", "xh2"):
-			raise ValueError(f"Unsupported backend: {self.backend}")
 		if not Path(model_path).is_file():
 			raise FileNotFoundError(f"model not found: {model_path}")
 		print(f"[info] Backend: {self.backend}")
 		print(f"[info] Loading model: {model_path}")
 		start = time.perf_counter()
-		self.model = HMMRuntimeModel(self.OUTPUTS, self.ndevice).load(model_path)
+		if self.backend in ("hmm", "xh2"):
+			self.model = HMMRuntimeModel(self.OUTPUTS, self.ndevice).load(model_path)
+		elif self.backend in ("onnx", "ort"):
+			self.model = OrtRuntimeModel(self.OUTPUTS).load(model_path)
+		else:
+			raise ValueError(f"Unsupported backend: {self.backend}")
 		self.last_profile = {"load_ms": (time.perf_counter() - start) * 1000.0}
-		print(f"[info] HMM inputs: {sorted(self.model.input_names)}")
+		print(f"[info] Model inputs: {sorted(self.model.input_names)}")
 		self._load_tokenizer()
 		return self
 
@@ -307,7 +409,13 @@ class SAM3Engine:
 		}
 		return outputs
 
-	def postprocess(self, outputs, orig_height: int, orig_width: int):
+	def postprocess(
+		self,
+		outputs,
+		orig_height: int,
+		orig_width: int,
+		ensure_one: bool = True,
+	):
 		logits = outputs["pred_logits"][0, :, 0].astype(np.float32)
 		presence = outputs["presence_logit_dec"].reshape(-1).astype(np.float32)[0]
 		scores = 1.0 / (1.0 + np.exp(-np.clip(logits, -20.0, 20.0)))
@@ -316,7 +424,7 @@ class SAM3Engine:
 		boxes = outputs["pred_boxes_xyxy"][0].astype(np.float32)
 		masks = outputs["pred_masks"][0].astype(np.float32)
 		indices = np.nonzero(scores >= self.threshold)[0]
-		if len(indices) == 0:
+		if len(indices) == 0 and ensure_one:
 			indices = np.argsort(scores)[-1:]
 		results = []
 		for index in indices:
@@ -338,10 +446,19 @@ class SAM3Engine:
 			)
 		return results
 
-	def infer(self, image, prompt, boxes_xywh=None, box_labels=None):
+	def infer(
+		self,
+		image,
+		prompt,
+		boxes_xywh=None,
+		box_labels=None,
+		ensure_one: bool = True,
+	):
 		orig_height, orig_width = image.shape[:2]
 		outputs = self.infer_raw(image, prompt, boxes_xywh, box_labels)
-		return self.postprocess(outputs, orig_height, orig_width)
+		return self.postprocess(
+			outputs, orig_height, orig_width, ensure_one=ensure_one
+		)
 
 	def benchmark(
 		self,
@@ -350,7 +467,7 @@ class SAM3Engine:
 		warmup: int = 1,
 		repeat: int = 10,
 	) -> dict[str, float]:
-		"""Benchmark HMM input setup, inference, and output retrieval."""
+		"""Benchmark runtime input setup, inference, and output retrieval."""
 		if self.model is None:
 			raise RuntimeError(HMM_MODEL_NOT_LOADED)
 		if warmup < 0 or repeat < 1:
