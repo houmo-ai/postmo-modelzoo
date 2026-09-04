@@ -492,7 +492,10 @@ class HmPaddleOCRVL:
         info = self.vision.get_input_info(name)
         data = pixel_values.unsqueeze(1).numpy().astype(_dtype(info)) if pixel_values.ndim == 4 else pixel_values.numpy().astype(_dtype(info))
         if data.shape != tuple(info.shape):
-            data = data.reshape(info.shape)
+            raise ValueError(
+                "Processor visual input shape does not match the loaded graph: "
+                f"processor={data.shape}, graph={tuple(info.shape)}"
+            )
         self.perf_tracker.perf_start(PERFTYPE.VISION_INPUT_TIME)
         self.vision.set_input(name, data)
         self.perf_tracker.perf_end(PERFTYPE.VISION_INPUT_TIME)
@@ -587,7 +590,23 @@ class HmPaddleOCRVL:
             logits = self._run_timed_prefill(chunk, pos, current)
             if logits.ndim == 2:
                 logits = logits.reshape(1, logits.shape[0], logits.shape[1])
-            next_id = int(logits[0, -1].argmax())
+            if logits.ndim != 3 or logits.shape[0] != 1:
+                raise ValueError(f"Unexpected prefill logits shape: {tuple(logits.shape)}")
+            logits_length = int(logits.shape[1])
+            if logits_length == 1:
+                next_logits = logits[0, 0]
+            elif current <= logits_length:
+                # The last prefill chunk is padded to the static graph length.
+                # Its next-token logits are at the last real token, not at the
+                # padded tail.  This matters for resolutions whose image-token
+                # count does not make the prompt length a multiple of the chunk.
+                next_logits = logits[0, current - 1]
+            else:
+                raise ValueError(
+                    "Prefill logits are shorter than the requested chunk: "
+                    f"{logits_length}/{current}"
+                )
+            next_id = int(next_logits.argmax())
             self.context_length += current
         return next_id
 

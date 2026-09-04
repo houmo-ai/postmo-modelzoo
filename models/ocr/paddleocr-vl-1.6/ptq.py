@@ -294,6 +294,67 @@ def _reinitialize_visual_rope(native_model: torch.nn.Module) -> None:
         )
 
 
+def _keep_visual_rope_frequency_float32(native_model: torch.nn.Module) -> None:
+    """Keep the integer-range source of visual RoPE in a valid ONNX dtype.
+
+    The visual model itself is exported in float16, but ``torch.arange`` in
+    ``SigLIPRotaryEmbedding.forward`` uses ``inv_freq.dtype``.  Converting the
+    whole model to float16 therefore makes ONNX emit a float16 ``Range`` input,
+    which ONNX Runtime does not accept.  The resulting sine/cosine tensors are
+    still consumed by the float16 attention path.
+    """
+    for module in native_model.modules():
+        if module.__class__.__name__ == "SigLIPRotaryEmbedding":
+            module.inv_freq.data = module.inv_freq.data.float()
+
+
+def _patch_visual_attention_rope_dtype(native_model: torch.nn.Module) -> None:
+    """Keep RoPE factors in the visual attention activation dtype.
+
+    ``inv_freq`` must remain float32 to export a valid ONNX ``Range`` node, but
+    its sine/cosine outputs would otherwise promote float16 Q/K to float32 and
+    make the attention-weight/value matmul fail.  Patch only the classes used by
+    this export process instead of changing the shared vision implementation.
+    """
+
+    patched_count = 0
+    for module in native_model.modules():
+        module_class = type(module)
+        if not module_class.__name__.endswith("SiglipAttention"):
+            continue
+        if getattr(module, "_rope_dtype_patched", False):
+            continue
+        original_forward = module.forward
+
+        def forward_with_rope_dtype(
+            self,
+            hidden_states,
+            attention_mask=None,
+            output_attentions=False,
+            cu_seqlens=None,
+            rope_emb=None,
+            _original_forward=original_forward,
+        ):
+            if rope_emb is not None:
+                rope_emb = tuple(
+                    value.to(dtype=hidden_states.dtype) for value in rope_emb
+                )
+            return _original_forward(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                cu_seqlens=cu_seqlens,
+                rope_emb=rope_emb,
+            )
+
+        module.forward = types.MethodType(forward_with_rope_dtype, module)
+        module._rope_dtype_patched = True
+        patched_count += 1
+    if patched_count == 0:
+        raise ValueError("Cannot find optimized SigLIP attention modules")
+    logger.info("Patched visual attention RoPE dtype for {} modules", patched_count)
+
+
 class VisionProjectorWrapModel(torch.nn.Module):
     def __init__(
         self,
@@ -461,7 +522,7 @@ def houmo_export_llm(args):
         image_embeds = native_model.mlp_AR(image_embeds, image_grid_thw)
         if isinstance(image_embeds, (list, tuple)):
             image_embeds = torch.cat(image_embeds, dim=0)
-    
+
     del visual
     del visual_outputs, pixel_values, siglip_position_ids, sample_indices, cu_seqlens
 
@@ -475,9 +536,9 @@ def houmo_export_llm(args):
     kv_cache_shape = paddleocr_vl_llm_model.past_key_caches[0].shape
     num_hidden_layers = len(paddleocr_vl_llm_model.past_key_caches)
     hidden_size = token_embedding.weight.shape[1]
-    
+
     del native_model
-    
+
     data_prefill = {
         "input_ids": inputs["input_ids"].to(torch.device("cpu")),
         "image_embeds": image_embeds,
@@ -514,7 +575,7 @@ def houmo_export_llm(args):
     prefill_hmonnx_file = export_prefill_decode(
         paddleocr_vl_llm_model, data_prefill, args.model_name, prefill_hmonnx_dir, args.quant_type, mode="prefill"
     )
-    
+
     logger.info("*************** Start exporting decode model ***************")
     paddleocr_vl_llm_model.change_eval_type(EvalModelType.QUANTED_ALIGNED)
     paddleocr_vl_llm_model.set_input_sequence_length(1)
@@ -522,7 +583,7 @@ def houmo_export_llm(args):
         "input_ids": torch.randint(0, 1000, (1, 1)),
         "past_seq_length": 256,
     }
-    
+
     decode_hmonnx_dir = Path(work_dir) / "decode"
     decode_hmonnx_dir.mkdir(exist_ok=True, parents=True)
     decode_hmonnx_file = export_prefill_decode(
@@ -646,11 +707,21 @@ def houmo_export_vision(args):
         native_model.model.mlp_AR.to(torch.device("cpu")).to(torch.float16)
     if hasattr(native_model, "model") and hasattr(native_model.model, "projector"):
         native_model.model.projector.to(torch.device("cpu")).to(torch.float16)
-    
+
     hm_pixel_values = (
-        inputs["pixel_values"].unsqueeze(0) if inputs["pixel_values"].ndim == 4 else inputs["pixel_values"]
+        inputs["pixel_values"].unsqueeze(1)
+        if inputs["pixel_values"].ndim == 4
+        else inputs["pixel_values"]
     )
-    hm_pixel_values = hm_pixel_values.type(wraped_model.dtype).to(wraped_model.device)
+    expected_shape = (1, 1, 3, fixed_output_height, fixed_output_width)
+    if tuple(hm_pixel_values.shape) != expected_shape:
+        raise ValueError(
+            "Unexpected static visual input shape: "
+            f"{tuple(hm_pixel_values.shape)} != {expected_shape}"
+        )
+    hm_pixel_values = hm_pixel_values.to(
+        device=wraped_model.device, dtype=wraped_model.dtype
+    )
 
     fused_model = VisionProjectorWrapModel(
         wraped_model,
@@ -658,13 +729,19 @@ def houmo_export_vision(args):
         patch_size=cfg.model.wrap_cfg.patch_size,
         temporal_patch_size=cfg.model.wrap_cfg.temporal_patch_size,
     )
-    fused_model.float().eval()
+    # The runtime visual graph consumes float16.  Export and calibration must use
+    # the same dtype; exporting a float32 graph and feeding it float16 at runtime
+    # is especially unstable for the interpolated positional embeddings used by
+    # non-square static resolutions.
+    fused_model.to(dtype=hm_pixel_values.dtype).eval()
+    _keep_visual_rope_frequency_float32(fused_model)
+    _patch_visual_attention_rope_dtype(fused_model)
     fused_model.cpu()
 
     logger.info("Start export vision onnx ...")
 
     with torch.no_grad():
-        vision_only_output = wraped_model(hm_pixel_values.float().cpu())
+        vision_only_output = wraped_model(hm_pixel_values.cpu())
         vision_hidden_states = getattr(
             vision_only_output, "last_hidden_state", vision_only_output
         )
@@ -675,7 +752,7 @@ def houmo_export_vision(args):
         projector_output = projector_model(projector_input, image_grid_thw.tolist())
         projector_output = _unwrap_model_output(projector_output)
 
-        torch_output = fused_model(hm_pixel_values.float().cpu())
+        torch_output = fused_model(hm_pixel_values.cpu())
 
     vision_tmp_onnx_dir = work_dir / "vision_tmp"
     vision_tmp_onnx_dir.mkdir(exist_ok=True, parents=True)
@@ -683,7 +760,7 @@ def houmo_export_vision(args):
 
     torch.onnx.export(
         fused_model,
-        (hm_pixel_values.float().cpu()),
+        (hm_pixel_values.cpu()),
         vision_tmp_onnx_file,
         export_params=True,
         opset_version=18,
@@ -716,7 +793,7 @@ def houmo_export_vision(args):
 
     convert_onnx_to_hmonnx(
         vision_onnx_file,
-        [hm_pixel_values.float().cpu()],
+        [hm_pixel_values.cpu()],
         device_type=DeviceType.XH2a,
         out_hmonnx_file=vision_hmonnx_file,
         quant_config=cfg.model.quant_config,
