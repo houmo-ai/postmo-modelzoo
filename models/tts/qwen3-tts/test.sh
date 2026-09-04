@@ -86,6 +86,11 @@ if should_run_step "demo"; then
         python3 demo.py "${COMMON_MODEL_ARGS[@]}" "${COMMON_DEMO_ARGS[@]}"
         python3 python/demo.py "${COMMON_MODEL_ARGS[@]}" "${COMMON_DEMO_ARGS[@]}"
 
+        echo "Convert embedding files for C++ inference."
+        python3 convert_embedding.py \
+            --input_dir "output/${HOUMO_TARGET}/hmquant" \
+            --output_dir "output/${HOUMO_TARGET}/hmquant"
+
         echo "Build C++ streaming demo."
         "${SCRIPT_DIR}/cpp/build_linux.sh"
 
