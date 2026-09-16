@@ -39,8 +39,8 @@ HOUMO_TARGET = os.getenv("HOUMO_TARGET")
 assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 DEFAULT_SYSTEM_PROMPT = (
-	"You are a helpful, conversationally-fluent assistant made by Poolside. "
-	"You are here to be helpful to users through natural language conversations."
+	"你是由 Poolside 开发的、乐于助人且对话流畅的助手。"
+	"你的职责是通过自然语言对话为用户提供帮助。"
 )
 SLIDING_WINDOW = 512
 SW_MASK_PREFILL_WIDTH = 768
@@ -153,7 +153,11 @@ class HmLaguna:
 		self.prefill_length = self.prefill.get_input_info("input_1").shape[1]
 		self.context_max_length = args.context_length
 		self.embedding_weight = self._load_embedding(embedding_path)
-		self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir, trust_remote_code=True)
+		self.tokenizer = AutoTokenizer.from_pretrained(
+			tokenizer_dir,
+			trust_remote_code=True,
+			fix_mistral_regex=True,
+		)
 		self.samplingmanager = SamplingManager(args.temperature, args.topk, args.repetition_penalty)
 		self.context_length = 0
 		self.perf_tracker.reset_perf_time()
@@ -173,12 +177,12 @@ class HmLaguna:
 		return saved["weight"].float()
 
 	@staticmethod
-	def _sliding_mask(q_len, past_len, width):
+	def _sliding_mask(q_len, past_len, current_len, width):
 		mask = np.full((1, 1, q_len, width), np.finfo(np.float16).min, dtype=np.float16)
+		clamped_past = min(past_len, width - current_len)
 		for q in range(q_len):
-			absolute_position = past_len + q
-			end = min(width, absolute_position + 1)
-			start = max(0, end - SLIDING_WINDOW)
+			end = min(width, clamped_past + q + 1)
+			start = max(0, clamped_past + q - SLIDING_WINDOW + 1)
 			mask[0, 0, q, start:end] = 0
 		return mask
 
@@ -199,7 +203,7 @@ class HmLaguna:
 		model.set_input("input_1", embeds)
 		model.set_input("valid_length", np.array([past_len], dtype=np.int32))
 		model.set_input("current_length", np.array([current_len], dtype=np.int32))
-		model.set_input("sliding_attention_mask", self._sliding_mask(q_len, past_len, width))
+		model.set_input("sliding_attention_mask", self._sliding_mask(q_len, past_len, current_len, width))
 
 	def _run(self, model, input_ids, past_len, current_len, prefill):
 		total_type = PERFTYPE.PREFILL_TOTAL_TIME if prefill else PERFTYPE.DECODE_TOTAL_TIME
@@ -242,20 +246,26 @@ class HmLaguna:
 		logger.success("response:")
 		print("\033[1;95m", end="", flush=True)
 		generated = []
+		last_current_length = 0
 		for start in range(0, len(ids), self.prefill_length):
 			chunk = ids[start:start + self.prefill_length]
 			current = len(chunk)
 			padded = chunk + [self.tokenizer.pad_token_id] * (self.prefill_length - current)
 			logits = self._run(self.prefill, padded, self.context_length, current, True)
 			self.context_length += current
-		next_id = int(np.argmax(logits[0, 0]))
+			last_current_length = current
+		# The prefill graph returns logits for the fixed-size padded sequence.
+		# Some compiled graphs keep only the final logits and return sequence
+		# length 1, while others return logits for the valid chunk positions.
+		output_length = min(logits.shape[1], last_current_length)
+		next_id = int(np.argmax(logits[0, output_length - 1]))
 		decode_count = 0
 		printed_response = ""
 		pending_response = ""
 		if next_id not in (2, 24):
 			generated.append(next_id)
 			pending_response = self.tokenizer.decode(generated, skip_special_tokens=True)
-			if pending_response:
+			if pending_response and is_valid_char(ord(pending_response[-1])):
 				print(pending_response, end="", flush=True)
 				printed_response = pending_response
 				pending_response = ""
