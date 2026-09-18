@@ -177,9 +177,9 @@ class HmLaguna:
 		return saved["weight"].float()
 
 	@staticmethod
-	def _sliding_mask(q_len, past_len, current_len, width):
+	def _sliding_mask(q_len, past_len, width):
 		mask = np.full((1, 1, q_len, width), np.finfo(np.float16).min, dtype=np.float16)
-		clamped_past = min(past_len, width - current_len)
+		clamped_past = min(past_len, SLIDING_WINDOW - 1)
 		for q in range(q_len):
 			end = min(width, clamped_past + q + 1)
 			start = max(0, clamped_past + q - SLIDING_WINDOW + 1)
@@ -203,7 +203,7 @@ class HmLaguna:
 		model.set_input("input_1", embeds)
 		model.set_input("valid_length", np.array([past_len], dtype=np.int32))
 		model.set_input("current_length", np.array([current_len], dtype=np.int32))
-		model.set_input("sliding_attention_mask", self._sliding_mask(q_len, past_len, current_len, width))
+		model.set_input("sliding_attention_mask", self._sliding_mask(q_len, past_len, width))
 
 	def _run(self, model, input_ids, past_len, current_len, prefill):
 		total_type = PERFTYPE.PREFILL_TOTAL_TIME if prefill else PERFTYPE.DECODE_TOTAL_TIME
