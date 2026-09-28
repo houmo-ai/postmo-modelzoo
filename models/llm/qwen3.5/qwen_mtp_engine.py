@@ -23,8 +23,6 @@ import numpy as np
 from houmo_engine import HoumoEngine
 from houmo_engine.core.types import Stage
 from houmo_engine.perf import PerfTracker
-from houmo_engine.sampling import GreedySampler, GreedySamplingParams
-
 from qwen_module import Qwen36MtpModule
 from qwen_process import Qwen36MtpProcess
 from qwen_types import Qwen36MtpGenerationState, VerifyResult
@@ -47,7 +45,6 @@ class Qwen36MtpEngine(HoumoEngine):
         *,
         ndevice: int = 1,
         batch: int = 1,
-        sampling_params: GreedySamplingParams | None = None,
         perf: bool = False,
         debug: bool = False,
     ):
@@ -55,7 +52,6 @@ class Qwen36MtpEngine(HoumoEngine):
         if self.batch != 1:
             raise ValueError("Qwen36MtpEngine only supports batch=1")
         self.perf = PerfTracker.create(perf)
-        self.sampler = GreedySampler(sampling_params)
         with self.perf.scope("llm_mtp.init"):
             self.module = Qwen36MtpModule(
                 prefill_path,
@@ -82,6 +78,13 @@ class Qwen36MtpEngine(HoumoEngine):
     def clear_session(self) -> None:
         self.state = Qwen36MtpGenerationState()
         self.module.clear_session()
+
+    @staticmethod
+    def _argmax(logits) -> int:
+        logits = np.asarray(logits).astype(np.float32).reshape(-1)
+        if logits.size == 0:
+            raise ValueError("logits must not be empty")
+        return int(np.argmax(logits))
 
     def _prefill(self, request) -> int:
         input_length = int(request.input_ids.size)
@@ -137,7 +140,7 @@ class Qwen36MtpEngine(HoumoEngine):
         if last_logits is None or last_hidden is None:
             raise RuntimeError("empty prompt is not supported")
         self.module.prepare_verify_from_prefill()
-        token = self.sampler.sample(last_logits[:, -1:, :])
+        token = self._argmax(last_logits[:, -1:, :])
         self.state.context_length = input_length
         self.state.pending_token = token
         self.state.draft_anchor_hidden = last_hidden
@@ -159,10 +162,7 @@ class Qwen36MtpEngine(HoumoEngine):
                 self.module.set_input(Stage.DRAFT, inputs)
                 self.module.run(Stage.DRAFT)
                 logits, hidden = self.module.get_output(Stage.DRAFT).tensors
-                token = self.sampler.sample(
-                    logits,
-                    previous_tokens=[*self.state.generated_ids, *drafts],
-                )
+                token = self._argmax(logits)
                 drafts.append(token)
         return drafts
 
@@ -182,19 +182,13 @@ class Qwen36MtpEngine(HoumoEngine):
 
         accepted_count = 0
         for index, draft_token in enumerate(draft_tokens):
-            predicted = self.sampler.sample(
-                logits[:, index : index + 1, :],
-                previous_tokens=[*self.state.generated_ids, *draft_tokens[:index]],
-            )
+            predicted = self._argmax(logits[:, index : index + 1, :])
             if predicted != draft_token:
                 next_token = predicted
                 break
             accepted_count += 1
         else:
-            next_token = self.sampler.sample(
-                logits[:, -1:, :],
-                previous_tokens=[*self.state.generated_ids, *draft_tokens],
-            )
+            next_token = self._argmax(logits[:, -1:, :])
         next_hidden = hidden[:, accepted_count : accepted_count + 1, :].copy()
         return VerifyResult(
             draft_tokens=draft_tokens,
@@ -283,7 +277,6 @@ class Qwen36MtpEngine(HoumoEngine):
         self,
         prompt: str,
         *,
-        sampling_params: GreedySamplingParams | None = None,
         max_new_tokens: int | None = None,
         keep_history: bool = False,
         system_prompt: str | None = None,
@@ -296,9 +289,6 @@ class Qwen36MtpEngine(HoumoEngine):
             raise ValueError("max_new_tokens must be greater than zero")
         if system_prompt is None:
             system_prompt = "You are a helpful assistant."
-        if sampling_params is not None:
-            self.sampler = GreedySampler(sampling_params)
-
         self.perf.reset(preserve_prefixes=("llm_mtp.init",))
         self.clear_session()
         decode_tokens = 0

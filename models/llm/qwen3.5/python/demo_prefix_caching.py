@@ -326,7 +326,7 @@ def _create_prefix_caching_engine():
                         with self.perf.scope("llm.prefix.snapshot"):
                             self.prefix_snapshots[end] = self._snapshot_prefix_state()
                     start = end
-                token = int(np.asarray(logits).reshape(-1).argmax())
+                token = int(np.asarray(logits).astype(np.float32).reshape(-1).argmax())
             self.state.context_length = input_length
             return token, input_length
 

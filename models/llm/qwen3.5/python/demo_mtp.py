@@ -31,8 +31,6 @@ ENGINE_SRC = HOUMO_EXAMPLES_PATH / "utils" / "python"
 sys.path.insert(0, str(MODEL_DIR))
 sys.path.insert(0, str(ENGINE_SRC))
 
-from houmo_engine.sampling import GreedySamplingParams
-
 HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
 DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / HOUMO_TARGET
@@ -52,7 +50,6 @@ class HmQwen36Mtp:
         tokenizer_path,
         ndevice: int = 1,
         batch: int = 1,
-        sampling_params: GreedySamplingParams | None = None,
         perf: bool = False,
         debug: bool = False,
     ):
@@ -67,7 +64,6 @@ class HmQwen36Mtp:
             tokenizer_path=tokenizer_path,
             ndevice=ndevice,
             batch=batch,
-            sampling_params=sampling_params,
             perf=perf,
             debug=debug,
         )
@@ -203,43 +199,6 @@ def get_args() -> argparse.ArgumentParser:
         help="maximum generated tokens including the prefill token",
     )
     parser.add_argument(
-        "--temperature",
-        dest="temperature",
-        type=float,
-        default=1.0,
-        help="sampling temperature",
-    )
-    parser.add_argument(
-        "--topk",
-        "--top-k",
-        dest="top_k",
-        type=int,
-        default=None,
-        help="top-k logits filtering value",
-    )
-    parser.add_argument(
-        "--topp",
-        "--top-p",
-        dest="top_p",
-        type=float,
-        default=1.0,
-        help="top-p probability filtering value",
-    )
-    parser.add_argument(
-        "--presence-penalty",
-        dest="presence_penalty",
-        type=float,
-        default=0.0,
-        help="presence penalty applied to generated tokens",
-    )
-    parser.add_argument(
-        "--repetition-penalty",
-        dest="repetition_penalty",
-        type=float,
-        default=1.0,
-        help="repetition penalty applied to generated tokens",
-    )
-    parser.add_argument(
         "--perf",
         dest="perf",
         type=_parse_bool,
@@ -310,13 +269,6 @@ def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
 
 def main():
     args = _resolve_args(get_args().parse_args())
-    sampling = GreedySamplingParams(
-        temperature=args.temperature,
-        top_k=args.top_k,
-        top_p=args.top_p,
-        presence_penalty=args.presence_penalty,
-        repetition_penalty=args.repetition_penalty,
-    )
     model = HmQwen36Mtp(
         prefill_path=args.prefill_path,
         prefill_mtp_path=args.prefill_mtp_path,
@@ -326,7 +278,6 @@ def main():
         tokenizer_path=args.tokenizer_dir,
         ndevice=args.ndevice,
         batch=args.batch,
-        sampling_params=sampling,
         perf=args.perf,
         debug=args.debug,
     )
