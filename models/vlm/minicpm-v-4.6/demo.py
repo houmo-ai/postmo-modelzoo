@@ -31,8 +31,8 @@ IMODELZOO_ROOT = MODEL_DIR.parents[2]
 ENGINE_SRC = IMODELZOO_ROOT / "utils" / "python"
 sys.path.insert(0, str(ENGINE_SRC))
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
-OUTPUT_DIR = MODEL_DIR / "output" / HOUMO_TARGET
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
+OUTPUT_DIR = MODEL_DIR / "output" / POSTMO_TARGET
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
 DEFAULT_TOKENIZER_DIR = MODEL_DIR / "MiniCPM-V-4.6"
 

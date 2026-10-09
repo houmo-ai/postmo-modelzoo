@@ -96,14 +96,14 @@ pip install -r requirements.txt
 linux环境下运行env.sh配置环境变量，windows环境下请参照 tools/win_envs 目录的 README.MD 进行环境变量的设置。
 
 示例可能用到的环境变量如下：
-- HOUMO_TARGET：芯片平台
-- HOUMO_VERSION：后摩大道版本，可通过这个环境变量设置下载预编译模型的版本号
-- HOUMO_PATH：后摩大道工具链软件安装目录
-- HOUMO_SDK_PATH：后摩大道驱动软件安装目录
+- POSTMO_TARGET：芯片平台
+- POSTMO_VERSION：后摩大道版本，可通过这个环境变量设置下载预编译模型的版本号
+- POSTMO_PATH：后摩大道工具链软件安装目录
+- POSTMO_SDK_PATH：后摩大道驱动软件安装目录
 - TCIM_RUNTIME_PATH：后摩大道runtime软件安装目录
-- HOUMO_EXAMPLES_PATH：后摩大道示例目录
-- HOUMO_DATASETS_PATH：后摩大道示例所用的数据目录
-- HOUMO_MODEL_PATH：后摩大道示例所用的模型目录
+- POSTMO_EXAMPLES_PATH：后摩大道示例目录
+- POSTMO_DATASETS_PATH：后摩大道示例所用的数据目录
+- POSTMO_MODEL_PATH：后摩大道示例所用的模型目录
 - HF_ENDPOINT：指定 Hugging Face 资源的访问镜像地址，可自行决定设置
 - HF_TOKEN：设置 Hugging Face 的身份验证令牌（Token），可自行决定设置
 

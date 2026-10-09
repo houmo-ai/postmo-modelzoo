@@ -54,8 +54,8 @@ from xhquant.api import (
 from xhquant.utils import MemoryTracker, TimeProfiler
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -93,7 +93,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--model_size", type=str, default=None, help="model size")
     parser.add_argument("--quant_type", type=str, default=None, help="quant type, default is w8a8h1_sefp")
     parser.add_argument("--work_dir", type=str, default="work_dirs", help="working directory")
-    parser.add_argument("--out_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="output directory")
+    parser.add_argument("--out_dir", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant"), help="output directory")
     parser.add_argument("--context_length", type=int, default=2048, help="max sequence length")
     parser.add_argument("--input_sequence_length", type=int, default=None, help="input sequence length")
     parser.add_argument("--device", type=str, default="cuda", help="device for quantization (e.g. cuda, cpu)")

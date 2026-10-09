@@ -48,8 +48,8 @@ from demo import (
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 def _onnx_input_shape(model_path: str) -> List[int]:
@@ -194,7 +194,7 @@ def get_args():
         default=str(
             SCRIPT_DIR
             / "output"
-            / HOUMO_TARGET
+            / POSTMO_TARGET
             / "hmquant"
             / "paddleocr_v5_det"
             / "hmquant_paddleocr_v5_det_xh2_with_act.onnx"
@@ -206,7 +206,7 @@ def get_args():
         default=str(
             SCRIPT_DIR
             / "output"
-            / HOUMO_TARGET
+            / POSTMO_TARGET
             / "hmquant"
             / "paddleocr_v5_rec"
             / "hmquant_paddleocr_v5_rec_xh2_with_act.onnx"

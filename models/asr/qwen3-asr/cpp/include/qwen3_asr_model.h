@@ -20,8 +20,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef HOUMO_QWEN3_ASR_MODEL_H
-#define HOUMO_QWEN3_ASR_MODEL_H
+#ifndef POSTMO_QWEN3_ASR_MODEL_H
+#define POSTMO_QWEN3_ASR_MODEL_H
 
 #include <memory>
 #include <string>
@@ -160,4 +160,4 @@ class Qwen3AsrModel : public ASRModel {
 
 }  // namespace houmo
 
-#endif  // HOUMO_QWEN3_ASR_MODEL_H
+#endif  // POSTMO_QWEN3_ASR_MODEL_H

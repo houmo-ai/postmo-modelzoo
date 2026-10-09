@@ -376,9 +376,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    target = os.getenv("HOUMO_TARGET")
+    target = os.getenv("POSTMO_TARGET")
     if target not in ["xh2"]:
-        raise ValueError("HOUMO_TARGET must be xh2")
+        raise ValueError("POSTMO_TARGET must be xh2")
 
     MODEL_NAME = f"{target}_conv"
 
@@ -428,8 +428,8 @@ if __name__ == "__main__":
         args.skip_build = True
         from hmatc.utils.utils import get_file_from_jfrog
 
-        if "HOUMO_MODELZOO_URL" not in os.environ:
-            os.environ["HOUMO_MODELZOO_URL"] = (
+        if "POSTMO_MODELZOO_URL" not in os.environ:
+            os.environ["POSTMO_MODELZOO_URL"] = (
                 "http://artifactory.houmo.ai/artifactory/Dadao"
             )
         if target == "xh2":

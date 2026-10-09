@@ -86,10 +86,10 @@ python3 get_model.py --type hmm --model_name minicpm-v-4.6 --model_size 1.3b
 
 下载后的资源默认解压到当前目录。Demo 默认从以下位置读取芯片模型和相关资源：
 
-- `output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_prefill.hmm`
-- `output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_decode.hmm`
-- `output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_visual_16x.hmm`
-- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `output/${POSTMO_TARGET}/minicpm-v-4.6-1.3b_prefill.hmm`
+- `output/${POSTMO_TARGET}/minicpm-v-4.6-1.3b_decode.hmm`
+- `output/${POSTMO_TARGET}/minicpm-v-4.6-1.3b_visual_16x.hmm`
+- `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
 - `MiniCPM-V-4.6/`
 
 当 `--ndevice` 大于 1 时，prefill 和 decode 的默认文件后缀切换为 `.hmms`；视觉模型仍使用 `.hmm`。
@@ -113,7 +113,7 @@ python3 ptq.py --model-name minicpm-v-4.6 --model-size 1.3b
 `ptq.py` 默认读取 `MiniCPM-V-4.6/` 中的原始模型，并使用 `config.yaml` 指定的 Merak workflow 执行量化和 HMONNX 导出。默认输出目录为：
 
 ```text
-output/${HOUMO_TARGET}/hmquant/
+output/${POSTMO_TARGET}/hmquant/
 ```
 
 主要产物包括：
@@ -135,7 +135,7 @@ python3 ptq.py --model-name minicpm-v-4.6 --model-size 1.3b --overwrite
 编译前需要准备与 `build.py` 输入约定一致的中间模型，默认位于：
 
 ```text
-output/${HOUMO_TARGET}/hmquant/
+output/${POSTMO_TARGET}/hmquant/
 ```
 
 该目录需要包含 `prefill`、包含 `decode` 名称的目录，以及以 `vision` 或 `visual` 命名的视觉模型目录。这些中间模型可通过上一节的 `ptq.py` 生成。
@@ -146,7 +146,7 @@ output/${HOUMO_TARGET}/hmquant/
 python3 build.py --model_name minicpm-v-4.6 --model_size 1.3b --ndevice 1
 ```
 
-默认输出目录为 `output/${HOUMO_TARGET}`，默认输出文件为：
+默认输出目录为 `output/${POSTMO_TARGET}`，默认输出文件为：
 
 - `minicpm-v-4.6-1.3b_prefill.hmm`
 - `minicpm-v-4.6-1.3b_decode.hmm`
@@ -223,10 +223,10 @@ python3 demo.py \
 ```bash
 python3 demo.py \
     --tokenizer-dir MiniCPM-V-4.6 \
-    --prefill-path output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_prefill.hmm \
-    --decode-path output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_decode.hmm \
-    --vit-path output/${HOUMO_TARGET}/minicpm-v-4.6-1.3b_visual_16x.hmm \
-    --embedding-path output/${HOUMO_TARGET}/hmquant/quant_embedding.pt
+    --prefill-path output/${POSTMO_TARGET}/minicpm-v-4.6-1.3b_prefill.hmm \
+    --decode-path output/${POSTMO_TARGET}/minicpm-v-4.6-1.3b_decode.hmm \
+    --vit-path output/${POSTMO_TARGET}/minicpm-v-4.6-1.3b_visual_16x.hmm \
+    --embedding-path output/${POSTMO_TARGET}/hmquant/quant_embedding.pt
 ```
 
 默认启用性能报告，可通过以下命令关闭：
@@ -239,10 +239,10 @@ python3 demo.py --perf false
 
 以上步骤可以通过 `test.sh` 脚本执行。脚本默认执行 `demo` 步骤，并在未指定 `--skip_download` 时先下载预编译模型：
 
-运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录。`demo` 阶段使用该路径调用 `tools/llm_perf/convert_embed.py`。
+运行前请确保 `POSTMO_EXAMPLES_PATH` 指向当前仓库根目录。`demo` 阶段使用该路径调用 `tools/llm_perf/convert_embed.py`。
 
 ```bash
-export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
 bash test.sh
 ```
 
@@ -300,7 +300,7 @@ bash test.sh -s all --skip_download
 
 - `quant`：检查 GPU，按需下载原始模型，并调用 `ptq.py` 生成量化 HMONNX 中间模型。
 - `build`：调用 `build.py` 编译 prefill、decode、vision 4x 和 vision 16x 模型。
-- `demo`：默认下载预编译模型后调用 `demo.py`；与其他步骤组合执行时直接使用本地构建产物。Python Demo 完成后，脚本将 `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt` 转换为 `quant_embedding.bin`。
+- `demo`：默认下载预编译模型后调用 `demo.py`；与其他步骤组合执行时直接使用本地构建产物。Python Demo 完成后，脚本将 `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt` 转换为 `quant_embedding.bin`。
 - 如果环境中存在 `llm_perf`，`demo` 阶段会分别使用 `visual_4x.hmm` 和 `visual_16x.hmm` 执行两组性能测试；未安装 `llm_perf` 时跳过性能命令，但仍会生成 `quant_embedding.bin`。
 - `all`：依次执行 quant、build 和 demo。
 
@@ -311,7 +311,7 @@ bash test.sh -s all --skip_download
 - `batch=1`
 - `loop=1`
 - 视觉模型：`minicpm-v-4.6-1.3b_visual_4x.hmm`、`minicpm-v-4.6-1.3b_visual_16x.hmm`
-- embedding：`output/${HOUMO_TARGET}/hmquant/quant_embedding.bin`
+- embedding：`output/${POSTMO_TARGET}/hmquant/quant_embedding.bin`
 
 当 `--ndevice` 大于 1 时，性能测试使用 `.hmms` 格式的 prefill 和 decode 模型，并将设备编号展开为逗号分隔的 `--devices` 参数；视觉模型仍使用 `.hmm`。
 

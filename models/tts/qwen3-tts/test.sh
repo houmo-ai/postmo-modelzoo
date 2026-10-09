@@ -88,8 +88,8 @@ if should_run_step "demo"; then
 
         echo "Convert embedding files for C++ inference."
         python3 convert_embedding.py \
-            --input_dir "output/${HOUMO_TARGET}/hmquant" \
-            --output_dir "output/${HOUMO_TARGET}/hmquant"
+            --input_dir "output/${POSTMO_TARGET}/hmquant" \
+            --output_dir "output/${POSTMO_TARGET}/hmquant"
 
         echo "Build C++ streaming demo."
         "${SCRIPT_DIR}/cpp/build_linux.sh"
@@ -105,15 +105,15 @@ if should_run_step "demo"; then
             echo "Run llm_perf TTS performance case (${MODEL_NAME}-${MODEL_SIZE})."
             llm_perf \
                 --model_name "${MODEL_NAME}-${MODEL_SIZE}" \
-                --text_projection "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_text_projection.hmm" \
-                --talker_prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_talker_prefill.hmm" \
-                --talker_decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_talker_decode.hmm" \
-                --code_predictor_prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_code_predictor_prefill.hmm" \
-                --code_predictor_decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_code_predictor_decode.hmm" \
-                --stateful_decoder "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_stateful_decoder.hmm" \
-                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
-                --code_embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding_code_predictor.bin" \
-                --text_embedding "output/${HOUMO_TARGET}/hmquant/text_embedding.bin" \
+                --text_projection "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_text_projection.hmm" \
+                --talker_prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_talker_prefill.hmm" \
+                --talker_decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_talker_decode.hmm" \
+                --code_predictor_prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_code_predictor_prefill.hmm" \
+                --code_predictor_decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_code_predictor_decode.hmm" \
+                --stateful_decoder "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_stateful_decoder.hmm" \
+                --embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding.bin" \
+                --code_embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding_code_predictor.bin" \
+                --text_embedding "output/${POSTMO_TARGET}/hmquant/text_embedding.bin" \
                 --tts_audio_length 10.0 \
                 --devices 0 \
                 --loop 1 \

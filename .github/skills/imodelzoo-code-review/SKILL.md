@@ -148,8 +148,8 @@ Prefill/Decode 循环归属、`context_length` 所有权和 Perf 打点 contract
 - 检查 Shell 引号、退出码和错误传播，避免失败后继续执行。
 - 标记个人绝对路径、硬编码设备、私有凭据或未说明的内网环境假设。
 - 判定 Shell/CMake/README 中的环境变量未定义前，必须按 `仓库根 env.sh / 平台初始化脚本 -> 父级启动脚本或容器入口 -> 当前脚本` 的实际执行链追踪定义。仓库文档要求用户预先执行的初始化脚本所 `export` 的变量，视为标准流程已定义，不能仅因当前子脚本没有再次赋值而形成 finding。
-- 对 `HOUMO_EXAMPLES_PATH`、`HOUMO_PATH`、`HOUMO_SDK_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_DATASETS_PATH`、`HOUMO_MODEL_PATH` 等仓库级变量，检查其在根 `env.sh` 或对应平台环境准备中的最终展开值以及下游路径是否真实一致；不要假设它们为空。只有标准初始化后仍未定义、被中途 unset/覆盖成无效值、用于不受该初始化约束的独立入口，或文档把命令声明为可直接运行却遗漏必要环境准备时，才报告问题。
-- 例如，`run.sh` 使用 `$HOUMO_EXAMPLES_PATH/3rdparty/...`，而根 `env.sh` 已将 `HOUMO_EXAMPLES_PATH` 导出为仓库根目录时，不能以“run.sh 本地未定义变量”为由报告路径展开为空；应继续检查初始化后的目标目录、库名和平台分支是否正确。
+- 对 `POSTMO_EXAMPLES_PATH`、`POSTMO_PATH`、`POSTMO_SDK_PATH`、`TCIM_RUNTIME_PATH`、`POSTMO_DATASETS_PATH`、`POSTMO_MODEL_PATH` 等仓库级变量，检查其在根 `env.sh` 或对应平台环境准备中的最终展开值以及下游路径是否真实一致；不要假设它们为空。只有标准初始化后仍未定义、被中途 unset/覆盖成无效值、用于不受该初始化约束的独立入口，或文档把命令声明为可直接运行却遗漏必要环境准备时，才报告问题。
+- 例如，`run.sh` 使用 `$POSTMO_EXAMPLES_PATH/3rdparty/...`，而根 `env.sh` 已将 `POSTMO_EXAMPLES_PATH` 导出为仓库根目录时，不能以“run.sh 本地未定义变量”为由报告路径展开为空；应继续检查初始化后的目标目录、库名和平台分支是否正确。
 
 ### 跨文件功能设计与状态最小化
 

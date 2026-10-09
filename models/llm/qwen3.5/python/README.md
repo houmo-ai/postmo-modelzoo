@@ -30,10 +30,10 @@ cd models/llm/qwen3.5/python
 建议设置仓库根目录：
 
 ```bash
-export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
 ```
 
-`HOUMO_TARGET` 未设置时默认为 `xh2`。
+`POSTMO_TARGET` 未设置时默认为 `xh2`。
 
 ### 2.2 默认配置和模型路径
 
@@ -46,21 +46,21 @@ export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
 
 标准生成和前缀缓存示例默认读取：
 
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_decode.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m96.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m196.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m384.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m704.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_visual_m1536.hmm`
-- `../output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_prefill.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_decode.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_visual_m96.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_visual_m196.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_visual_m384.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_visual_m704.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_visual_m1536.hmm`
+- `../output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
 
 已存在的 visual gear HMM 会在启动时全部加载。图片按原始宽高比和 pixel budget 动态生成 patch，运行时根据真实 image token 数选择最小可容纳 gear，补齐到该视觉图容量，并裁剪 padding 输出。默认运行不需要传 `--vision_path`；程序会扫描实际存在的 `_visual_m<gear>.hmm`，允许只生成部分 gear。若没有带 gear 后缀的文件，则兼容加载 `visual.hmm` 作为最大 gear。
 
 MTP 示例额外读取：
 
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_prefill_mtp.hmm`
-- `../output/${HOUMO_TARGET}/${model_name}-${model_size}_decode_mtp.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_prefill_mtp.hmm`
+- `../output/${POSTMO_TARGET}/${model_name}-${model_size}_decode_mtp.hmm`
 
 当 `ndevice>1` 时，文本模型路径会自动从 `.hmm` 切换为 `.hmms`。标准示例和前缀缓存示例的 visual 模型仍使用 `.hmm`。
 
@@ -91,7 +91,7 @@ python3 demo.py \
   --model_name qwen3.6 \
   --model_size 35b-a3b \
   --question "请描述图片中的人物和动物" \
-  --image_path "${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg"
+  --image_path "${POSTMO_EXAMPLES_PATH}/data/pic/beach.jpeg"
 ```
 
 通过 `--image_path` 可以传入一张或多张图片：
@@ -235,7 +235,7 @@ python3 demo_prefix_caching.py \
 
 ```bash
 python3 demo_prefix_caching.py \
-  --image_path "${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg" \
+  --image_path "${POSTMO_EXAMPLES_PATH}/data/pic/beach.jpeg" \
   --question "请仔细观察这张图片，并描述主要主体。" \
   --question "请仔细观察这张图片，并描述拍摄环境。" \
   --question "请仔细观察这张图片，并说明人物和动物的互动。"

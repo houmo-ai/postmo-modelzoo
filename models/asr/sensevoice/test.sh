@@ -47,7 +47,7 @@ if should_run_step "demo"; then
         python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute demo."
-    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+    python3 demo.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" --audio "${POSTMO_EXAMPLES_PATH}/data/audio/audio.mp3"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

@@ -40,8 +40,8 @@ from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs
 import tcim_lite as tcim
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -114,7 +114,7 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -152,11 +152,11 @@ def get_args() -> argparse.Namespace:
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.encode_path is None:
         args.encode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_encode.hmm"
         )
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_prefill.hmm"
         )
     if args.ndevice > 1:
         if args.prefill_path.endswith(".hmm"):
@@ -197,7 +197,7 @@ class Qwen3ForceAligner:
         self.config = AutoConfig.from_pretrained(processor_dir, trust_remote_code=True)
 
         self.embedding_weight = torch.load(embedding_path, map_location=self.device)
-        if HOUMO_TARGET == "xh2":
+        if POSTMO_TARGET == "xh2":
             self.embedding_weight = self.embedding_weight["weight"].float()
 
         self.aligner_processor = Qwen3ForceAlignProcessor()

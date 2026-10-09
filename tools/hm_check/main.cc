@@ -48,7 +48,7 @@ using namespace std::chrono;
 
 static const int INDENT = 2;       // Indentation spaces
 static const int COL_PADDING = 4;  // Column padding
-static std::string HOUMO_TARGET = "xh2";
+static std::string POSTMO_TARGET = "xh2";
 
 typedef enum CheckStatus { PASS = 0, FAIL, WARN } checkStatus_t;
 
@@ -563,9 +563,9 @@ static void Infer(int32_t tid, std::string model_name, int32_t warmup,
 }
 
 static std::string get_backend_name() {
-    if (HOUMO_TARGET == "xh1") {
+    if (POSTMO_TARGET == "xh1") {
         return "Xh1HdiBackend";
-    } else if (HOUMO_TARGET == "xh2") {
+    } else if (POSTMO_TARGET == "xh2") {
         return "Xh2HalBackend";
     } else {
         throw std::runtime_error("Invalid target");
@@ -754,7 +754,7 @@ int main(int argc, char **argv) {
 
     auto verbose = parser.get<bool>("verbose");
     auto repeat = parser.get<int32_t>("repeat");
-    HOUMO_TARGET = parser.get<std::string>("target");
+    POSTMO_TARGET = parser.get<std::string>("target");
 
     struct hm_device_info info = {0};
     uint32_t ret = hm_sys_get_device_info(&info);
@@ -790,7 +790,7 @@ int main(int argc, char **argv) {
 
     // Performance testing
     printf("===== Computing Power Test =====\n");
-    std::string model_name = HOUMO_TARGET + "_compute";
+    std::string model_name = POSTMO_TARGET + "_compute";
     float elapsed_time = 0;
     int32_t rounds = 1;
     for (size_t i = 0; i < devices.size(); ++i) {
@@ -812,7 +812,7 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < devices.size(); ++i) {
         auto &d = devices[i];
         repeat = d.core_count * 4;
-        model_name = HOUMO_TARGET + "_bandwidth_read";
+        model_name = POSTMO_TARGET + "_bandwidth_read";
         elapsed_time = run_model(model_name, d.device_id, d.core_count, repeat,
                                  rounds);  // ms
         auto *r_model = get_model(model_name);
@@ -823,7 +823,7 @@ int main(int argc, char **argv) {
                d.ddr_bandwidth_read);
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-        model_name = HOUMO_TARGET + "_bandwidth_write";
+        model_name = POSTMO_TARGET + "_bandwidth_write";
         elapsed_time = run_model(model_name, d.device_id, d.core_count, repeat,
                                  rounds);  // ms
         auto *w_model = get_model(model_name);

@@ -33,8 +33,8 @@ import tcim_lite as tcim
 from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 TARGET_TYPE = torch.float16
 FILE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -146,7 +146,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -183,15 +183,15 @@ def get_args() -> argparse.Namespace:
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.encoder_path is None:
         args.encoder_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_encode.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_encode.hmm"
         )
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_prefill.hmm"
         )
     if args.decode_path is None:
         args.decode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_decode.hmm"
         )
     if args.ndevice > 1:
         if args.prefill_path.endswith(".hmm"):

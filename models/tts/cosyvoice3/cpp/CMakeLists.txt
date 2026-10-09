@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Include TCIM runtime configuration
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 
 # Determine platform-specific library path
 if(ANDROID_ABI)
@@ -30,20 +30,20 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
     endif()
-    set(HOUMO_TARGET "$ENV{HOUMO_TARGET}")
-    if(NOT HOUMO_TARGET)
-        message(FATAL_ERROR "HOUMO_TARGET environment variable is not set")
+    set(POSTMO_TARGET "$ENV{POSTMO_TARGET}")
+    if(NOT POSTMO_TARGET)
+        message(FATAL_ERROR "POSTMO_TARGET environment variable is not set")
     endif()
     set(SYS_NAME ${CMAKE_SYSTEM_NAME})
-    set(LIB_PATH "${SYS_NAME}_${ARCH}_${HOUMO_TARGET}")
-    message(STATUS "Platform: ${SYS_NAME}_${ARCH}_${HOUMO_TARGET}")
+    set(LIB_PATH "${SYS_NAME}_${ARCH}_${POSTMO_TARGET}")
+    message(STATUS "Platform: ${SYS_NAME}_${ARCH}_${POSTMO_TARGET}")
 else()
     message(WARNING "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
 
 # Third-party paths
 set(TOKENIZER_CPP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/tokenizers-cpp)
-set(THIRDPARTY_PATH $ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
+set(THIRDPARTY_PATH $ENV{POSTMO_EXAMPLES_PATH}/3rdparty)
 
 # Audio libraries configuration
 if(BUILD_AUDIO_FROM_SOURCE)
@@ -167,7 +167,7 @@ endif()
 # Configuration summary
 message(STATUS "")
 message(STATUS "CosyVoice3 TTS Demo Configuration:")
-message(STATUS "  HOUMO_TARGET: $ENV{HOUMO_TARGET}")
+message(STATUS "  POSTMO_TARGET: $ENV{POSTMO_TARGET}")
 message(STATUS "  TCIM_RUNTIME_PATH: ${TCIM_RUNTIME_PATH}")
 message(STATUS "  Platform lib path: ${LIB_PATH}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")

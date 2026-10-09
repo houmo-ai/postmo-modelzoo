@@ -63,7 +63,7 @@ if should_run_step "demo"; then
     )
     python3 demo.py "${demo_args[@]}"
 
-    python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+    python3 "${POSTMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${POSTMO_TARGET}/hmquant/quant_embedding.pt"
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
         cd "${SCRIPT_DIR}"
@@ -75,16 +75,16 @@ if should_run_step "demo"; then
         devices_param=$(get_devices_param "${NDEVICE}")
         llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
             --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
-            --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
-            --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
-            --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_1x.hmm" \
-            --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+            --prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+            --decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+            --visual "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_1x.hmm" \
+            --embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding.bin"
         llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
             --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
-            --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
-            --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
-            --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_6x.hmm" \
-            --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+            --prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+            --decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+            --visual "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_6x.hmm" \
+            --embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding.bin"
     fi
 
 fi

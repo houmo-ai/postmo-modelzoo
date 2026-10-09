@@ -41,7 +41,7 @@ benchmark、packaging 或测试时，按变更涉及的章节执行，不要求�
 - mutually exclusive 和 required 约束在 parser/resolver 中真实生效；
 - partial argument、冲突 backend flag 和无效 mode 给出清晰错误并返回非零状态；
 - 公共 parent option 只出现在语义有效的命令中，或明确说明无影响；
-- `--target` 与 `HOUMO_TARGET` 的 required/default/choices 和 README 一致；
+- `--target` 与 `POSTMO_TARGET` 的 required/default/choices 和 README 一致；
 - deprecated/hidden option 只用于兼容已有调用方，不应成为新 README 的推荐入口；
 - CLI option、alias、默认值或 mode 变化时，搜索 `models/**`、`apis/**`、tests 和 README 调用方。
 
@@ -105,9 +105,9 @@ parser
 CLI 显式路径
 config 文件所在目录
 当前工作目录
-HOUMO_MODEL_PATH
-HOUMO_DATASETS_PATH
-HOUMO_EXAMPLES_PATH
+POSTMO_MODEL_PATH
+POSTMO_DATASETS_PATH
+POSTMO_EXAMPLES_PATH
 ```
 
 - 相对路径必须有唯一、文档化的基准；
@@ -256,7 +256,7 @@ HOUMO_EXAMPLES_PATH
 - `hmatc = hmatc:main` 指向可导入且返回状态一致的入口；
 - setup/build/wheel/help 命令不会被自定义参数解析破坏；
 - 版本、commit、build time 生成文件在源码安装和 wheel 中可用且不会误改源码；
-- `tcim_lite`、`HOUMO_TARGET`、`HOUMO_VERSION`、`HOUMO_SDK_PATH` 的要求清晰；
+- `tcim_lite`、`POSTMO_TARGET`、`POSTMO_VERSION`、`POSTMO_SDK_PATH` 的要求清晰；
 - `hmatc.python.perf` 和可选 `hmatc.python.smi` 的 module name、source、library、ABI 和 package data 一致；
 - `--enable_smi_support` 仅影响 SMI extension，不成为默认安装强依赖；
 - Linux/Windows compile/link 参数和 Windows DLL copy 与 runtime 布局一致；

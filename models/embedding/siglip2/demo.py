@@ -38,9 +38,9 @@ from model import (
     make_runner,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
-assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+POSTMO_EXAMPLES_PATH = os.getenv("POSTMO_EXAMPLES_PATH", ".")
+assert POSTMO_TARGET == "xh2", "Only support POSTMO_TARGET: xh2"
 
 
 def parse_args():

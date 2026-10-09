@@ -44,8 +44,8 @@ from xhquant.api import (
 from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import check_gpu, first_not_none, get_model_configs, parse_context_length
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2."
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", "Only support POSTMO_TARGET: xh2."
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 def get_default_model_dir(model_config: dict, idx: int) -> str:
@@ -94,7 +94,7 @@ def parse_args():
         "--work_dir", type=str, default="work_dir", help="path of onnx model"
     )
     parser.add_argument(
-        "--out_dir", type=str, default="output/{}".format(HOUMO_TARGET), help="output save path"
+        "--out_dir", type=str, default="output/{}".format(POSTMO_TARGET), help="output save path"
     )
     parser.add_argument(
         "--model_name", type=str, default=None, help="output hmonnx model name"
@@ -114,7 +114,7 @@ def parse_args():
     parser.add_argument(
         "--batch_size", type=int, default=None, help="batch size"
     )
-    parser.add_argument("--output_path", default=f"output/{HOUMO_TARGET}", type=str)
+    parser.add_argument("--output_path", default=f"output/{POSTMO_TARGET}", type=str)
     parser.add_argument(
         "--quant_type",
         type=str,

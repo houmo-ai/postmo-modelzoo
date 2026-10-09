@@ -34,11 +34,11 @@
 
 | 配置文件 | 模型规格 | 量化方法 | Context Length | 输出目录 |
 |---|---|---|---:|---|
-| `configs/gemma4_e2b.yml` | `e2b` | `autoround` | 131072 | `output/e2b/${HOUMO_TARGET}` |
-| `configs/gemma4_e4b.yml` | `e4b` | `gptq` | 131072 | `output/e4b/${HOUMO_TARGET}` |
-| `configs/gemma4_26b-a4b.yml` | `26b-a4b` | `gptq` | 262144 | `output/26b-a4b/${HOUMO_TARGET}` |
-| `configs/gemma4_26b-a4b-mtp.yml` | `26b-a4b[MTP]` | `gptq` | 262144 | `output/26b-a4b-mtp/${HOUMO_TARGET}` |
-| `configs/gemma4_31b.yml` | `31b` | `gptq` | 262144 | `output/31b/${HOUMO_TARGET}` |
+| `configs/gemma4_e2b.yml` | `e2b` | `autoround` | 131072 | `output/e2b/${POSTMO_TARGET}` |
+| `configs/gemma4_e4b.yml` | `e4b` | `gptq` | 131072 | `output/e4b/${POSTMO_TARGET}` |
+| `configs/gemma4_26b-a4b.yml` | `26b-a4b` | `gptq` | 262144 | `output/26b-a4b/${POSTMO_TARGET}` |
+| `configs/gemma4_26b-a4b-mtp.yml` | `26b-a4b[MTP]` | `gptq` | 262144 | `output/26b-a4b-mtp/${POSTMO_TARGET}` |
+| `configs/gemma4_31b.yml` | `31b` | `gptq` | 262144 | `output/31b/${POSTMO_TARGET}` |
 
 模型名称、规格、原始模型目录、设备数、量化方法、context length、prefill chunk length、组件开关和输出目录均由所选 YAML 配置决定。
 
@@ -48,7 +48,7 @@ Gemma4 模型通过 HMATC CLI 完成量化和编译。芯片模型只能在 Linu
 
 ### 2.1 环境准备
 
-`test.sh` 会在 Gemma4 目录下创建或复用 `gemma4_venv`，激活该虚拟环境，并安装 `requirements.txt`。如果环境变量 `HOUMO_EXAMPLES_PATH` 指向包含 `hmodel/gptqmodel/requirements.txt` 的示例仓库目录，脚本还会安装该 GPTQModel requirements 文件。首次运行 `test.sh` 需要可访问 Python 包源；也可以提前手动准备依赖：
+`test.sh` 会在 Gemma4 目录下创建或复用 `gemma4_venv`，激活该虚拟环境，并安装 `requirements.txt`。如果环境变量 `POSTMO_EXAMPLES_PATH` 指向包含 `hmodel/gptqmodel/requirements.txt` 的示例仓库目录，脚本还会安装该 GPTQModel requirements 文件。首次运行 `test.sh` 需要可访问 Python 包源；也可以提前手动准备依赖：
 
 ```bash
 python3 -m venv --system-site-packages gemma4_venv
@@ -71,7 +71,7 @@ python3 get_model.py --config ./configs/gemma4_e2b.yml --type hmm
 python3 get_model.py --config ./configs/gemma4_26b-a4b-mtp.yml --type raw
 ```
 
-原始模型默认下载到 `./models`。预编译模型默认解压到 `output/<model_size>/${HOUMO_TARGET}`。切换模型规格时，仅需替换配置文件。
+原始模型默认下载到 `./models`。预编译模型默认解压到 `output/<model_size>/${POSTMO_TARGET}`。切换模型规格时，仅需替换配置文件。
 
 ### 2.3 量化
 
@@ -85,7 +85,7 @@ hmatc quant -c ./configs/gemma4_e2b.yml
 hmatc quant -c ./configs/gemma4_26b-a4b-mtp.yml
 ```
 
-量化产物保存在配置 `save_dir` 对应的 `${HOUMO_TARGET}/hmquant` 目录，供后续编译和 Demo 使用。MTP 是否启用由配置中的 `quant.speculative_decode: mtp` 决定，无需额外传递 MTP 开关。
+量化产物保存在配置 `save_dir` 对应的 `${POSTMO_TARGET}/hmquant` 目录，供后续编译和 Demo 使用。MTP 是否启用由配置中的 `quant.speculative_decode: mtp` 决定，无需额外传递 MTP 开关。
 
 ### 2.4 编译
 
@@ -99,14 +99,14 @@ hmatc build -c ./configs/gemma4_e2b.yml
 hmatc build -c ./configs/gemma4_26b-a4b-mtp.yml
 ```
 
-编译参数由配置中的 `build` 段控制，主要包括 `ndevice`、`context_length`、`prefill_chunk_length`、`flash_attention`、`enable_common_subgraph` 以及各模型组件的构建开关。编译结果位于 `<save_dir>/${HOUMO_TARGET}`，prefill/decode 组件可能生成 `.hmm` 或 `.hmms`。
+编译参数由配置中的 `build` 段控制，主要包括 `ndevice`、`context_length`、`prefill_chunk_length`、`flash_attention`、`enable_common_subgraph` 以及各模型组件的构建开关。编译结果位于 `<save_dir>/${POSTMO_TARGET}`，prefill/decode 组件可能生成 `.hmm` 或 `.hmms`。
 
 ### 2.5 演示
 
 Gemma4 模型使用 Python API 进行演示。将 HMM/HMMS 模型及其 `hmquant` 目录放在同一个模型目录下，然后执行：
 
 ```bash
-# 文本模式；默认模型目录为 output/e2b/${HOUMO_TARGET}
+# 文本模式；默认模型目录为 output/e2b/${POSTMO_TARGET}
 python3 demo.py --question "你好，请介绍一下你自己。" --image "" --audio ""
 
 # 图片模式
@@ -124,7 +124,7 @@ python3 demo.py --model /path/to/gemma4-mtp-model --question "你好，请介绍
 模型目录还必须包含 `hmquant/quant_embedding.pt` 和 `hmquant/hf_config`。存在 audio 模型时还必须包含 `hmquant/per_layer_input_embedding.pt`，程序会使用 `Gemma4E`；否则使用 `Gemma4`。存在 assistant 模型时自动启用对应的 MTP 路径，无需显式传入模型规格或 MTP 开关。
 
 演示参数说明：
-- `--model`: 模型目录，默认 `output/e2b/${HOUMO_TARGET}`
+- `--model`: 模型目录，默认 `output/e2b/${POSTMO_TARGET}`
 - `--ndevice`: 此次运行允许使用的最大设备数，默认 `1`；实际设备列表为 `0` 到 `ndevice - 1`
 - `--question`: 输入问题
 - `--system_prompt`: system prompt
@@ -133,7 +133,7 @@ python3 demo.py --model /path/to/gemma4-mtp-model --question "你好，请介绍
 - `--max-new-tokens`: 最大生成 token 数，默认 `2048`
 - `--enable-thinking`: 在 chat template 渲染阶段启用 thinking 模式
 
-只运行文本输入时，应显式传入 `--image "" --audio ""`。输入文件会先按当前路径查找，再按 `${HOUMO_EXAMPLES_PATH}/<path>` 查找。
+只运行文本输入时，应显式传入 `--image "" --audio ""`。输入文件会先按当前路径查找，再按 `${POSTMO_EXAMPLES_PATH}/<path>` 查找。
 
 ## 3 一键运行
 
@@ -181,13 +181,13 @@ bash test.sh -s quant -c ./configs/gemma4_e4b.yml
 bash test.sh -s build -c ./configs/gemma4_26b-a4b-mtp.yml
 
 # 下载并运行 31b 预编译模型
-bash test.sh -s demo -c ./configs/gemma4_31b.yml --model output/31b/${HOUMO_TARGET}
+bash test.sh -s demo -c ./configs/gemma4_31b.yml --model output/31b/${POSTMO_TARGET}
 
 # 使用已有 e2b 模型运行 Demo
-bash test.sh -s demo --skip_download --model output/e2b/${HOUMO_TARGET}
+bash test.sh -s demo --skip_download --model output/e2b/${POSTMO_TARGET}
 
 # 完整执行 26b-a4b MTP 流程
-bash test.sh -s all -c ./configs/gemma4_26b-a4b-mtp.yml --model output/26b-a4b-mtp/${HOUMO_TARGET}
+bash test.sh -s all -c ./configs/gemma4_26b-a4b-mtp.yml --model output/26b-a4b-mtp/${POSTMO_TARGET}
 ```
 
 ## 4 HMM 内存占用参考
@@ -195,7 +195,7 @@ bash test.sh -s all -c ./configs/gemma4_26b-a4b-mtp.yml --model output/26b-a4b-m
 可使用 `readhmm` 查看编译后 HMM 的内存占用：
 
 ```bash
-readhmm "output/e2b/${HOUMO_TARGET}/gemma4-e2b_prefill.hmm" --mem_usage
+readhmm "output/e2b/${POSTMO_TARGET}/gemma4-e2b_prefill.hmm" --mem_usage
 ```
 
 以下数据来自一组历史编译产物，单位为二进制单位 GiB / MiB，仅用于内存占用参考；表中的 context length 和 ndevice 以该组产物的实际编译参数为准，不一定与当前 `configs/*.yml` 完全一致。`InOut(no KV)` 为 `mem_usage.inout` 中去除 KV cache 后的输入/输出占用，`Shared KV Cache` 为 LLM prefill/decode HMM 共享的 KV cache 输入占用；同一模型的 prefill 和 decode 使用同一份 KV cache，不需要把两行重复累加。`Workspace` 为 `mem_usage.workspace` 列表求和。`.hmms` 多设备模型的内存占用按单设备子模型统计。

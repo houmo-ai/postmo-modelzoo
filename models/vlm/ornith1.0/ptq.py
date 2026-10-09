@@ -28,8 +28,8 @@ from pathlib import Path
 
 import yaml
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 MODEL_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
@@ -98,11 +98,11 @@ def move_hmquant(export_dir: Path, output_dir: Path, visual_suffix: str) -> None
     candidates = sorted(
         path
         for path in export_dir.iterdir()
-        if path.is_dir() and path.name.startswith(f"hmquant_{HOUMO_TARGET}_")
+        if path.is_dir() and path.name.startswith(f"hmquant_{POSTMO_TARGET}_")
     )
     if len(candidates) != 1:
         raise RuntimeError(
-            f"expected one hmquant_{HOUMO_TARGET}_* directory under {export_dir}, "
+            f"expected one hmquant_{POSTMO_TARGET}_* directory under {export_dir}, "
             f"found: {candidates}"
         )
 
@@ -152,13 +152,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out-dir",
         dest="output_dir",
-        default=str(MODEL_DIR / "output" / HOUMO_TARGET / "hmquant"),
+        default=str(MODEL_DIR / "output" / POSTMO_TARGET / "hmquant"),
         help="final flattened hmquant output directory",
     )
     parser.add_argument(
         "--work-dir",
         dest="work_dir",
-        default=str(MODEL_DIR / "output" / HOUMO_TARGET / "work_dirs"),
+        default=str(MODEL_DIR / "output" / POSTMO_TARGET / "work_dirs"),
         help="default workflow working directory",
     )
     parser.add_argument(

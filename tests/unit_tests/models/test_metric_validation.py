@@ -268,7 +268,7 @@ def test_hmatc_perf_aggregates_max_qps_across_all_cases(tmp_path: Path) -> None:
 def test_eval_keeps_partial_dataset_factor_and_requires_all_metrics(
     monkeypatch,
 ) -> None:
-    monkeypatch.delenv("HOUMO_FULL_DATASET", raising=False)
+    monkeypatch.delenv("POSTMO_FULL_DATASET", raising=False)
     onnx = CommandResult(
         CommandSpec("onnx", ("hmatc", "eval")),
         0,

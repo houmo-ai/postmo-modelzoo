@@ -27,16 +27,16 @@ from pathlib import Path
 
 MODEL_DIR = Path(__file__).resolve().parents[1]
 IMODELZOO_ROOT = Path(__file__).resolve().parents[4]
-HOUMO_EXAMPLES_PATH = Path(os.getenv("HOUMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
-ENGINE_SRC = HOUMO_EXAMPLES_PATH / "utils" / "python"
+POSTMO_EXAMPLES_PATH = Path(os.getenv("POSTMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
+ENGINE_SRC = POSTMO_EXAMPLES_PATH / "utils" / "python"
 sys.path.insert(0, str(ENGINE_SRC))
 
 from houmo_engine.sampling import GreedySamplingParams
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
-DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / HOUMO_TARGET
-DEFAULT_AUDIO_PATH = HOUMO_EXAMPLES_PATH / "data" / "audio" / "audio.mp3"
+DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / POSTMO_TARGET
+DEFAULT_AUDIO_PATH = POSTMO_EXAMPLES_PATH / "data" / "audio" / "audio.mp3"
 
 
 class HmQwen3Asr:
@@ -126,7 +126,7 @@ def get_args() -> argparse.ArgumentParser:
         "--audio",
         dest="audio",
         type=str,
-        default=os.path.join(HOUMO_EXAMPLES_PATH, "data", "audio", "audio.mp3"),
+        default=os.path.join(POSTMO_EXAMPLES_PATH, "data", "audio", "audio.mp3"),
         help="path to the input audio file",
     )
     parser.add_argument(

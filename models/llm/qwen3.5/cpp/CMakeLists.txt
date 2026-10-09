@@ -18,7 +18,7 @@ else()
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -ggdb")
 endif()
 
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 
 add_executable(demo
   demo.cc

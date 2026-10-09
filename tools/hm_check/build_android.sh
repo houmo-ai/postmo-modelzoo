@@ -28,7 +28,7 @@ Options:
   -j JOBS        Parallel jobs for build (default: number of CPUs)
   --ndk PATH     Path to Android NDK (default: uses NDK_PATH env or common locations)
   --tcim PATH    Set TCIM_RUNTIME_PATH (default: read from env TCIM_RUNTIME_PATH)
-  --houmo PATH   Set HOUMO_SDK_PATH (default: read from env HOUMO_SDK_PATH)
+  --houmo PATH   Set POSTMO_SDK_PATH (default: read from env POSTMO_SDK_PATH)
   --abi ABI      Android ABI (default: arm64-v8a)
   --platform API Android platform level (default: android-35)
   --install [PATH]  Install after building (default: ${SOURCE_DIR}/../android, always enabled by default)
@@ -41,7 +41,7 @@ Example:
   ./build_android.sh -b build_android -c Release -j 8 --ndk /opt/android-ndk-r25 --tcim /opt/tcim --houmo /opt/houmo --abi arm64-v8a --platform android-35 --no-install
 
 Notes:
-  - Script prefers environment variables [TCIM_RUNTIME_PATH](file:///data/weiguo.xing/repo/imodelzoo/hmatc/setup.py#L29-L29) and `HOUMO_SDK_PATH` if set.
+  - Script prefers environment variables [TCIM_RUNTIME_PATH](file:///data/weiguo.xing/repo/imodelzoo/hmatc/setup.py#L29-L29) and `POSTMO_SDK_PATH` if set.
   - If `--ndk` is not provided, script tries $NDK_PATH and common installation paths.
   - Installation runs by default unless --no-install is specified.
 EOF
@@ -86,7 +86,7 @@ if [[ -n "${TCIM:-}" ]]; then
   export TCIM_RUNTIME_PATH="$TCIM"
 fi
 if [[ -n "${HOUMO:-}" ]]; then
-  export HOUMO_SDK_PATH="$HOUMO"
+  export POSTMO_SDK_PATH="$HOUMO"
 fi
 
 # find NDK
@@ -125,18 +125,18 @@ if [[ -z "${TCIM_RUNTIME_PATH:-}" ]]; then
   exit 1
 fi
 
-if [[ -z "${HOUMO_SDK_PATH:-}" ]]; then
+if [[ -z "${POSTMO_SDK_PATH:-}" ]]; then
   candidates=("/opt/houmo_sdk" "/usr/local/houmo_sdk" "${SOURCE_DIR}/../../houmo_sdk" )
   for p in "${candidates[@]}"; do
     if [[ -d "$p" && ( -d "$p/include" || -d "$p/inc" ) ]]; then
-      export HOUMO_SDK_PATH="$p"
-      echo "Auto-detected HOUMO_SDK_PATH: $p"
+      export POSTMO_SDK_PATH="$p"
+      echo "Auto-detected POSTMO_SDK_PATH: $p"
       break
     fi
   done
 fi
-if [[ -z "${HOUMO_SDK_PATH:-}" ]]; then
-  echo "HOUMO_SDK_PATH not set and auto-detection failed. Set HOUMO_SDK_PATH or pass --houmo." >&2
+if [[ -z "${POSTMO_SDK_PATH:-}" ]]; then
+  echo "POSTMO_SDK_PATH not set and auto-detection failed. Set POSTMO_SDK_PATH or pass --houmo." >&2
   exit 1
 fi
 
@@ -150,7 +150,7 @@ echo "Jobs: $JOBS"
 echo "ANDROID_ABI: $ABI"
 echo "ANDROID_PLATFORM: $PLATFORM"
 echo "TCIM_RUNTIME_PATH: $TCIM_RUNTIME_PATH"
-echo "HOUMO_SDK_PATH: $HOUMO_SDK_PATH"
+echo "POSTMO_SDK_PATH: $POSTMO_SDK_PATH"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"

@@ -57,7 +57,7 @@ hmatc perf -c config.yml -t xh2 -wn 10 -sn 1000 -tn 4
 
 > **注意：** 
 > 
-> 性能测试的线程数建议是芯片核数的两倍，核数可通过环境变量HOUMO_CORE_NUM查看
+> 性能测试的线程数建议是芯片核数的两倍，核数可通过环境变量POSTMO_CORE_NUM查看
 >
 
 

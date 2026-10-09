@@ -163,8 +163,8 @@ HMATC v2 不使用该 bundle。no-infer 直接发布 quant/build `cached_results
 
 1. workspace 中的 `requirements_ptq.txt`；
 2. workspace 中的 `requirements.txt`；
-3. `hm_gptq=true` 时追加 `$HOUMO_EXAMPLES_PATH/hmodel/gptqmodel/requirements.txt`；
-4. `py_reqs` 相对路径先查 workspace，再查 `HOUMO_DATASETS_PATH`。
+3. `hm_gptq=true` 时追加 `$POSTMO_EXAMPLES_PATH/hmodel/gptqmodel/requirements.txt`；
+4. `py_reqs` 相对路径先查 workspace，再查 `POSTMO_DATASETS_PATH`。
 
 缺失的 requirements 文件会被忽略，不会传给模型脚本。模型测试侧保留的是依赖选择策略，共享层负责 virtualenv 创建、复用、激活和安装命令。
 

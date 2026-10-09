@@ -48,7 +48,7 @@ def parse_args():
         default=default_imagenet_dir(),
         help=(
             "ImageNet root containing val.txt and ILSVRC2012_img_val. "
-            "Defaults to $HOUMO_EXAMPLES_PATH/data/datasets/imagenet when set."
+            "Defaults to $POSTMO_EXAMPLES_PATH/data/datasets/imagenet when set."
         ),
     )
     parser.add_argument(

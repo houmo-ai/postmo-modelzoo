@@ -350,7 +350,7 @@ eval 使用独立的 metric 比例：
 }
 ```
 
-校验为 `HM >= ONNX * threshold`；未设置 `HOUMO_FULL_DATASET` 时 threshold 再乘 `0.5`。
+校验为 `HM >= ONNX * threshold`；未设置 `POSTMO_FULL_DATASET` 时 threshold 再乘 `0.5`。
 
 perf 必须配置基线：
 

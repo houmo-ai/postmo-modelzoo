@@ -20,8 +20,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef HOUMO_WHISPER_MODEL_H
-#define HOUMO_WHISPER_MODEL_H
+#ifndef POSTMO_WHISPER_MODEL_H
+#define POSTMO_WHISPER_MODEL_H
 
 #include <memory>
 #include <string>
@@ -258,4 +258,4 @@ class WhisperModel : public ASRModel {
 
 }  // namespace houmo
 
-#endif  // HOUMO_WHISPER_MODEL_H
+#endif  // POSTMO_WHISPER_MODEL_H

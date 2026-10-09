@@ -3,8 +3,8 @@
 #
 # Prerequisites:
 #   export OHOS_SDK=/path/to/ohos-sdk
-#   export HOUMO_TARGET=xh2
-#   export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+#   export POSTMO_TARGET=xh2
+#   export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
 #   export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
 #
 # Usage:
@@ -23,9 +23,9 @@ if [ -z "$OHOS_SDK" ]; then
   exit 1
 fi
 
-if [ -z "$HOUMO_EXAMPLES_PATH" ]; then
-  echo "Error: HOUMO_EXAMPLES_PATH environment variable is not set"
-  echo "  export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo"
+if [ -z "$POSTMO_EXAMPLES_PATH" ]; then
+  echo "Error: POSTMO_EXAMPLES_PATH environment variable is not set"
+  echo "  export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo"
   exit 1
 fi
 
@@ -35,16 +35,16 @@ if [ -z "$TCIM_RUNTIME_PATH" ]; then
   exit 1
 fi
 
-if [ "$HOUMO_TARGET" != "xh2" ]; then
-  echo "Error: HOUMO_TARGET must be 'xh2'"
-  echo "  export HOUMO_TARGET=xh2"
+if [ "$POSTMO_TARGET" != "xh2" ]; then
+  echo "Error: POSTMO_TARGET must be 'xh2'"
+  echo "  export POSTMO_TARGET=xh2"
   exit 1
 fi
 
 echo "[INFO] OHOS_SDK:           $OHOS_SDK"
-echo "[INFO] HOUMO_EXAMPLES_PATH: $HOUMO_EXAMPLES_PATH"
+echo "[INFO] POSTMO_EXAMPLES_PATH: $POSTMO_EXAMPLES_PATH"
 echo "[INFO] TCIM_RUNTIME_PATH:   $TCIM_RUNTIME_PATH"
-echo "[INFO] HOUMO_TARGET:        $HOUMO_TARGET"
+echo "[INFO] POSTMO_TARGET:        $POSTMO_TARGET"
 
 OHOS_CLANG="${OHOS_SDK}/llvm/bin/clang"
 OHOS_CLANGXX="${OHOS_SDK}/llvm/bin/clang++"

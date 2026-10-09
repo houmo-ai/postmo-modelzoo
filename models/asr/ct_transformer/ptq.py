@@ -20,7 +20,7 @@ from xhquant.xhonnxruntime.hmonnx_inference import HMONNXInference
 THIS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = THIS_DIR.parents[2]
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
 DEFAULT_CONFIG_PATH = THIS_DIR / "config.yaml"
 
 

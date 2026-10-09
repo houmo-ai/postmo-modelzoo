@@ -99,8 +99,8 @@ gte_Qwen2-1.5B-instruct 模型使用 python API 进行演示。
 
 1. `demo.py` 默认从 `config.yaml` 推导 `tokenizer_dir`，并默认读取：
 
-  - `output/${HOUMO_TARGET}/gte-1.5b_prefill.hmm`
-  - `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+  - `output/${POSTMO_TARGET}/gte-1.5b_prefill.hmm`
+  - `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
 
 2. 执行脚本，推理完成将输出性能结果。
 

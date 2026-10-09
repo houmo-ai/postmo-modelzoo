@@ -17,7 +17,7 @@ else()
   set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -ggdb")
 endif()
 
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/qwen3_tts_frontend.cmake")
 
 if(ANDROID_ABI)

@@ -11,7 +11,7 @@ source "${MODELS_DIR}/test_common.sh"
 STEP="demo"
 SKIP_DOWNLOAD="false"
 parse_args "$@"
-HOUMO_TARGET="${HOUMO_TARGET:-xh2}"
+POSTMO_TARGET="${POSTMO_TARGET:-xh2}"
 
 cd "${SCRIPT_DIR}"
 

@@ -28,8 +28,8 @@ from pathlib import Path
 from hmatc.exec.xh2_exec import Xh2Exec
 from hmatc.utils.utils import find_hmonnx_file, get_platform, parse_context_length
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 MODEL_ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = MODEL_ROOT / "config.yaml"
@@ -103,7 +103,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model_dir",
-        default=str(MODEL_ROOT / "output" / HOUMO_TARGET / "hmquant"),
+        default=str(MODEL_ROOT / "output" / POSTMO_TARGET / "hmquant"),
         help="hmquant model directory",
     )
     parser.add_argument("--model_name", default=None, help="output model name")
@@ -122,7 +122,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage", choices=["build", "test", "all"], default="build")
     parser.add_argument(
         "--output_dir",
-        default=str(MODEL_ROOT / "output" / HOUMO_TARGET),
+        default=str(MODEL_ROOT / "output" / POSTMO_TARGET),
         help="compiled output directory",
     )
     parser.add_argument(

@@ -30,62 +30,62 @@
     "develop_url": false,
     "__comment__4": "All environment variables that env.bat will set",
     "all_environments": {
-        "HOUMO_MODELZOO_URL": "",
+        "POSTMO_MODELZOO_URL": "",
         "HDPL_PLATFORM": "",
-        "HOUMO_TARGET": "",
+        "POSTMO_TARGET": "",
         "TCIM_BACKEND": "",
-        "HOUMO_EXAMPLES_PATH": "",
+        "POSTMO_EXAMPLES_PATH": "",
         "PYTHON_DIR": "",
         "TCIM_RUNTIME_PATH": "",
         "CMAKE_PATH": "",
-        "HOUMO_PATH": "",
-        "HOUMO_SDK_PATH": "",
+        "POSTMO_PATH": "",
+        "POSTMO_SDK_PATH": "",
         "OPENCV_PATH": "",
-        "HOUMO_VERSION": "",
+        "POSTMO_VERSION": "",
         "PATH": ""
     },
     "__comment__5": "Environment variables required by get_model script",
     "get_model_environments": [
         "PYTHON_DIR",
-        "HOUMO_MODELZOO_URL",
-        "HOUMO_TARGET",
-        "HOUMO_VERSION",
+        "POSTMO_MODELZOO_URL",
+        "POSTMO_TARGET",
+        "POSTMO_VERSION",
         "HDPL_PLATFORM",
-        "HOUMO_EXAMPLES_PATH"
+        "POSTMO_EXAMPLES_PATH"
     ],
     "__comment__6": "Python example environment variables = get_model script required environment variables + current settings",
     "py_example_environments": {
         "qwen3": [
             "TCIM_BACKEND",
             "TCIM_RUNTIME_PATH",
-            "HOUMO_SDK_PATH"
+            "POSTMO_SDK_PATH"
         ],
         "resnet50": [
             "TCIM_BACKEND",
             "TCIM_RUNTIME_PATH",
-            "HOUMO_SDK_PATH"
+            "POSTMO_SDK_PATH"
         ],
         "resnet50_multistreams": [
             "TCIM_BACKEND",
             "TCIM_RUNTIME_PATH",
-            "HOUMO_SDK_PATH"
+            "POSTMO_SDK_PATH"
         ],
         "resnet50_pipeline": [
             "TCIM_BACKEND",
             "TCIM_RUNTIME_PATH",
-            "HOUMO_SDK_PATH"
+            "POSTMO_SDK_PATH"
         ],
         "yolov5s": [
             "TCIM_BACKEND",
             "TCIM_RUNTIME_PATH",
-            "HOUMO_SDK_PATH"
+            "POSTMO_SDK_PATH"
         ]
     },
     "__comment__7": "C++ example environment variables = Python example environment variables + current settings",
     "cpp_example_environments": {
         "qwen3": [
             "CMAKE_PATH",
-            "HOUMO_PATH"
+            "POSTMO_PATH"
         ],
         "resnet50": [
             "CMAKE_PATH",

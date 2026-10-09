@@ -136,17 +136,17 @@ def get_package_version(package_name: str):
 
 
 def get_houmo_version():
-    """Get the Houmo version from environment variable HOUMO_VERSION.
+    """Get the Houmo version from environment variable POSTMO_VERSION.
 
     Returns:
         str: The Houmo version string with 'v' prefix
 
     Raises:
-        ValueError: If HOUMO_VERSION environment variable is not set or version format is invalid
+        ValueError: If POSTMO_VERSION environment variable is not set or version format is invalid
     """
-    v = os.getenv("HOUMO_VERSION")
+    v = os.getenv("POSTMO_VERSION")
     if v is None:
-        raise ValueError("Please set HOUMO_VERSION env")
+        raise ValueError("Please set POSTMO_VERSION env")
 
     def check_version(version_str):
         pattern = r"^(v)?(\d+)\.(\d+)\.(\d+)(\.dev\d{8})?$"
@@ -429,7 +429,7 @@ def _parse_file_url(file_path: str) -> tuple[str, str, str]:
         file_relative_path = file_path[split_idx:]
     # 2. Handling the situation of relative paths
     else:
-        env_url = os.getenv("HOUMO_MODELZOO_URL")
+        env_url = os.getenv("POSTMO_MODELZOO_URL")
         if _ping_houmo_domain() is True:
             repo_type = "jfrog"
             modelzoo_url = env_url if env_url else JFROG_REPO
@@ -728,7 +728,7 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
 
     Args:
         file_path (str): Complete URL or relative path to the file
-        save_dir (str): Directory to save the downloaded file (default: current directory or HOUMO_MODEL_PATH)
+        save_dir (str): Directory to save the downloaded file (default: current directory or POSTMO_MODEL_PATH)
         extract_dir (str, optional): Directory to extract compressed files (default: None)
 
     Returns:
@@ -745,7 +745,7 @@ def get_file_from_jfrog(file_path: str, save_dir: str = "", extract_dir=None) ->
         return ""
 
     save_dir = (
-        save_dir.strip() if save_dir else os.getenv("HOUMO_MODEL_PATH", default="./")
+        save_dir.strip() if save_dir else os.getenv("POSTMO_MODEL_PATH", default="./")
     )
     save_dir = os.path.abspath(save_dir)
     os.makedirs(save_dir, exist_ok=True)
@@ -1010,7 +1010,7 @@ def hmatc_get_file(
     if file_type in ["raw"]:
         ignore_patterns = []
         if model_cfgs.get("raw_files", None) is not None:
-            extract_dir_new = os.getenv("HOUMO_DATASETS_PATH", ".")
+            extract_dir_new = os.getenv("POSTMO_DATASETS_PATH", ".")
             _download_raw_quant(
                 file_type,
                 model_cfgs,

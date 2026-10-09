@@ -21,8 +21,8 @@ import os
 import argparse
 import torch
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 def parse_args():

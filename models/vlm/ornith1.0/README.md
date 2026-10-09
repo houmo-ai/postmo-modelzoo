@@ -54,14 +54,14 @@
 source env.sh
 cd models/vlm/ornith1.0
 pip3 install -r requirements.txt
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 ```
 
 `requirements.txt` 中包含 Demo 所需的 Python 依赖。量化和编译还需要与当前 Houmo XH2 工具链匹配的运行环境。
 
 ### 2.2 获取模型和数据
 
-设置 `HOUMO_TARGET=xh2` 后，使用 `get_model.py` 下载模型。该脚本支持下载原始模型（`raw`）和预编译芯片模型（`hmm`）。
+设置 `POSTMO_TARGET=xh2` 后，使用 `get_model.py` 下载模型。该脚本支持下载原始模型（`raw`）和预编译芯片模型（`hmm`）。
 
 下载原始模型用于量化：
 
@@ -89,17 +89,17 @@ python3 get_model.py \
 
 默认 Demo 产物路径如下：
 
-- `output/${HOUMO_TARGET}/ornith1.0-35b_prefill.hmm`
-- `output/${HOUMO_TARGET}/ornith1.0-35b_decode.hmm`
-- `output/${HOUMO_TARGET}/ornith1.0-35b_visual_448x448x2.hmm`
-- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
-- `output/${HOUMO_TARGET}/hmquant/hf_config/`
+- `output/${POSTMO_TARGET}/ornith1.0-35b_prefill.hmm`
+- `output/${POSTMO_TARGET}/ornith1.0-35b_decode.hmm`
+- `output/${POSTMO_TARGET}/ornith1.0-35b_visual_448x448x2.hmm`
+- `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
+- `output/${POSTMO_TARGET}/hmquant/hf_config/`
 
 当使用多设备编译时，prefill 和 decode 产物为对应的 `.hmms` 文件，例如 `ornith1.0-35b_prefill.hmms` 和 `ornith1.0-35b_decode.hmms`。
 
 ### 2.3 量化
 
-量化使用 `config.yaml` 中的 Merak workflow 配置，并将量化和导出结果整理到 `output/${HOUMO_TARGET}/hmquant/`。确保原始模型和量化环境已准备完成后，在模型目录执行：
+量化使用 `config.yaml` 中的 Merak workflow 配置，并将量化和导出结果整理到 `output/${POSTMO_TARGET}/hmquant/`。确保原始模型和量化环境已准备完成后，在模型目录执行：
 
 ```bash
 python3 ptq.py \
@@ -131,7 +131,7 @@ python3 ptq.py \
 
 ### 2.4 编译
 
-编译前，确认 `output/${HOUMO_TARGET}/hmquant/` 下已有 `prefill`、`decode` 和视觉模型目录。执行：
+编译前，确认 `output/${POSTMO_TARGET}/hmquant/` 下已有 `prefill`、`decode` 和视觉模型目录。执行：
 
 ```bash
 python3 build.py \
@@ -143,9 +143,9 @@ python3 build.py \
 
 默认编译产物为：
 
-- `output/${HOUMO_TARGET}/ornith1.0-35b_prefill.hmm`
-- `output/${HOUMO_TARGET}/ornith1.0-35b_decode.hmm`
-- `output/${HOUMO_TARGET}/ornith1.0-35b_visual_448x448x2.hmm`
+- `output/${POSTMO_TARGET}/ornith1.0-35b_prefill.hmm`
+- `output/${POSTMO_TARGET}/ornith1.0-35b_decode.hmm`
+- `output/${POSTMO_TARGET}/ornith1.0-35b_visual_448x448x2.hmm`
 
 多设备编译示例：
 
@@ -166,7 +166,7 @@ python3 build.py \
 ```bash
 source env.sh
 cd models/vlm/ornith1.0
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 python3 demo.py
 ```
 

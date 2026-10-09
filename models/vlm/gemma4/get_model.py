@@ -24,8 +24,8 @@ import yaml
 
 from hmatc.utils.utils import get_houmo_version, hmatc_get_file, first_not_none
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config_gemma4_e2b.yml")
 
 # fmt: off
@@ -87,10 +87,10 @@ if __name__ == "__main__":
     batch = args.batch
     ncore = args.ncore
     model_size = f"{model_size}-mtp" if mtp else model_size
-    extract_dir = f"output/{model_size}/{HOUMO_TARGET}" if args.extract_dir is None else args.extract_dir
+    extract_dir = f"output/{model_size}/{POSTMO_TARGET}" if args.extract_dir is None else args.extract_dir
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": model_name,

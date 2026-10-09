@@ -76,11 +76,11 @@ from xh_model_zoo.xh_llm.models.qwen3_tts import (
 )
 from hmatc.utils.utils import get_model_configs, first_not_none
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", os.path.abspath("../../../"))
+POSTMO_EXAMPLES_PATH = os.getenv("POSTMO_EXAMPLES_PATH", os.path.abspath("../../../"))
 DEFAULT_CONFIG_PATH = os.path.join(script_dir, "config.yaml")
 
 SUPPORTED_MODELS = [
@@ -2076,7 +2076,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
     parser.add_argument("--model_dir", type=str, default=None, help="HF model dir (auto-resolved from model_name/model_size if not set)")
     parser.add_argument("--work_dir", type=str, default="./work_dirs", help="Base working directory (model tag appended automatically)")
-    parser.add_argument("--output_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="Output directory for final quantized artifacts")
+    parser.add_argument("--output_dir", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant"), help="Output directory for final quantized artifacts")
     parser.add_argument("--model_name", type=str, default=None, help="Model name")
     parser.add_argument("--model_size", type=str, default=None, help="Model size")
     parser.add_argument("--batch", type=int, default=None, help="batch size")
@@ -2090,7 +2090,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--frontend_mel_frames", type=int, default=400, help="speaker_encoder export mel frames")
     parser.add_argument("--frontend_mel_dim", type=int, default=128, help="speaker_encoder export mel dim")
     parser.add_argument("--frontend_opset", type=int, default=18, help="ONNX opset for base-only frontend models")
-    parser.add_argument("--ref_audio", type=str, default=f"{HOUMO_EXAMPLES_PATH}/data/audio/clone_1.wav", help="Reference audio for base model voice clone")
+    parser.add_argument("--ref_audio", type=str, default=f"{POSTMO_EXAMPLES_PATH}/data/audio/clone_1.wav", help="Reference audio for base model voice clone")
     parser.add_argument("--ref_text", type=str, default="甚至出现交易几乎停滞的情况。", help="Reference text for base model voice clone")
     parser.add_argument("--models", type=str, default="all",
                         help=f"Exporters to run, comma-separated from {SUPPORTED_MODELS}, or 'all' for every exporter")

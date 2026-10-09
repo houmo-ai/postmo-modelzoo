@@ -113,7 +113,7 @@ python3 ptq.py --model_name cosyvoice3 --model_size 0.5b-2512
 - `--input_sequence_length`: 输入序列长度，默认 `256`
 - `--quant_type`: 量化类型，默认 `w8a16h1_sefp`
 
-默认产物目录为 `output/$HOUMO_TARGET/hmquant`，其中会包含多子目录与文件（示例）：
+默认产物目录为 `output/$POSTMO_TARGET/hmquant`，其中会包含多子目录与文件（示例）：
 
 ```text
 output/xh2/hmquant
@@ -142,7 +142,7 @@ cd models/tts/cosyvoice3
 python3 build.py --model_name cosyvoice3 --model_size 0.5b-2512
 ```
 
-编译产物默认位于 `output/$HOUMO_TARGET/` 目录下，包含多个 `.hmm` 文件。
+编译产物默认位于 `output/$POSTMO_TARGET/` 目录下，包含多个 `.hmm` 文件。
 
 默认输出名称分别为：
 

@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Get version from environment or use default
-HOUMO_VERSION="${HOUMO_VERSION:-1.1.0}"
+POSTMO_VERSION="${POSTMO_VERSION:-1.1.0}"
 
 # Check if already in a venv, create sub-venv to isolate dependencies
 VENV_DIR="qwen3_vl_demo"
@@ -41,7 +41,7 @@ pip3 install transformers==4.57.1 qwen_vl_utils -i https://pypi.tuna.tsinghua.ed
 echo "Running evaluation..."
 hmeval \
     --model ./hm_xh2_qwen3_vl.py \
-    --model-dir ./models/hmm_xh2_qwen3-vl_4b_256_32k_b1_1chip_2cores_v${HOUMO_VERSION} \
+    --model-dir ./models/hmm_xh2_qwen3-vl_4b_256_32k_b1_1chip_2cores_v${POSTMO_VERSION} \
     --dataset mm_bench \
     --limit 1 \
     --model-args tokenizer_dir=./models/tokenizers

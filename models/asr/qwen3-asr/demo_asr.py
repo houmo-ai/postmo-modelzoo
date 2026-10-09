@@ -36,8 +36,8 @@ from qwen_asr.core.transformers_backend import (
 from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 ASR_TEXT_PATTERN = re.compile(r"(?<=<asr_text>)[\s\S]*")
@@ -324,7 +324,7 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -346,11 +346,11 @@ def get_args() -> argparse.Namespace:
         args.processor_dir = get_default_processor_dir(model_config)
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.encode_path is None:
-        args.encode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_encode.hmm")
+        args.encode_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_encode.hmm")
     if args.decode_path is None:
-        args.decode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_decode.hmm")
+        args.decode_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_decode.hmm")
     if args.prefill_path is None:
-        args.prefill_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm")
+        args.prefill_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_prefill.hmm")
     if args.ndevice > 1:
         if args.decode_path.endswith(".hmm"):
             args.decode_path = args.decode_path.replace(".hmm", ".hmms")
@@ -402,7 +402,7 @@ class Qwen3Asr:
             self.audio_pad_id = self.tokenizer.encode("<|audio_pad|>", add_special_tokens=False)[0]
 
         embedding_tensor = torch.load(embedding_path, map_location=self.device)
-        if HOUMO_TARGET == "xh2":
+        if POSTMO_TARGET == "xh2":
             embedding_tensor = embedding_tensor["weight"]
         if embedding_tensor.dtype != torch.float16:
             embedding_tensor = embedding_tensor.to(torch.float16)

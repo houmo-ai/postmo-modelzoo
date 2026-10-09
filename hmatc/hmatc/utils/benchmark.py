@@ -87,7 +87,7 @@ def run_single_model(
 
     # Check model location
     if not os.path.exists(location):
-        alt_location = os.path.join(os.environ.get("HOUMO_EXAMPLES_PATH", ""), location)
+        alt_location = os.path.join(os.environ.get("POSTMO_EXAMPLES_PATH", ""), location)
         if os.path.exists(alt_location):
             location = alt_location
         else:

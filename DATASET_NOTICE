@@ -24,7 +24,7 @@ data/
 示例默认通过环境变量定位数据，可指向仓库内目录或外部目录：
 
 ```bash
-export HOUMO_DATASETS_PATH=/path/to/datasets
+export POSTMO_DATASETS_PATH=/path/to/datasets
 ```
 
 ## 3. 数据集分类与处理方式

@@ -284,9 +284,9 @@ static int RunAsr(std::unordered_map<std::string, std::string> args,
       std::unordered_map<std::string, std::string> tmp;
       tmp["devices"] = args["devices"];
       settings.devices = validate_multi_setting(tmp, "devices");
-    } else if (getenv("HOUMO_VISIBLE_DEVICES") != nullptr) {
+    } else if (getenv("POSTMO_VISIBLE_DEVICES") != nullptr) {
       std::unordered_map<std::string, std::string> tmp;
-      tmp["devices"] = getenv("HOUMO_VISIBLE_DEVICES");
+      tmp["devices"] = getenv("POSTMO_VISIBLE_DEVICES");
       settings.devices = validate_multi_setting(tmp, "devices");
     } else {
       settings.devices = {0};

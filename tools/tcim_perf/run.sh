@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-TEST_MODEL=$HOUMO_EXAMPLES_PATH/models/backbone/resnet50/output/xh2/resnet50_xh2_b1_1core_O2.hmm
+TEST_MODEL=$POSTMO_EXAMPLES_PATH/models/backbone/resnet50/output/xh2/resnet50_xh2_b1_1core_O2.hmm
 MODEL_NAME=resnet50_xh2_w8a8h1_sefp
 MODEL_NDEVICE=1
-TEST_INPUT=$HOUMO_EXAMPLES_PATH/models/backbone/resnet50/output/xh2/hmquant/golden/step_0
+TEST_INPUT=$POSTMO_EXAMPLES_PATH/models/backbone/resnet50/output/xh2/hmquant/golden/step_0
 TEST_SAMPLES=1000
 TEST_WARMUP=1
 TEST_BATCH=1

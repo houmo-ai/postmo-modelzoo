@@ -25,10 +25,10 @@ import os
 
 from hmatc.utils.utils import first_not_none, get_houmo_version, get_model_configs, hmatc_get_file, get_file_from_jfrog
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
-HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+POSTMO_CORE_NUM = int(os.getenv("POSTMO_CORE_NUM", 2))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -61,7 +61,7 @@ def get_args() -> argparse.Namespace:
         "--extract_dir",
         dest="extract_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET),
+        default=os.path.join("output", POSTMO_TARGET),
         help="where to extract downloaded archives",
     )
     parser.add_argument(
@@ -100,10 +100,10 @@ if __name__ == "__main__":
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    ncore = first_not_none(args.ncore, model_config.get("ncore", POSTMO_CORE_NUM))
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": model_name,

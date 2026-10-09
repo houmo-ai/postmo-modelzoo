@@ -199,7 +199,7 @@ BUILD_POSITIVE_INTEGER_FIELDS = {
 
 class XH2LmRunner(object):
     def __init__(self, cfg: dict):
-        target = cfg.get("target") or os.environ.get("HOUMO_TARGET", "xh2")
+        target = cfg.get("target") or os.environ.get("POSTMO_TARGET", "xh2")
         self.target = target
         save_dir = (
             os.environ.get("HMATC_SAVE_DIR")

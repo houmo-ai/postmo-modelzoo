@@ -1,6 +1,6 @@
 # Qwen3.5 MLLM C++ 推理示例
 
-本目录展示如何在 Linux、Windows 11 和 Android Native 环境中注册当前目录 `include/` 和 `src/` 下的 Qwen3.5 MLLM 子类实现，并通过 `ModelFactory` 和 `$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 复用 `houmo_engine` 的基础框架能力。
+本目录展示如何在 Linux、Windows 11 和 Android Native 环境中注册当前目录 `include/` 和 `src/` 下的 Qwen3.5 MLLM 子类实现，并通过 `ModelFactory` 和 `$POSTMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 复用 `houmo_engine` 的基础框架能力。
 
 示例支持：
 
@@ -16,7 +16,7 @@
 | `demo.cc` | Qwen3.5 MLLM 推理 demo 主程序 |
 | `include/qwen35_mllm_model.h` | `Qwen35MLLMModel` / `Qwen35MLLMContext` 声明 |
 | `src/qwen35_mllm_model.cc` | Qwen3.5 MLLM 子类实现和静态注册 |
-| `$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` | houmo_engine 依赖配置模块 |
+| `$POSTMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` | houmo_engine 依赖配置模块 |
 | `CMakeLists.txt` | demo 编译配置 |
 | `build_linux.sh` | Linux 编译脚本 |
 | `build_win.bat` | Windows 11 编译脚本 |
@@ -63,8 +63,8 @@ target_link_libraries(demo PRIVATE houmo_engine)
 Linux 构建前需要准备：
 
 ```bash
-export HOUMO_TARGET=xh2
-export HOUMO_EXAMPLES_PATH=/hmdd/imodelzoo
+export POSTMO_TARGET=xh2
+export POSTMO_EXAMPLES_PATH=/hmdd/imodelzoo
 export TCIM_RUNTIME_PATH=/path/to/tcim_runtime
 export TCIM_BACKEND=Xh2HalBackend
 ```
@@ -72,19 +72,19 @@ export TCIM_BACKEND=Xh2HalBackend
 Windows 环境建议参考仓库根目录的 `env.bat` 和 `tools/win_envs`：
 
 ```bat
-cd /d "%HOUMO_EXAMPLES_PATH%"
+cd /d "%POSTMO_EXAMPLES_PATH%"
 env.bat --set
 ```
 
-`env.bat --set` 会根据 `tools/win_envs/env.json` 设置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`、`OPENCV_PATH`、`PATH` 等变量。执行完成后需要重新打开 cmd 窗口，使环境变量生效。
+`env.bat --set` 会根据 `tools/win_envs/env.json` 设置 `POSTMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`POSTMO_SDK_PATH`、`OPENCV_PATH`、`PATH` 等变量。执行完成后需要重新打开 cmd 窗口，使环境变量生效。
 
-请确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\utils\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll` 等运行时依赖。
+请确认 `PATH` 中包含 `%POSTMO_EXAMPLES_PATH%\utils\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll` 等运行时依赖。
 
 Android 交叉编译还需要：
 
 ```bash
 export NDK_PATH=/path/to/android-ndk-r28c
-export HOUMO_SDK_PATH=/path/to/houmo-drv-xh2
+export POSTMO_SDK_PATH=/path/to/houmo-drv-xh2
 ```
 
 ## 编译
@@ -114,7 +114,7 @@ bash build_ndk.sh
 build_win.bat
 ```
 
-Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$HOUMO_EXAMPLES_PATH/utils/lib` 下缺少 `houmo_infer` 相关产物，`$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 会自动触发 `utils/cpp/houmo_engine/build_win.bat` 构建依赖。
+Windows 构建默认使用 `Release`，并使用 `%NUMBER_OF_PROCESSORS%` 并行编译。首次构建时，如果 `$POSTMO_EXAMPLES_PATH/utils/lib` 下缺少 `houmo_infer` 相关产物，`$POSTMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 会自动触发 `utils/cpp/houmo_engine/build_win.bat` 构建依赖。
 
 Linux 编译产物位于：
 
@@ -250,7 +250,7 @@ demo 推理结束后会输出：
 - 只要传入 `--image`，就必须同时传入 dynamic visual `.hmm` 文件或 gear 目录。
 - `--tokenizer` 需要与模型编译时使用的 tokenizer 保持一致。
 - `--embedding` 需要使用框架要求的量化 embedding 格式。
-- `$HOUMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 会链接 `houmo_infer`、`tcim_runtime_lite`，并复用 `houmo_engine` 的 include 和 lib 配置；Windows 平台下还会导入 `tokenizer_lib.lib/.dll`，并在依赖缺失时自动调用 `utils/cpp/houmo_engine/build_win.bat` 构建。
+- `$POSTMO_EXAMPLES_PATH/cmake/houmo_engine.cmake` 会链接 `houmo_infer`、`tcim_runtime_lite`，并复用 `houmo_engine` 的 include 和 lib 配置；Windows 平台下还会导入 `tokenizer_lib.lib/.dll`，并在依赖缺失时自动调用 `utils/cpp/houmo_engine/build_win.bat` 构建。
 
 ## 免责声明
 

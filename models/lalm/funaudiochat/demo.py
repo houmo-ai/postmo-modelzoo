@@ -248,7 +248,7 @@ def get_args() -> argparse.ArgumentParser:
 def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:
     """Resolve defaults that depend on the selected inference stage."""
     if args.audio_path is None:
-        examples = Path(os.getenv("HOUMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
+        examples = Path(os.getenv("POSTMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
         args.audio_path = examples / "data" / "audio" / ("questions.wav" if args.stage == "e2e" else "question.wav")
     if args.system_prompt is None:
         args.system_prompt = DEFAULT_SYSTEM_PROMPT if args.stage == "s2t" else SPOKEN_PROMPT

@@ -33,13 +33,13 @@ from hmatc.utils.utils import (
     get_platform,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
-HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+POSTMO_CORE_NUM = int(os.getenv("POSTMO_CORE_NUM", 2))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
-DEFAULT_MODEL_DIR = os.path.join("output", HOUMO_TARGET, "hmquant")
-DEFAULT_OUTPUT_DIR = os.path.join("output", HOUMO_TARGET)
+DEFAULT_MODEL_DIR = os.path.join("output", POSTMO_TARGET, "hmquant")
+DEFAULT_OUTPUT_DIR = os.path.join("output", POSTMO_TARGET)
 
 
 def get_args() -> argparse.Namespace:
@@ -123,7 +123,7 @@ def get_args() -> argparse.Namespace:
             f"Model configuration not found: {args.model_name}/{args.model_size} "
             f"in {args.config_path}"
         )
-    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", POSTMO_CORE_NUM))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     return args
 
@@ -148,7 +148,7 @@ def main() -> None:
             ndevice=args.ndevice,
             opt_level=args.opt_level,
             parallel_jobs=args.parallel_jobs,
-            target=HOUMO_TARGET,
+            target=POSTMO_TARGET,
         )
 
     if not os.path.isfile(hmm_path):

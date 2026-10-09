@@ -27,11 +27,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-IMODELZOO_ROOT = Path(os.getenv("HOUMO_EXAMPLES_PATH") or "../../../")
+IMODELZOO_ROOT = Path(os.getenv("POSTMO_EXAMPLES_PATH") or "../../../")
 sys.path.insert(0, str(IMODELZOO_ROOT / "utils" / "python"))
 sys.path.insert(0, str(ROOT))
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = ROOT / "config.yaml"
 
 
@@ -136,7 +136,7 @@ def get_args() -> argparse.ArgumentParser:
         "--embedding-path",
         dest="embedding_path",
         type=Path,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="embedding weights",
     )
     return parser
@@ -153,13 +153,13 @@ def _default_question(args: argparse.Namespace) -> str:
 def _resolve_model_paths(args: argparse.Namespace, model_prefix: str) -> None:
     model_suffix = "hmms" if args.ndevice > 1 else "hmm"
     if args.prefill_path is None:
-        args.prefill_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_prefill.{model_suffix}")
+        args.prefill_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_prefill.{model_suffix}")
     if args.decode_path is None:
-        args.decode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_decode.{model_suffix}")
+        args.decode_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_decode.{model_suffix}")
     if args.vision_path is None:
         vision_profile = "6x" if args.video_path and not args.image_path else "1x"
-        args.vision_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_visual_{vision_profile}.hmm")
-    args.video_vision_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_visual_6x.hmm")
+        args.vision_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_visual_{vision_profile}.hmm")
+    args.video_vision_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_visual_6x.hmm")
 
 
 def _resolve_args(args: argparse.Namespace) -> argparse.Namespace:

@@ -58,7 +58,7 @@ TEST_VENV_ACTIVE=0
 dir_path="qwen3.5_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
-    gptq_requirements="${HOUMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"
+    gptq_requirements="${POSTMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"
     if [ -f "${gptq_requirements}" ]; then
         pip3 install -r "${gptq_requirements}"
     fi
@@ -138,18 +138,18 @@ if should_run_step "demo"; then
         else
             python3 python/demo_prefix_caching.py --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
-            python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+            python3 "${POSTMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${POSTMO_TARGET}/hmquant/quant_embedding.pt"
             echo "Execute cpp demo."
             cd cpp && ./build_linux.sh && cd ..
             if [[ "${NDEVICE}" -eq 1 ]]; then
                 ./bin/demo --config config.yaml \
                     --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}" \
                     --prompt "描述这些图片" \
-                    --image_path "${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg"
+                    --image_path "${POSTMO_EXAMPLES_PATH}/data/pic/beach.jpeg"
             fi
             if command -v llm_perf &>/dev/null; then
                 echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
-                visual_prefix="output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual"
+                visual_prefix="output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual"
                 visual_model_path=""
                 for gear in 1536 704 384 196 96; do
                     if [ -f "${visual_prefix}_m${gear}.hmm" ]; then
@@ -178,15 +178,18 @@ if should_run_step "demo"; then
                 else
                     model_suffix="hmm"
                 fi
+                # Installed llm_perf still reads HOUMO_TARGET. Map the current
+                # POSTMO backend onto that name for this invocation only.
+                HOUMO_TARGET="${POSTMO_TARGET:-xh2}" \
                 llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" \
                     --devices "${devices_param}" \
                     --input 256,1024,2048 \
                     --output 256,256,256 \
                     --loop 1 --batch 1 ${LOAD_MODE} \
-                    --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
-                    --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+                    --prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+                    --decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
                     --visual "${visual_model_path}" \
-                    --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+                    --embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding.bin"
             fi
         fi
     fi

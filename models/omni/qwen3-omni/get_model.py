@@ -31,10 +31,10 @@ from hmatc.utils.utils import (
 
 from base_utils import parse_quant_types
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
-HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+POSTMO_CORE_NUM = int(os.getenv("POSTMO_CORE_NUM", 2))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 # Pre-compiled hmm package URL (not part of the frozen config.yaml, passed via args).
 
@@ -155,12 +155,12 @@ if __name__ == "__main__":
     )
     batch = first_not_none(args.batch, model_config.get("batch", 1))
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    ncore = first_not_none(args.ncore, model_config.get("ncore", POSTMO_CORE_NUM))
     quant_types = parse_quant_types(model_config)
     quant_type = first_not_none(args.quant_type, quant_types["llm"])
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": model_name,

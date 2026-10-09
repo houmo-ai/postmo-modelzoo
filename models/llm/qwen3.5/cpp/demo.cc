@@ -441,7 +441,7 @@ int main(int argc, char* argv[]) {
   const ModelSelection selected = load_model_selection(
       config_file.string(), model_name, model_size);
   const fs::path model_root = config_file.parent_path();
-  const fs::path output_dir = model_root / "output" / env_or("HOUMO_TARGET", "xh2");
+  const fs::path output_dir = model_root / "output" / env_or("POSTMO_TARGET", "xh2");
   const std::string model_prefix = selected.name + "-" + selected.size;
   if (prefill_path.empty()) prefill_path = (output_dir / (model_prefix + "_prefill.hmm")).string();
   if (decode_path.empty()) decode_path = (output_dir / (model_prefix + "_decode.hmm")).string();
@@ -449,7 +449,7 @@ int main(int argc, char* argv[]) {
   if (tokenizer_path.empty()) tokenizer_path = (model_root / selected.repo_name).string();
   if (visual_path.empty()) visual_path = find_default_visual_path(output_dir, model_prefix);
   if (image_paths.empty()) {
-    image_paths.push_back((fs::path(env_or("HOUMO_EXAMPLES_PATH", model_root.string())) / "data/pic/beach.jpeg").string());
+    image_paths.push_back((fs::path(env_or("POSTMO_EXAMPLES_PATH", model_root.string())) / "data/pic/beach.jpeg").string());
   }
 
   if (!requireFile("--prefill", prefill_path) ||

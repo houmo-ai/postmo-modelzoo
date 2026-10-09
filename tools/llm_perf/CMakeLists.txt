@@ -3,33 +3,33 @@ project(llm_perf)
 
 include(CheckCXXCompilerFlag)
 
-set(HOUMO_ENGINE_DIR $ENV{HOUMO_EXAMPLES_PATH}/utils/cpp/houmo_engine)
-set(HOUMO_PLATFORM_ANDROID FALSE)
-set(HOUMO_PLATFORM_WINDOWS FALSE)
-set(HOUMO_PLATFORM_LINUX FALSE)
-set(HOUMO_PLATFORM_NAME "unknown")
-set(HOUMO_NEED_PTHREAD FALSE)
-set(THIRDPARTY_PATH $ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
+set(POSTMO_ENGINE_DIR $ENV{POSTMO_EXAMPLES_PATH}/utils/cpp/houmo_engine)
+set(POSTMO_PLATFORM_ANDROID FALSE)
+set(POSTMO_PLATFORM_WINDOWS FALSE)
+set(POSTMO_PLATFORM_LINUX FALSE)
+set(POSTMO_PLATFORM_NAME "unknown")
+set(POSTMO_NEED_PTHREAD FALSE)
+set(THIRDPARTY_PATH $ENV{POSTMO_EXAMPLES_PATH}/3rdparty)
 
 if(ANDROID_ABI)
-  set(HOUMO_PLATFORM_ANDROID TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/android.cmake)
+  set(POSTMO_PLATFORM_ANDROID TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/android.cmake)
 elseif(MSVC)
-  set(HOUMO_PLATFORM_WINDOWS TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/windows.cmake)
+  set(POSTMO_PLATFORM_WINDOWS TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/windows.cmake)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set(HOUMO_PLATFORM_LINUX TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/linux.cmake)
+  set(POSTMO_PLATFORM_LINUX TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/linux.cmake)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-  set(HOUMO_PLATFORM_OHOS TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/ohos.cmake)
+  set(POSTMO_PLATFORM_OHOS TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/ohos.cmake)
 else()
   message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
 
-message(STATUS "HOUMO platform: ${HOUMO_PLATFORM_NAME}")
+message(STATUS "HOUMO platform: ${POSTMO_PLATFORM_NAME}")
 
-check_cxx_compiler_flag("${HOUMO_CXX17_FLAG}" SUPPORT_CXX17)
+check_cxx_compiler_flag("${POSTMO_CXX17_FLAG}" SUPPORT_CXX17)
 if(NOT SUPPORT_CXX17)
   message(FATAL_ERROR "C++17 is required to build ${PROJECT_NAME}")
 endif()
@@ -38,7 +38,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_compile_options(${HOUMO_COMPILE_OPTIONS})
+add_compile_options(${POSTMO_COMPILE_OPTIONS})
 if(MSVC)
   add_compile_options(/DNOMINMAX /DEIGEN_MPL2_ONLY)
 else()
@@ -48,24 +48,24 @@ endif()
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
-if(HOUMO_RELEASE_FLAGS)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${HOUMO_RELEASE_FLAGS}")
+if(POSTMO_RELEASE_FLAGS)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${POSTMO_RELEASE_FLAGS}")
 endif()
-if(HOUMO_DEBUG_FLAGS)
-  set(CMAKE_CXX_FLAGS_DEBUG "${HOUMO_DEBUG_FLAGS}")
+if(POSTMO_DEBUG_FLAGS)
+  set(CMAKE_CXX_FLAGS_DEBUG "${POSTMO_DEBUG_FLAGS}")
 endif()
 
 if(MSVC)
   set(ORIGINAL_CXX_FLAGS ${CMAKE_CXX_FLAGS})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267 /wd4244")
 endif()
-include($ENV{HOUMO_EXAMPLES_PATH}/cmake/yaml-cpp.cmake)
+include($ENV{POSTMO_EXAMPLES_PATH}/cmake/yaml-cpp.cmake)
 if(MSVC)
   set(CMAKE_CXX_FLAGS ${ORIGINAL_CXX_FLAGS})
 endif()
 
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 
 option(ENABLE_ASR "Enable ASR support" ON)
 message(STATUS "ENABLE_ASR: ${ENABLE_ASR}")
@@ -73,19 +73,19 @@ option(ENABLE_TTS "Enable TTS support" ON)
 message(STATUS "ENABLE_TTS: ${ENABLE_TTS}")
 
 if(ENABLE_TTS)
-  include($ENV{HOUMO_EXAMPLES_PATH}/models/tts/qwen3-tts/cpp/cmake/qwen3_tts_frontend.cmake)
+  include($ENV{POSTMO_EXAMPLES_PATH}/models/tts/qwen3-tts/cpp/cmake/qwen3_tts_frontend.cmake)
   add_qwen3_tts_streaming_frontend(llm_perf_qwen3_tts_frontend)
 endif()
 
 include_directories(
-  $ENV{HOUMO_SDK_PATH}/hal/export/include
-  $ENV{HOUMO_SDK_PATH}/hal/include
+  $ENV{POSTMO_SDK_PATH}/hal/export/include
+  $ENV{POSTMO_SDK_PATH}/hal/include
   ${CMAKE_SOURCE_DIR}/include
   ${THIRDPARTY_PATH}
 )
 
 link_directories(
-  $ENV{HOUMO_SDK_PATH}/hal/lib
+  $ENV{POSTMO_SDK_PATH}/hal/lib
 )
 
 set(SOURCE_FILES
@@ -129,7 +129,7 @@ if(ENABLE_TTS)
   list(APPEND LLM_PERF_LIBS llm_perf_qwen3_tts_frontend)
 endif()
 
-if(HOUMO_NEED_PTHREAD)
+if(POSTMO_NEED_PTHREAD)
   list(APPEND LLM_PERF_LIBS pthread)
 endif()
 
@@ -137,8 +137,8 @@ if(NOT MSVC)
   list(APPEND LLM_PERF_LIBS hal_xh2a ${CMAKE_DL_LIBS})
 endif()
 
-if(HOUMO_EXTRA_LIBS)
-  list(APPEND LLM_PERF_LIBS ${HOUMO_EXTRA_LIBS})
+if(POSTMO_EXTRA_LIBS)
+  list(APPEND LLM_PERF_LIBS ${POSTMO_EXTRA_LIBS})
 endif()
 
 if(MSVC)

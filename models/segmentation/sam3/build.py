@@ -30,12 +30,12 @@ from hmatc.utils.utils import (
 	get_platform,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_MODEL_NAME = "sam3"
-DEFAULT_MODEL_DIR = os.path.join("output", HOUMO_TARGET, "hmquant")
-DEFAULT_OUTPUT_DIR = os.path.join("output", HOUMO_TARGET)
+DEFAULT_MODEL_DIR = os.path.join("output", POSTMO_TARGET, "hmquant")
+DEFAULT_OUTPUT_DIR = os.path.join("output", POSTMO_TARGET)
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yml")
 
 
@@ -137,7 +137,7 @@ def get_args() -> argparse.Namespace:
 	model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
 	args.ncore = first_not_none(
 		args.ncore,
-		model_config.get("ncore", int(os.getenv("HOUMO_CORE_NUM", 2))),
+		model_config.get("ncore", int(os.getenv("POSTMO_CORE_NUM", 2))),
 	)
 	args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
 	args.quant_type = first_not_none(
@@ -178,7 +178,7 @@ if __name__ == "__main__":
 				ndevice=args.ndevice,
 				flash_attn=args.flash_attention,
 				parallel_jobs=args.j,
-				target=HOUMO_TARGET,
+				target=POSTMO_TARGET,
 			)
 
 	print(

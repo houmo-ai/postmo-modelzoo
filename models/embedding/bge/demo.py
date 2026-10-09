@@ -38,8 +38,8 @@ from hmatc.utils.utils import first_not_none, get_model_configs
 
 import tcim_lite
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 SUPPORTED_MODEL_TYPES = ["onnx", "houmo"]
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -151,11 +151,11 @@ def get_args() -> argparse.Namespace:
     )
     args.embedding_path = first_not_none(
         args.embedding_path,
-        os.path.join("output", HOUMO_TARGET, f"{embedder_name}-{args.model_size}.hmm"),
+        os.path.join("output", POSTMO_TARGET, f"{embedder_name}-{args.model_size}.hmm"),
     )
     args.reranker_path = first_not_none(
         args.reranker_path,
-        os.path.join("output", HOUMO_TARGET, f"{reranker_name}-{args.model_size}.hmm"),
+        os.path.join("output", POSTMO_TARGET, f"{reranker_name}-{args.model_size}.hmm"),
     )
     return args
 

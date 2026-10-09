@@ -25,8 +25,8 @@ from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import check_gpu, first_not_none, get_model_configs
 from quant_pipeline import quant_and_export_llm
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument(
         "--out-dir",
         type=str,
-        default="output/{}/hmquant".format(HOUMO_TARGET),
+        default="output/{}/hmquant".format(POSTMO_TARGET),
         help="output directory for quantized models and golden data",
     )
     parser.add_argument(

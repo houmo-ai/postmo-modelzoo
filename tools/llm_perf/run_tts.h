@@ -114,9 +114,9 @@ static TtsPerfSettings ParseTtsSettings(
   std::vector<int> devices;
   if (args.count("devices")) {
     devices = validate_multi_setting(args, "devices");
-  } else if (std::getenv("HOUMO_VISIBLE_DEVICES") != nullptr) {
+  } else if (std::getenv("POSTMO_VISIBLE_DEVICES") != nullptr) {
     std::unordered_map<std::string, std::string> device_args;
-    device_args["devices"] = std::getenv("HOUMO_VISIBLE_DEVICES");
+    device_args["devices"] = std::getenv("POSTMO_VISIBLE_DEVICES");
     devices = validate_multi_setting(device_args, "devices");
   } else {
     devices = {0};

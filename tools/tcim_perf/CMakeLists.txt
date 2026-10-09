@@ -5,21 +5,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 include_directories(
-  $ENV{HOUMO_SDK_PATH}/hal/export/include
-  $ENV{HOUMO_SDK_PATH}/hal/include
-  $ENV{HOUMO_EXAMPLES_PATH}/3rdparty
-  $ENV{HOUMO_EXAMPLES_PATH}/3rdparty/libnpy
-  $ENV{HOUMO_EXAMPLES_PATH}/utils/cpp/include
+  $ENV{POSTMO_SDK_PATH}/hal/export/include
+  $ENV{POSTMO_SDK_PATH}/hal/include
+  $ENV{POSTMO_EXAMPLES_PATH}/3rdparty
+  $ENV{POSTMO_EXAMPLES_PATH}/3rdparty/libnpy
+  $ENV{POSTMO_EXAMPLES_PATH}/utils/cpp/include
 )
 
 if(MSVC)
-  include_directories($ENV{HOUMO_EXAMPLES_PATH}/3rdparty/mingw/include)
+  include_directories($ENV{POSTMO_EXAMPLES_PATH}/3rdparty/mingw/include)
 endif()
 
 link_directories(
-  $ENV{HOUMO_SDK_PATH}/hal/lib
+  $ENV{POSTMO_SDK_PATH}/hal/lib
 )
 if(MSVC)
     add_compile_options("/std:c++17" "/utf-8" "/w")

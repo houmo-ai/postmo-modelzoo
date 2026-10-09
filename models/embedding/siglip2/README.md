@@ -1,6 +1,6 @@
 # SigLIP2 Large Patch16 256
 
-本目录提供 `google/siglip2-large-patch16-256` 的导出、量化、编译、推理和 ImageNet 评测示例，仅支持 `HOUMO_TARGET=xh2`。
+本目录提供 `google/siglip2-large-patch16-256` 的导出、量化、编译、推理和 ImageNet 评测示例，仅支持 `POSTMO_TARGET=xh2`。
 
 模型拆分为 vision 和 text 两个 encoder，输出均为 L2 归一化的 1024 维 embedding：
 
@@ -206,10 +206,10 @@ python3 eval_imagenet.py \
 默认数据目录：
 
 ```text
-$HOUMO_EXAMPLES_PATH/data/datasets/imagenet
+$POSTMO_EXAMPLES_PATH/data/datasets/imagenet
 ```
 
-未设置 `HOUMO_EXAMPLES_PATH` 时使用当前目录下的 `imagenet/`。目录结构如下：
+未设置 `POSTMO_EXAMPLES_PATH` 时使用当前目录下的 `imagenet/`。目录结构如下：
 
 ```text
 imagenet/

@@ -634,9 +634,9 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
     }
 
     // Handle core number environment variable
-    const char *houmo_core_num = getenv("HOUMO_CORE_NUM");
+    const char *houmo_core_num = getenv("POSTMO_CORE_NUM");
     if (houmo_core_num == nullptr) {
-        printf("%s[WARNING] HOUMO_CORE_NUM is not set, default set to %d%s\n",
+        printf("%s[WARNING] POSTMO_CORE_NUM is not set, default set to %d%s\n",
                COLOR_YELLOW, kDefaultCoreNum, COLOR_RESET);
         houmo_core_num = "2";
     }
@@ -653,9 +653,9 @@ int32_t Run(const std::string &model_path, int32_t thread_num, int32_t stream_nu
     printf("[INFO] Stream number: %d\n", stream_num);
 
     // Validate target environment
-    const std::string target = getenv("HOUMO_TARGET") ? getenv("HOUMO_TARGET") : "";
+    const std::string target = getenv("POSTMO_TARGET") ? getenv("POSTMO_TARGET") : "";
     if (target != "xh2") {
-        printf("%s[ERROR] HOUMO_TARGET is invalid: %s (expected: xh2)%s\n", COLOR_RED, target.c_str(), COLOR_RESET);
+        printf("%s[ERROR] POSTMO_TARGET is invalid: %s (expected: xh2)%s\n", COLOR_RED, target.c_str(), COLOR_RESET);
         return -1;
     }
 

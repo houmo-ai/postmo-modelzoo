@@ -34,9 +34,9 @@ try:
 except ImportError:
     raise Exception("Please install tcim_lite in current Python environment")
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-if HOUMO_TARGET != "xh2":
-    raise Exception("Please set HOUMO_TARGET to xh2")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+if POSTMO_TARGET != "xh2":
+    raise Exception("Please set POSTMO_TARGET to xh2")
 
 
 def get_version():
@@ -44,9 +44,9 @@ def get_version():
     Get package version from environment variable.
 
     Returns:
-        str: Version string from HOUMO_VERSION environment variable
+        str: Version string from POSTMO_VERSION environment variable
     """
-    return os.environ.get("HOUMO_VERSION", "1.5.0.dev")
+    return os.environ.get("POSTMO_VERSION", "1.5.0.dev")
 
 
 def get_build_time():
@@ -161,9 +161,9 @@ class BuildExtWithDLL(build_ext):
             return
 
         dll_dirs = [os.path.join(TCIM_RUNTIME_PATH, "bin")]
-        HOUMO_SDK_PATH = os.environ.get("HOUMO_SDK_PATH")
-        if HOUMO_SDK_PATH:
-            dll_dirs.append(os.path.join(HOUMO_SDK_PATH, "hal/lib"))
+        POSTMO_SDK_PATH = os.environ.get("POSTMO_SDK_PATH")
+        if POSTMO_SDK_PATH:
+            dll_dirs.append(os.path.join(POSTMO_SDK_PATH, "hal/lib"))
 
         for ext in self.extensions:
             pyd_path = self.get_ext_fullpath(ext.name)
@@ -181,7 +181,7 @@ args, remaining_argv = parser.parse_known_args()
 sys.argv = [sys.argv[0]] + remaining_argv
 
 if args.enable_smi_support:
-    HOUMO_SDK_PATH = os.environ.get("HOUMO_SDK_PATH")
+    POSTMO_SDK_PATH = os.environ.get("POSTMO_SDK_PATH")
     if sys.platform == "win32":
         smi_libraries = ["libhal_xh2a"]
         smi_compile_args = ["/std:c++17", "/O2", "/w"]
@@ -194,10 +194,10 @@ if args.enable_smi_support:
         sources=["hmatc/python/device_smi.cpp"],
         include_dirs=[
             pybind11.get_include(),
-            os.path.join(HOUMO_SDK_PATH, "hal/export/include"),
+            os.path.join(POSTMO_SDK_PATH, "hal/export/include"),
             "3rdparty/nlohmann/include",
         ],
-        library_dirs=[os.path.join(HOUMO_SDK_PATH, "hal/lib")],
+        library_dirs=[os.path.join(POSTMO_SDK_PATH, "hal/lib")],
         libraries=smi_libraries,
         language="c++",
         define_macros=[("ENABLE_SMI", None)],

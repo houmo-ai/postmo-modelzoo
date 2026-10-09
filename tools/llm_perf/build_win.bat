@@ -4,7 +4,7 @@ set VSLANG=1033
 setlocal enabledelayedexpansion
 
 set PROJECT_DIR=%cd%
-if "%HOUMO_EXAMPLES_PATH%"=="" set HOUMO_EXAMPLES_PATH=%PROJECT_DIR%\..\..
+if "%POSTMO_EXAMPLES_PATH%"=="" set POSTMO_EXAMPLES_PATH=%PROJECT_DIR%\..\..
 set BUILD_TYPE=Release
 set BUILD_JOBS=%NUMBER_OF_PROCESSORS%
 set BUILD_DIR=build_vs2022

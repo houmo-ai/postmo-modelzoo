@@ -8,10 +8,10 @@ else()
 endif()
 
 include_directories($ENV{TCIM_RUNTIME_PATH}/include)
-include_directories($ENV{HOUMO_SDK_PATH}/hal/export/include)
+include_directories($ENV{POSTMO_SDK_PATH}/hal/export/include)
 
 link_directories($ENV{TCIM_RUNTIME_PATH}/lib)
-link_directories($ENV{HOUMO_SDK_PATH}/hal/lib)
+link_directories($ENV{POSTMO_SDK_PATH}/hal/lib)
 
 set(MODEL_OBJECTS)
 if(MSVC)

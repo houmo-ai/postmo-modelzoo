@@ -33,8 +33,8 @@ from hmatc.utils.utils import get_model_configs
 from xhmodel_merak.xh_llm.workflows import AutoLLMWorkflow
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 def find_configs_merak_dir() -> Path:
@@ -107,7 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         "--output_dir",
         dest="output_dir",
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant"),
     )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--overwrite", action="store_true")

@@ -35,7 +35,7 @@ from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs
 
 MAX_GEN_LEN = 448
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
 FILE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(FILE_DIR, "config.yaml")
 
@@ -267,7 +267,7 @@ class SamplingManager:
 
     def sample(self, logits: np.ndarray, previous_tokens: Optional[List[int]] = None) -> int:
         logits = logits[0].numpy()
-        if HOUMO_TARGET == "xh2":
+        if POSTMO_TARGET == "xh2":
             logits = logits[0]
         probs = self.process_logits(logits, previous_tokens)
         if np.all(probs == 0):
@@ -656,11 +656,11 @@ if __name__ == "__main__":
     args.tokenizer_path = first_not_none(args.tokenizer_path, get_default_tokenizer_path(model_config))
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.encode_path is None:
-        args.encode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_encode.hmm")
+        args.encode_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_encode.hmm")
     if args.decode_path is None:
-        args.decode_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_decode.hmm")
+        args.decode_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_decode.hmm")
     if args.prefill_path is None:
-        args.prefill_path = os.path.join("output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm")
+        args.prefill_path = os.path.join("output", POSTMO_TARGET, f"{model_prefix}_prefill.hmm")
 
     whisper = HmWhisper(args.encode_path, args.decode_path, args.prefill_path, args.ndevice)
     processor = WhisperProcessor.from_pretrained(args.tokenizer_path)

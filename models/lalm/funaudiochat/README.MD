@@ -79,14 +79,14 @@ pip3 install -r requirements.txt
 通过 `get_model.py` 获取模型资源。默认下载预编译芯片模型和 token2wav 依赖：
 
 ```bash
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 python3 get_model.py --type hmm
 ```
 
 如需从 ModelScope 下载预训练模型文件：
 
 ```bash
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 python3 get_model.py --type raw --source_type modelscope
 ```
 
@@ -107,7 +107,7 @@ docker run -it --gpus all --pid=host -w /hmdd -v $PWD:/hmdd --shm-size 64g harbo
 ```bash
 source env.sh
 cd models/lalm/funaudiochat
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 python3 ptq.py \
     --model-dir Fun-Audio-Chat-8B \
     --model-name funaudiochat \
@@ -133,7 +133,7 @@ audio_decoder_decode/
 `build.py` 消费 `output/xh2/hmquant/` 下的六个主组件并生成与 `demo.py` 默认文件名一致的 HMM：
 
 ```bash
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 python3 build.py \
     --model_dir output/xh2/hmquant \
     --output_dir output/xh2 \
@@ -181,7 +181,7 @@ python3 demo.py --stage e2e --audio_path /path/to/questions.wav --e2e_output_dir
 常用推理参数如下：
 
 - `--stage`: 推理模式，可选 `s2t`、`s2s`、`e2e`，默认 `s2t`。
-- `--audio_path`: 输入音频路径；未指定时，`s2t`/`s2s` 默认使用 `$HOUMO_EXAMPLES_PATH/data/audio/question.wav`，`e2e` 默认使用 `$HOUMO_EXAMPLES_PATH/data/audio/questions.wav`。
+- `--audio_path`: 输入音频路径；未指定时，`s2t`/`s2s` 默认使用 `$POSTMO_EXAMPLES_PATH/data/audio/question.wav`，`e2e` 默认使用 `$POSTMO_EXAMPLES_PATH/data/audio/questions.wav`。
 - `--max_new_tokens`: 最大生成文本 token 数，默认 `2048`。
 - `--temperature`: 语音采样温度，默认 `0.6`。
 - `--top_k`: 语音采样的 top-k，默认 `20`。

@@ -81,7 +81,7 @@ cd models/embedding/qwen3-embedding
 python3 ptq.py
 ```
 
-量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
+量化完成的模型存放在`output/$POSTMO_TARGET/hmquant`目录：
 
 ```bash
 .
@@ -107,8 +107,8 @@ Qwen3-Embedding 模型使用 python API 进行演示。
 
 1. `demo.py` 默认从 `config.yaml` 推导 `tokenizer_dir`，并默认读取：
 
-  - `output/${HOUMO_TARGET}/qwen3-embedding-8b_prefill.hmm`
-  - `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+  - `output/${POSTMO_TARGET}/qwen3-embedding-8b_prefill.hmm`
+  - `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
 
 2. 执行脚本，推理完成将输出性能结果。
 

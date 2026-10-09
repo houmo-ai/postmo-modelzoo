@@ -11,7 +11,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("run_all.py")
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "houmo")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "houmo")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -257,13 +257,13 @@ def main(allArgs=None):
 
 
 def setup_environment():
-    HOUMO_EXAMPLES_PATH = os.path.abspath(os.getenv("HOUMO_EXAMPLES_PATH", "."))
+    POSTMO_EXAMPLES_PATH = os.path.abspath(os.getenv("POSTMO_EXAMPLES_PATH", "."))
     hmatc_dir = os.path.join(script_dir, "hmatc")
-    datasets_dir = os.path.join(HOUMO_EXAMPLES_PATH, "data", "datasets")
-    llm_perf_dir = os.path.join(HOUMO_EXAMPLES_PATH, "tools", "llm_perf")
-    llm_perf_bin = os.path.join(HOUMO_EXAMPLES_PATH, "tools", "bin", "llm_perf")
+    datasets_dir = os.path.join(POSTMO_EXAMPLES_PATH, "data", "datasets")
+    llm_perf_dir = os.path.join(POSTMO_EXAMPLES_PATH, "tools", "llm_perf")
+    llm_perf_bin = os.path.join(POSTMO_EXAMPLES_PATH, "tools", "bin", "llm_perf")
     hmeval_install = os.path.join(
-        HOUMO_EXAMPLES_PATH, "tools", "hmeval", "scripts", "install.sh"
+        POSTMO_EXAMPLES_PATH, "tools", "hmeval", "scripts", "install.sh"
     )
 
     # install hmatc
@@ -273,7 +273,7 @@ def setup_environment():
     run_command(["python3", "get_datasets.py", "--remove-archive"], cwd=datasets_dir)
     # install llm_perf
     run_command(["bash", "build_linux.sh"], cwd=llm_perf_dir)
-    run_command(["cp", llm_perf_bin, os.path.join(HOUMO_PATH, "bin")])
+    run_command(["cp", llm_perf_bin, os.path.join(POSTMO_PATH, "bin")])
     # install hmeval
     run_command([hmeval_install])
 
@@ -284,8 +284,8 @@ def setup_environment():
 
 
 if __name__ == "__main__":
-    os.environ["HOUMO_MODEL_PATH"] = "/data02/modelzoo_ci/models"
-    HOUMO_PATH = os.getenv("HOUMO_PATH", "/usr/local/houmo")
+    os.environ["POSTMO_MODEL_PATH"] = "/data02/modelzoo_ci/models"
+    POSTMO_PATH = os.getenv("POSTMO_PATH", "/usr/local/houmo")
     os.environ["SKIP_INFER"] = "ON"
 
     try:

@@ -67,8 +67,8 @@ from qwen3_tts_runtime import (
     tokenize_texts,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -1133,13 +1133,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--text_projection_hmm", type=str, default=None, help="Text Projection HMM 模型文件路径")
     parser.add_argument("--code_predictor_prefill_hmm", type=str, default=None, help="Code Predictor Prefill HMM 文件路径")
     parser.add_argument("--code_predictor_decode_hmm", type=str, default=None, help="Code Predictor Decode HMM 文件路径")
-    parser.add_argument("--code_predictor_token_embedding", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding_code_predictor.pt"), help="Code Predictor Token Embedding 文件路径")
+    parser.add_argument("--code_predictor_token_embedding", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding_code_predictor.pt"), help="Code Predictor Token Embedding 文件路径")
     parser.add_argument("--talker_prefill_hmm", type=str, default=None, help="Talker Prefill HMM 文件路径")
     parser.add_argument("--talker_decode_hmm", type=str, default=None, help="Talker Decode HMM 文件路径")
-    parser.add_argument("--talker_token_embedding", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"), help="Talker Token Embedding 文件路径")
-    parser.add_argument("--talker_text_embedding", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant", "text_embedding.pt"), help="Talker Text Embedding 文件路径")
+    parser.add_argument("--talker_token_embedding", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"), help="Talker Token Embedding 文件路径")
+    parser.add_argument("--talker_text_embedding", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant", "text_embedding.pt"), help="Talker Text Embedding 文件路径")
     parser.add_argument("--speech_tokenizer_hmm", type=str, default=None, help="Speech Tokenizer HMM 模型文件路径")
-    parser.add_argument("--speech_tokenizer_decode_padding_shapes", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant", "decode_padding_shapes.json"), help="Speech Tokenizer decode_padding_shapes JSON 文件路径")
+    parser.add_argument("--speech_tokenizer_decode_padding_shapes", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant", "decode_padding_shapes.json"), help="Speech Tokenizer decode_padding_shapes JSON 文件路径")
     parser.add_argument("--stateful_decoder_hmm", type=str, default=None, help="Stateful Decoder HMM 文件路径 (streaming 模式必需)")
     parser.add_argument("--ndevice", type=int, default=1, help="设备数量")
     parser.add_argument("--output_wav", type=str, default="./output_custom_voice.wav", help="输出 wav 文件路径，默认保存到当前目录下的 output_custom_voice.wav")

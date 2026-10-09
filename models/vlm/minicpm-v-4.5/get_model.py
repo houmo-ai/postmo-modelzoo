@@ -25,8 +25,8 @@ import os
 
 from hmatc.utils.utils import first_not_none, get_houmo_version, get_model_configs, hmatc_get_file
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -58,7 +58,7 @@ def main() -> None:
         raise ValueError(f"Unsupported model combination: {model_name}-{model_size}")
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": model_name,

@@ -46,10 +46,10 @@ def _model_requirement_paths(
 
     options = dict(other_requirements or {})
     if options.get("hm_gptq", False):
-        examples_path = os.environ.get("HOUMO_EXAMPLES_PATH")
+        examples_path = os.environ.get("POSTMO_EXAMPLES_PATH")
         if examples_path:
             paths.append(Path(examples_path) / "hmodel" / "gptqmodel" / "requirements.txt")
-    datasets_value = os.environ.get("HOUMO_DATASETS_PATH")
+    datasets_value = os.environ.get("POSTMO_DATASETS_PATH")
     datasets_path = Path(datasets_value) if datasets_value else workspace
     if not datasets_path.is_absolute():
         datasets_path = workspace / datasets_path

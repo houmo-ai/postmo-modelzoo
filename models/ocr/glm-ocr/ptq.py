@@ -29,8 +29,8 @@ from hmatc.utils.utils import (
     parse_context_length,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -67,7 +67,7 @@ def parse_arguments():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant"),
         help="output directory",
     )
     parser.add_argument(

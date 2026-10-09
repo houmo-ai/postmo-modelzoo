@@ -2,12 +2,12 @@ if(TARGET yaml-cpp)
   return()
 endif()
 
-if(NOT DEFINED ENV{HOUMO_EXAMPLES_PATH})
-  message(FATAL_ERROR "HOUMO_EXAMPLES_PATH not set")
+if(NOT DEFINED ENV{POSTMO_EXAMPLES_PATH})
+  message(FATAL_ERROR "POSTMO_EXAMPLES_PATH not set")
 endif()
 
-file(TO_CMAKE_PATH "$ENV{HOUMO_EXAMPLES_PATH}" HOUMO_EXAMPLES_PATH_CMAKE)
-set(YAML_CPP_SOURCE_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/3rdparty/yaml-cpp")
+file(TO_CMAKE_PATH "$ENV{POSTMO_EXAMPLES_PATH}" POSTMO_EXAMPLES_PATH_CMAKE)
+set(YAML_CPP_SOURCE_DIR "${POSTMO_EXAMPLES_PATH_CMAKE}/3rdparty/yaml-cpp")
 if(NOT EXISTS "${YAML_CPP_SOURCE_DIR}/include/yaml-cpp/yaml.h")
   message(FATAL_ERROR "yaml-cpp sources not found: ${YAML_CPP_SOURCE_DIR}")
 endif()
@@ -28,9 +28,9 @@ add_library(yaml-cpp SHARED ${YAML_CPP_SOURCES})
 add_library(yaml-cpp::yaml-cpp ALIAS yaml-cpp)
 
 if(ANDROID_ABI)
-  set(YAML_CPP_OUTPUT_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/android")
+  set(YAML_CPP_OUTPUT_DIR "${POSTMO_EXAMPLES_PATH_CMAKE}/utils/android")
 else()
-  set(YAML_CPP_OUTPUT_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/lib")
+  set(YAML_CPP_OUTPUT_DIR "${POSTMO_EXAMPLES_PATH_CMAKE}/utils/lib")
 endif()
 
 set_target_properties(yaml-cpp PROPERTIES

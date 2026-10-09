@@ -33,8 +33,8 @@ import tcim_lite as tcim
 from hmatc.python.get_hm_devices import get_hm_devices
 from loguru import logger
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -42,7 +42,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 def get_hmm_path(model_name: str, model_size: str, sub_model_name: str) -> str:
     """Build default HMM path from model_name/model_size and sub-model name."""
     model_tag = f"{model_name}-{model_size}"
-    return os.path.join("output", HOUMO_TARGET, f"{model_tag}_{sub_model_name}.hmm")
+    return os.path.join("output", POSTMO_TARGET, f"{model_tag}_{sub_model_name}.hmm")
 
 
 def get_default_hf_model_dir(

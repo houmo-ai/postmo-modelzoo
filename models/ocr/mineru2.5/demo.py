@@ -34,8 +34,8 @@ from transformers import Qwen2VLProcessor
 
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", "Only support POSTMO_TARGET: xh2"
 
 # ---------------------------------------------------------------------------
 #  Constants
@@ -1000,7 +1000,7 @@ def get_args():
     parser.add_argument("--model_name", type=str, default=None, help="model name")
     parser.add_argument("--model_size", type=str, default=None, help="model size")
     parser.add_argument("--tokenizer_dir", type=str, default=None)
-    parser.add_argument("--embedding_path", type=str, default=f"output/{HOUMO_TARGET}/hmquant/quant_embedding.pt")
+    parser.add_argument("--embedding_path", type=str, default=f"output/{POSTMO_TARGET}/hmquant/quant_embedding.pt")
     parser.add_argument("--prefill_path", type=str, default=None)
     parser.add_argument("--decode_path", type=str, default=None)
     parser.add_argument("--vit_path", type=str, default=None)
@@ -1019,15 +1019,15 @@ def get_args():
     args.max_size_w = first_not_none(args.max_size_w, model_config.get("max_size_w", 1036))
     args.max_size_h = first_not_none(args.max_size_h, model_config.get("max_size_h", 1036))
     if args.tokenizer_dir is None:
-        args.tokenizer_dir = f"output/{HOUMO_TARGET}/hmquant/hf_config"
+        args.tokenizer_dir = f"output/{POSTMO_TARGET}/hmquant/hf_config"
     if args.prefill_path is None:
-        args.prefill_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_prefill.hmm"
+        args.prefill_path = f"output/{POSTMO_TARGET}/{args.model_name}-{args.model_size}_prefill.hmm"
     if args.decode_path is None:
-        args.decode_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_decode.hmm"
+        args.decode_path = f"output/{POSTMO_TARGET}/{args.model_name}-{args.model_size}_decode.hmm"
     if args.vit_path is None:
-        args.vit_path = f"output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}.hmm"
+        args.vit_path = f"output/{POSTMO_TARGET}/{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}.hmm"
     if args.visual_buckets_manifest is None:
-        args.visual_buckets_manifest = f"output/{HOUMO_TARGET}/hmquant/mineru_visual_buckets.json"
+        args.visual_buckets_manifest = f"output/{POSTMO_TARGET}/hmquant/mineru_visual_buckets.json"
 
     if args.ndevice > 1:
         if args.prefill_path.endswith(".hmm"):
@@ -1043,7 +1043,7 @@ if __name__ == "__main__":
 
     logger.info("========================================")
     logger.info("[MinerU2.5] Demo — TCIM inference")
-    logger.info("[MinerU2.5] HOUMO_TARGET = {}", HOUMO_TARGET)
+    logger.info("[MinerU2.5] POSTMO_TARGET = {}", POSTMO_TARGET)
     logger.info("[MinerU2.5] Image: {}", args.image)
     if args.visual_buckets_manifest:
         logger.info(

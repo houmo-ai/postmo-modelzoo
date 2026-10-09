@@ -21,8 +21,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef HOUMO_QWEN35_MODEL_H
-#define HOUMO_QWEN35_MODEL_H
+#ifndef POSTMO_QWEN35_MODEL_H
+#define POSTMO_QWEN35_MODEL_H
 
 #include "core/context.h"
 #include "core/vlm_model.h"
@@ -222,4 +222,4 @@ class Qwen35MLLMModel : public VLMModel {
 
 }  // namespace houmo
 
-#endif  // HOUMO_QWEN35_LLM_MODEL_H
+#endif  // POSTMO_QWEN35_LLM_MODEL_H

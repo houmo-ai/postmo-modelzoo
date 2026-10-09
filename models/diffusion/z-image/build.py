@@ -35,10 +35,10 @@ from hmatc.utils.utils import (
     parse_context_length,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
-HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+POSTMO_CORE_NUM = int(os.getenv("POSTMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -91,15 +91,15 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     # fmt: off
     parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
-    parser.add_argument("--model_dir", dest="model_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="path to the model dir")
+    parser.add_argument("--model_dir", dest="model_dir", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant"), help="path to the model dir")
     parser.add_argument("--model_name", dest="model_name", type=str, default=None, help="output houmo model name")
     parser.add_argument("--model_size", dest="model_size", type=str, default=None, help="output houmo model size")
     parser.add_argument("--models", dest="models", type=str, nargs="+", default=None, choices=["dit", "vae", "text_encoder"], help="models to build or test")
     parser.add_argument("--j", dest="j", type=int, default=get_default_parallel_jobs(), help="build parallel jobs. Default is about 75%% of CPU count.")
-    parser.add_argument("--ncore", dest="ncore", type=int, default=HOUMO_CORE_NUM, help="core number")
+    parser.add_argument("--ncore", dest="ncore", type=int, default=POSTMO_CORE_NUM, help="core number")
     parser.add_argument("--ndevice", dest="ndevice", type=int, default=None, help="device number")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
-    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="build output dir")
+    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", POSTMO_TARGET), help="build output dir")
     parser.add_argument("--context_length", dest="context_length", type=int, default=None, help="context length")
     parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill length")
     parser.add_argument("--enable_common_subgraph", dest="enable_common_subgraph", action="store_true", default=False, help="enable common subgraph optimization")
@@ -114,7 +114,7 @@ def get_args() -> argparse.Namespace:
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
-    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", POSTMO_CORE_NUM))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     args.context_length = first_not_none(
         args.context_length,

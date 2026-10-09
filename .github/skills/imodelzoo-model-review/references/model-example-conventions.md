@@ -116,8 +116,8 @@ model_configs:
 
 检查生产者和消费者一致，不强制所有模型只有一种 suffix：
 
-- 量化产物通常位于 `output/${HOUMO_TARGET}/hmquant/`。
-- 编译产物通常位于 `output/${HOUMO_TARGET}/`。
+- 量化产物通常位于 `output/${POSTMO_TARGET}/hmquant/`。
+- 编译产物通常位于 `output/${POSTMO_TARGET}/`。
 - LLM/VLM 常使用 `<model>-<size>_prefill.hmm`、`<model>-<size>_decode.hmm`。
 - VLM 可增加 `_visual_<width>x<height>x<count>.hmm`。
 - TTS/Diffusion 等多子图模型使用 `<model>-<size>_<role>.hmm`，role 必须与 build、Demo、测试 JSON 一致。

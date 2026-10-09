@@ -3,7 +3,7 @@
 #
 # Prerequisites:
 #   export OHOS_SDK=/path/to/ohos-sdk
-#   export HOUMO_SDK_PATH=/path/to/houmo-sdk
+#   export POSTMO_SDK_PATH=/path/to/houmo-sdk
 #   export TCIM_RUNTIME_PATH=/path/to/tcim-runtime
 #
 # Usage:
@@ -20,9 +20,9 @@ if [ -z "$OHOS_SDK" ]; then
   exit 1
 fi
 
-if [ -z "$HOUMO_SDK_PATH" ]; then
-  echo "Error: HOUMO_SDK_PATH environment variable is not set"
-  echo "  export HOUMO_SDK_PATH=/path/to/houmo-sdk"
+if [ -z "$POSTMO_SDK_PATH" ]; then
+  echo "Error: POSTMO_SDK_PATH environment variable is not set"
+  echo "  export POSTMO_SDK_PATH=/path/to/houmo-sdk"
   exit 1
 fi
 
@@ -33,7 +33,7 @@ if [ -z "$TCIM_RUNTIME_PATH" ]; then
 fi
 
 echo "[INFO] OHOS_SDK:         $OHOS_SDK"
-echo "[INFO] HOUMO_SDK_PATH:    $HOUMO_SDK_PATH"
+echo "[INFO] POSTMO_SDK_PATH:    $POSTMO_SDK_PATH"
 echo "[INFO] TCIM_RUNTIME_PATH: $TCIM_RUNTIME_PATH"
 
 OHOS_CLANG="${OHOS_SDK}/llvm/bin/clang"

@@ -27,7 +27,7 @@ INPUT_MODE_GROUP_TITLE = "Input mode (choose one)"
 def build_parser() -> argparse.ArgumentParser:
     """Build the HMATC CLI argument parser with the current public surface."""
     # fmt: off
-    target = os.environ.get("HOUMO_TARGET")
+    target = os.environ.get("POSTMO_TARGET")
 
     parent_config = argparse.ArgumentParser(add_help=False)
     parent_target = argparse.ArgumentParser(add_help=False)

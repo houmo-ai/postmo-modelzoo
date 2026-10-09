@@ -80,7 +80,7 @@ def _dataset_root(path: Path) -> Path | None:
 
 def _candidate_roots(script_dir: Path) -> list[Path]:
 	candidates = [script_dir, script_dir / "data" / "dataset"]
-	for variable in ("HOUMO_DATASETS_PATH", "HOUMO_EXAMPLES_PATH"):
+	for variable in ("POSTMO_DATASETS_PATH", "POSTMO_EXAMPLES_PATH"):
 		value = os.environ.get(variable)
 		if value:
 			base = Path(value).expanduser()

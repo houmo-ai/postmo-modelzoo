@@ -112,7 +112,7 @@ source env.sh
 
 2. 将 houmo-examples-xh2 文件夹挂载至后摩 docker 镜像并创建&启动容器，进入docker容器
 
-3. 进入 houmo-examples-xh2 文件夹，执行: `source env.sh`，读取环境变量 `HOUMO_EXAMPLES_PATH`，通常为 houmo-examples-xh2 文件夹绝对路径
+3. 进入 houmo-examples-xh2 文件夹，执行: `source env.sh`，读取环境变量 `POSTMO_EXAMPLES_PATH`，通常为 houmo-examples-xh2 文件夹绝对路径
 
 4. 安装 Ninjia
 
@@ -123,7 +123,7 @@ sudo apt install ninja-build -y
 ninja --version
 ```
 
-5. 在 `HOUMO_EXAMPLES_PATH` 文件夹下创建 `toolchains` 文件夹，下载官方NDK[https://developer.android.google.cn/ndk/downloads/index.html?hl=ro]，解压到创建的 toolchains 目录下（也可通过设置环境变量 `NDK_PATH` 指定 NDK 路径）。预期结果如下：
+5. 在 `POSTMO_EXAMPLES_PATH` 文件夹下创建 `toolchains` 文件夹，下载官方NDK[https://developer.android.google.cn/ndk/downloads/index.html?hl=ro]，解压到创建的 toolchains 目录下（也可通过设置环境变量 `NDK_PATH` 指定 NDK 路径）。预期结果如下：
 
 ```bash
 houmo-examples-xh2/toolchains/android-ndk-r28c$ ls
@@ -158,7 +158,7 @@ build_win.bat
 
 ### 2.2.3 Android 环境
 
-build_ndk.sh 脚本中预设了编译所需的 NDK 环境路径为 `${HOUMO_EXAMPLES_PATH}/toolchains/android-ndk-r28c`，如有变化，可使用环境变量 `NDK_PATH` 进行配置。
+build_ndk.sh 脚本中预设了编译所需的 NDK 环境路径为 `${POSTMO_EXAMPLES_PATH}/toolchains/android-ndk-r28c`，如有变化，可使用环境变量 `NDK_PATH` 进行配置。
 
 ```bash
 cd houmo-examples-xh2/tools/tcim_perf/
@@ -169,13 +169,13 @@ cd houmo-examples-xh2/tools/tcim_perf/
 
 ### 2.2.4 OpenHarmony (OHOS) 环境
 
-`build_OHOS.sh` 脚本用于交叉编译，需要设置环境变量 `OHOS_SDK`、`HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH`。
+`build_OHOS.sh` 脚本用于交叉编译，需要设置环境变量 `OHOS_SDK`、`POSTMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH`、`POSTMO_SDK_PATH`。
 
 ```bash
 cd houmo-examples-xh2/tools/tcim_perf/
 export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
-export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
-export HOUMO_SDK_PATH=/path/to/houmo-sdk
+export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
+export POSTMO_SDK_PATH=/path/to/houmo-sdk
 export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
 ./build_OHOS.sh
 ```

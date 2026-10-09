@@ -5,36 +5,36 @@ endif()
 project(houmo_infer)
 
 include(CheckCXXCompilerFlag)
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake")
 
 # -----------------------------------------------------------------------------
 # Platform configuration
 # -----------------------------------------------------------------------------
-set(HOUMO_PLATFORM_ANDROID FALSE)
-set(HOUMO_PLATFORM_WINDOWS FALSE)
-set(HOUMO_PLATFORM_LINUX FALSE)
-set(HOUMO_PLATFORM_NAME "unknown")
-set(HOUMO_NEED_PTHREAD FALSE)
+set(POSTMO_PLATFORM_ANDROID FALSE)
+set(POSTMO_PLATFORM_WINDOWS FALSE)
+set(POSTMO_PLATFORM_LINUX FALSE)
+set(POSTMO_PLATFORM_NAME "unknown")
+set(POSTMO_NEED_PTHREAD FALSE)
 set(LIB_PATH "")
-set(HOUMO_TARGET_LINK_OPTIONS "")
+set(POSTMO_TARGET_LINK_OPTIONS "")
 
 if(ANDROID_ABI)
-  set(HOUMO_PLATFORM_ANDROID TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/android.cmake)
+  set(POSTMO_PLATFORM_ANDROID TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/android.cmake)
 elseif(MSVC)
-  set(HOUMO_PLATFORM_WINDOWS TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/windows.cmake)
+  set(POSTMO_PLATFORM_WINDOWS TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/windows.cmake)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  set(HOUMO_PLATFORM_LINUX TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/linux.cmake)
+  set(POSTMO_PLATFORM_LINUX TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/linux.cmake)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-  set(HOUMO_PLATFORM_OHOS TRUE)
-  include($ENV{HOUMO_EXAMPLES_PATH}/cmake/platforms/ohos.cmake)
+  set(POSTMO_PLATFORM_OHOS TRUE)
+  include($ENV{POSTMO_EXAMPLES_PATH}/cmake/platforms/ohos.cmake)
 else()
   message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
 
-message(STATUS "HOUMO platform: ${HOUMO_PLATFORM_NAME}")
+message(STATUS "HOUMO platform: ${POSTMO_PLATFORM_NAME}")
 if(LIB_PATH)
   message(STATUS "LIB_PATH: ${LIB_PATH}")
 endif()
@@ -42,7 +42,7 @@ endif()
 # -----------------------------------------------------------------------------
 # Build options
 # -----------------------------------------------------------------------------
-check_cxx_compiler_flag("${HOUMO_CXX17_FLAG}" SUPPORT_CXX17)
+check_cxx_compiler_flag("${POSTMO_CXX17_FLAG}" SUPPORT_CXX17)
 
 if(NOT SUPPORT_CXX17)
   message(FATAL_ERROR "C++17 is required to build ${PROJECT_NAME}")
@@ -52,12 +52,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_compile_options(${HOUMO_COMPILE_OPTIONS})
-if(HOUMO_RELEASE_FLAGS)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${HOUMO_RELEASE_FLAGS}")
+add_compile_options(${POSTMO_COMPILE_OPTIONS})
+if(POSTMO_RELEASE_FLAGS)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${POSTMO_RELEASE_FLAGS}")
 endif()
-if(HOUMO_DEBUG_FLAGS)
-  set(CMAKE_CXX_FLAGS_DEBUG "${HOUMO_DEBUG_FLAGS}")
+if(POSTMO_DEBUG_FLAGS)
+  set(CMAKE_CXX_FLAGS_DEBUG "${POSTMO_DEBUG_FLAGS}")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -70,12 +70,12 @@ endif()
 # Image: stb_image + pure C++ resize (header-only under 3rdparty).
 # Audio: miniaudio (header-only under  3rdparty) + pure C++ mel.
 
-# tokenizer.cpp / header-only deps under HOUMO_EXAMPLES_PATH
-if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
-  message(STATUS "Raw env: [$ENV{HOUMO_EXAMPLES_PATH}]")
-  set(THIRDPARTY_PATH $ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
+# tokenizer.cpp / header-only deps under POSTMO_EXAMPLES_PATH
+if(DEFINED ENV{POSTMO_EXAMPLES_PATH})
+  message(STATUS "Raw env: [$ENV{POSTMO_EXAMPLES_PATH}]")
+  set(THIRDPARTY_PATH $ENV{POSTMO_EXAMPLES_PATH}/3rdparty)
 else()
-  message(FATAL_ERROR "Environment variable HOUMO_EXAMPLES_PATH is not set!...")
+  message(FATAL_ERROR "Environment variable POSTMO_EXAMPLES_PATH is not set!...")
 endif()
 if(NOT EXISTS "${THIRDPARTY_PATH}/stb/stb_image.h")
   message(FATAL_ERROR "stb_image.h not found at ${THIRDPARTY_PATH}/stb/stb_image.h")
@@ -86,7 +86,7 @@ endif()
 if(NOT EXISTS "${THIRDPARTY_PATH}/half/half.hpp")
   message(FATAL_ERROR "half.hpp not found at ${THIRDPARTY_PATH}/half/half.hpp")
 endif()
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/tokenizer.cpp.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/tokenizer.cpp.cmake")
 
 # -----------------------------------------------------------------------------
 # Paths and sources
@@ -119,11 +119,11 @@ add_library(houmo_infer SHARED
 )
 target_compile_definitions(houmo_infer PUBLIC EIGEN_MPL2_ONLY)
 
-if(HOUMO_EXPORT_ALL_SYMBOLS)
+if(POSTMO_EXPORT_ALL_SYMBOLS)
   set_target_properties(houmo_infer PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
-if(HOUMO_TARGET_LINK_OPTIONS)
-  target_link_options(houmo_infer PRIVATE ${HOUMO_TARGET_LINK_OPTIONS})
+if(POSTMO_TARGET_LINK_OPTIONS)
+  target_link_options(houmo_infer PRIVATE ${POSTMO_TARGET_LINK_OPTIONS})
 endif()
 
 target_include_directories(houmo_infer PUBLIC
@@ -136,20 +136,20 @@ target_link_directories(houmo_infer PUBLIC
   ${TCIM_RUNTIME_PATH}/lib
 )
 
-set(HOUMO_INFER_LIBS
+set(POSTMO_INFER_LIBS
   ${TCIM_LIBRARY}
   tokenizer_lib
   ${CMAKE_DL_LIBS}
 )
 
-if(HOUMO_NEED_PTHREAD)
-  list(APPEND HOUMO_INFER_LIBS pthread)
+if(POSTMO_NEED_PTHREAD)
+  list(APPEND POSTMO_INFER_LIBS pthread)
 endif()
-if(HOUMO_EXTRA_LIBS)
-  list(APPEND HOUMO_INFER_LIBS ${HOUMO_EXTRA_LIBS})
+if(POSTMO_EXTRA_LIBS)
+  list(APPEND POSTMO_INFER_LIBS ${POSTMO_EXTRA_LIBS})
 endif()
 
-target_link_libraries(houmo_infer PUBLIC ${HOUMO_INFER_LIBS})
+target_link_libraries(houmo_infer PUBLIC ${POSTMO_INFER_LIBS})
 
 # -----------------------------------------------------------------------------
 # Install

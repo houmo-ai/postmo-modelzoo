@@ -35,8 +35,8 @@ from pathlib import Path
 
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -79,15 +79,15 @@ def _move_hmquant_to_output(
     hmquant_dirs = sorted(
         path
         for path in export_dir.iterdir()
-        if path.is_dir() and path.name.startswith(f"hmquant_{HOUMO_TARGET}_")
+        if path.is_dir() and path.name.startswith(f"hmquant_{POSTMO_TARGET}_")
     )
     if not hmquant_dirs:
         raise FileNotFoundError(
-            f"No hmquant_{HOUMO_TARGET}_* directory found under {export_dir}"
+            f"No hmquant_{POSTMO_TARGET}_* directory found under {export_dir}"
         )
     if len(hmquant_dirs) > 1:
         raise RuntimeError(
-            f"Expected one hmquant_{HOUMO_TARGET}_* directory under {export_dir}, found: {hmquant_dirs}"
+            f"Expected one hmquant_{POSTMO_TARGET}_* directory under {export_dir}, found: {hmquant_dirs}"
         )
 
     source_dir = hmquant_dirs[0]
@@ -112,7 +112,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model_size", type=str, default=None, help="Model size in config.yaml.")
     parser.add_argument("--model_dir", type=str, default=None, help="HF model directory; defaults to the model selected by model name and model size in config.yaml.")
     parser.add_argument("--quant_config_path", dest="quant_config_path", type=str, default=None, help="Explicit workflow YAML path; overrides workflow_config from config.yaml.")
-    parser.add_argument("--output_dir", default=f"./output/{HOUMO_TARGET}/hmquant", help="output directory")
+    parser.add_argument("--output_dir", default=f"./output/{POSTMO_TARGET}/hmquant", help="output directory")
     parser.add_argument("--work_dir", type=str, default="./work_dirs", help="work directory")
     parser.add_argument("--device", default="cuda", help="Device for quant/export/golden/quick test. Default: cuda")
     parser.add_argument("--overwrite", action="store_true", help="Remove existing export output directories before running.")

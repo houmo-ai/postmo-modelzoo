@@ -13,7 +13,7 @@ The repository has four main implementation layers:
 3. `hmatc/`, `utils/`, and `tools/` provide reusable workflow, engine, evaluation, and performance functionality.
 4. `tests/`, `config/imodelExampleConfig.yaml`, and `run_all.py` provide regression coverage and changed-path test selection.
 
-Before following a workflow, use `env.sh` on Linux or `env.bat` on Windows. These scripts establish repository-wide path contracts such as `HOUMO_EXAMPLES_PATH`, `HOUMO_PATH`, `HOUMO_SDK_PATH`, `TCIM_RUNTIME_PATH`, `HOUMO_DATASETS_PATH`, `HOUMO_MODEL_PATH`, `PATH`, `PYTHONPATH`, and the runtime library path.
+Before following a workflow, use `env.sh` on Linux or `env.bat` on Windows. These scripts establish repository-wide path contracts such as `POSTMO_EXAMPLES_PATH`, `POSTMO_PATH`, `POSTMO_SDK_PATH`, `TCIM_RUNTIME_PATH`, `POSTMO_DATASETS_PATH`, `POSTMO_MODEL_PATH`, `PATH`, `PYTHONPATH`, and the runtime library path.
 
 ## Top-level directories
 

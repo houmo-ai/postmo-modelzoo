@@ -75,12 +75,12 @@ class TestRuntimeContext:
     ) -> "TestRuntimeContext":
         uses_process_environment = environment is None
         env = dict(os.environ if uses_process_environment else environment)
-        backend = env.setdefault("HOUMO_TARGET", DEFAULT_BACKEND)
+        backend = env.setdefault("POSTMO_TARGET", DEFAULT_BACKEND)
         if uses_process_environment:
             # CommandRunner starts subprocesses from os.environ. Keep the
             # process environment aligned with the resolved runtime backend so
             # model scripts see the same default selected by the test suite.
-            os.environ.setdefault("HOUMO_TARGET", backend)
+            os.environ.setdefault("POSTMO_TARGET", backend)
         resolved_tests_root = tests_root.resolve() if tests_root is not None else Path(__file__).resolve().parents[1]
         resolved_asic = is_asic_platform() if asic is None else asic
         models_path = Path(
@@ -90,10 +90,10 @@ class TestRuntimeContext:
             )
         ).resolve()
         results_path = (resolved_tests_root / f"model_results_{backend}").resolve()
-        examples_path = Path(env.get("HOUMO_EXAMPLES_PATH", str(resolved_tests_root.parent))).resolve()
+        examples_path = Path(env.get("POSTMO_EXAMPLES_PATH", str(resolved_tests_root.parent))).resolve()
         datasets_path = Path(
             env.get(
-                "HOUMO_DATASETS_PATH",
+                "POSTMO_DATASETS_PATH",
                 str(resolved_tests_root.parent / "data" / "datasets"),
             )
         ).resolve()

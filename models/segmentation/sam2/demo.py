@@ -59,7 +59,7 @@ def parse_args():
     parser.add_argument(
         "--image",
         type=str,
-        default=os.path.join(os.getenv("HOUMO_EXAMPLES_PATH", ""), "data/pic/beach.jpeg"),
+        default=os.path.join(os.getenv("POSTMO_EXAMPLES_PATH", ""), "data/pic/beach.jpeg"),
         help="Path to input image",
     )
     parser.add_argument(
@@ -85,7 +85,7 @@ def parse_args():
     parser.add_argument(
         "--dataset_dir",
         type=str,
-        default=os.path.join(os.getenv("HOUMO_EXAMPLES_PATH", ""), "data/datasets/coco2017"),
+        default=os.path.join(os.getenv("POSTMO_EXAMPLES_PATH", ""), "data/datasets/coco2017"),
         help="dataset root directory for evaluation",
     )
     parser.add_argument(

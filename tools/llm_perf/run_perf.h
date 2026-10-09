@@ -151,16 +151,16 @@ PerfSettings ParsePerfRunSetting(
   std::vector<int> devices;
   if (args.count("devices")) {
     devices = validate_multi_setting(args, "devices");
-  } else if (getenv("HOUMO_VISIBLE_DEVICES") != nullptr) {
+  } else if (getenv("POSTMO_VISIBLE_DEVICES") != nullptr) {
     std::unordered_map<std::string, std::string> temp_args;
-    temp_args["devices"] = getenv("HOUMO_VISIBLE_DEVICES");
+    temp_args["devices"] = getenv("POSTMO_VISIBLE_DEVICES");
     devices = validate_multi_setting(temp_args, "devices");
     if (devices.size() > 1 && prefill_path.extension() != ".hmms") {
       std::cout << "[Warning] : "
-                << "Multiple devices specified in HOUMO_VISIBLE_DEVICES, "
+                << "Multiple devices specified in POSTMO_VISIBLE_DEVICES, "
                    "but model file is not .hmms. Multi-device testing is "
                    "only supported for .hmms model files. Ignoring "
-                   "additional devices and using HOUMO_VISIBLE_DEVICES[0] only."
+                   "additional devices and using POSTMO_VISIBLE_DEVICES[0] only."
                 << std::endl;
       devices = {devices[0]};
     }
@@ -293,7 +293,7 @@ int RunPerf(std::unordered_map<std::string, std::string> args) {
   try {
     PerfSettings settings = ParsePerfRunSetting(args);
     settings.interval_ms = interval;
-    const char* houmo_target_env = getenv("HOUMO_TARGET");
+    const char* houmo_target_env = getenv("POSTMO_TARGET");
     std::string houmo_target =
         houmo_target_env != nullptr ? std::string(houmo_target_env) : "houmo";
     if (houmo_target != "xh2") {

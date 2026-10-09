@@ -254,9 +254,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    target = os.getenv("HOUMO_TARGET")
+    target = os.getenv("POSTMO_TARGET")
     if target not in ["xh1", "xh2"]:
-        raise ValueError("HOUMO_TARGET must be xh1 or xh2")
+        raise ValueError("POSTMO_TARGET must be xh1 or xh2")
     MODEL_NAME = f"{target}_transpose"
 
     bandwidth_type = "Read" if args.type == "r" else "Write"
@@ -292,8 +292,8 @@ if __name__ == "__main__":
     if not os.path.exists(hmm_path) and args.skip_build:
         print(f"Skipping model generation since download hmm from network.")
         args.skip_build = True
-        if "HOUMO_MODELZOO_URL" not in os.environ:
-            os.environ["HOUMO_MODELZOO_URL"] = (
+        if "POSTMO_MODELZOO_URL" not in os.environ:
+            os.environ["POSTMO_MODELZOO_URL"] = (
                 "http://artifactory.houmo.ai/artifactory/Dadao"
             )
         zipped_hmm_path = f"models/tools/bandwidth_perf/hmm_{target}_transpose_{bandwidth_type.lower()}_1core_20251028.tar.xz"

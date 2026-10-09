@@ -29,10 +29,10 @@ if [ -e build ]; then
   mkdir build
 fi
 
-# Audio, image, and Eigen headers are under $HOUMO_EXAMPLES_PATH/3rdparty/.
+# Audio, image, and Eigen headers are under $POSTMO_EXAMPLES_PATH/3rdparty/.
 
 if [ "$(uname -s)" = "Linux" ] && { [ "$(uname -m)" = "x86_64" ] || [ "$(uname -m)" = "aarch64" ]; }; then
-  if [ "$HOUMO_TARGET" = "xh2" ]; then
+  if [ "$POSTMO_TARGET" = "xh2" ]; then
     WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     cd "${WORK_PATH}" || exit 1
 

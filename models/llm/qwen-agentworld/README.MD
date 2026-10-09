@@ -98,7 +98,7 @@ python3 ptq.py \
   --model_dir ./Qwen-AgentWorld-35B-A3B
 ```
 
-`--model_dir` 指向 Hugging Face / ModelScope 原始模型目录。`ptq.py` 会自动从 `config.yaml` 读取 `workflow_config` 路径，执行 quant 和 export，并把 export 生成的 `hmquant*` 目录移动为 `output/${HOUMO_TARGET}/hmquant`，供后续 `build.py` 使用。
+`--model_dir` 指向 Hugging Face / ModelScope 原始模型目录。`ptq.py` 会自动从 `config.yaml` 读取 `workflow_config` 路径，执行 quant 和 export，并把 export 生成的 `hmquant*` 目录移动为 `output/${POSTMO_TARGET}/hmquant`，供后续 `build.py` 使用。
 
 常用可选参数：
 
@@ -114,7 +114,7 @@ python3 ptq.py \
   --quant_config_path /path/to/workflow.yaml
 ```
 
-量化导出输出位于 `output/${HOUMO_TARGET}/hmquant`。
+量化导出输出位于 `output/${POSTMO_TARGET}/hmquant`。
 
 ### 2.4 编译
 
@@ -167,7 +167,7 @@ bash test.sh
 bash test.sh -s all
 ```
 
-运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录。
+运行前请确保 `POSTMO_EXAMPLES_PATH` 指向当前仓库根目录。
 
 `test.sh` 支持以下常用参数：
 

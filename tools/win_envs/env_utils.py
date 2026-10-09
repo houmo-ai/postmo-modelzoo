@@ -294,9 +294,9 @@ class EnvManager:
         return None
 
     def reset_env(self)-> None:
-        delete_envs = ["HOUMO_MODELZOO_URL", "HOUMO_TARGET", "TCIM_BACKEND", "HOUMO_EXAMPLES_PATH",
-                "PYTHON_DIR", "TCIM_RUNTIME_PATH", "HOUMO_PATH", "HOUMO_VERSION"]
-        check_envs = ["CMAKE_PATH", "HOUMO_SDK_PATH", "OPENCV_PATH"]
+        delete_envs = ["POSTMO_MODELZOO_URL", "POSTMO_TARGET", "TCIM_BACKEND", "POSTMO_EXAMPLES_PATH",
+                "PYTHON_DIR", "TCIM_RUNTIME_PATH", "POSTMO_PATH", "POSTMO_VERSION"]
+        check_envs = ["CMAKE_PATH", "POSTMO_SDK_PATH", "OPENCV_PATH"]
         user_vars = self._enum_reg_values(self.user_reg_path)
         with winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
@@ -331,11 +331,11 @@ class EnvManager:
                     self.remove_env_from_path(value)
 
             winreg.CloseKey(key)
-            #get val of CMAKE_PATH HOUMO_SDK_PATH TCIM_RUNTIME_PATH
+            #get val of CMAKE_PATH POSTMO_SDK_PATH TCIM_RUNTIME_PATH
             for key, val in user_vars.items():
                 if key == "CMAKE_PATH":
                     self.remove_env_from_path(val)
-                if key == "HOUMO_SDK_PATH":
+                if key == "POSTMO_SDK_PATH":
                     xh2a_dll_path = normalize_windows_path(os.path.join(val, "hal", "lib"))
                     self.remove_env_from_path(xh2a_dll_path)
                 if key == "TCIM_RUNTIME_PATH":

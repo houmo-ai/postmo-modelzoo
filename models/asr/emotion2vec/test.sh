@@ -51,10 +51,10 @@ if should_run_step "demo"; then
     fi
     echo "Execute python demo (${MODEL_NAME}-${MODEL_SIZE})."
     python3 demo.py \
-        --model_path "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}.hmm" \
-        --quant-embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt" \
+        --model_path "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}.hmm" \
+        --quant-embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding.pt" \
         --tokenizer_dir "${SCRIPT_DIR}/emotion2vec_plus_large" \
-        --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3" \
+        --audio "${POSTMO_EXAMPLES_PATH}/data/audio/audio.mp3" \
         --output-dir "${SCRIPT_DIR}/results"
 fi
 

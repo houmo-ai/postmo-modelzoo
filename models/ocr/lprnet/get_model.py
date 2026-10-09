@@ -26,8 +26,8 @@ import argparse
 from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -45,7 +45,7 @@ def get_args() -> argparse.Namespace:
         "--build_model_dir",
         dest="build_model_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET),
+        default=os.path.join("output", POSTMO_TARGET),
         help="where to save build_model",
     )
     parser.add_argument(
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     batch = 1
     opt_level = "O2"
     version = get_houmo_version()
-    target = HOUMO_TARGET
+    target = POSTMO_TARGET
 
     data_path = "models/dataset/base_yolov5lprnet.tar.gz"
     raw_path = "models/raw/onnx/lprnet_24x94_2dmaxpool.onnx"

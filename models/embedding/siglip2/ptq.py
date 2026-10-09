@@ -36,7 +36,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import yaml
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
 VISION_ONNX = "siglip2_large_patch16_256_vision.onnx"
 TEXT_ONNX = "siglip2_large_patch16_256_text.onnx"
 VISION_NAME = "siglip2_large_patch16_256_vision"
@@ -75,7 +75,7 @@ def parse_args():
     )
     parser.add_argument(
         "--out_dir",
-        default=f"output/{HOUMO_TARGET}/hmquant",
+        default=f"output/{POSTMO_TARGET}/hmquant",
         help="directory for tokenizer, ONNX, and hmonnx artifacts",
     )
     parser.add_argument("--quant_type", default=None, help="xhquant quant type")
@@ -96,8 +96,8 @@ def parse_args():
 
 
 def ensure_target():
-    if HOUMO_TARGET != "xh2":
-        raise SystemExit(f"Only support HOUMO_TARGET=xh2, got {HOUMO_TARGET!r}")
+    if POSTMO_TARGET != "xh2":
+        raise SystemExit(f"Only support POSTMO_TARGET=xh2, got {POSTMO_TARGET!r}")
 
 
 def validate_model_dir(model_dir):

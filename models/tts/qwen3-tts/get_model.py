@@ -30,8 +30,8 @@ from hmatc.utils.utils import (
 
 from convert_embedding import prepare_cpp_assets
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     quant_type = first_not_none(args.quant_type, model_config.get("quant_type", "w8a16h1_sefp"))
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": model_name,
@@ -172,7 +172,7 @@ if __name__ == "__main__":
             extract_root = Path(args.extract_dir).resolve()
             hmquant_dir = extract_root / "hmquant"
         else:
-            hmquant_dir = Path.cwd() / "output" / HOUMO_TARGET / "hmquant"
+            hmquant_dir = Path.cwd() / "output" / POSTMO_TARGET / "hmquant"
 
         print(f"Prepare C++ assets for {model_name}-{model_size}.")
         prepare_cpp_assets(

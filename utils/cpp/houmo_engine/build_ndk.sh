@@ -53,7 +53,7 @@ if [ -e build_ndk ]; then
   mkdir build_ndk
 fi
 
-# Audio, image, and Eigen headers are under $HOUMO_EXAMPLES_PATH/3rdparty/.
+# Audio, image, and Eigen headers are under $POSTMO_EXAMPLES_PATH/3rdparty/.
 
 if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
   WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

@@ -162,10 +162,10 @@ def _patched_siglip_embeddings_forward(
 
 SiglipVisionEmbeddings.forward = _patched_siglip_embeddings_forward
 
-HOUMO_PIC_PATH = os.getenv(
-    "HOUMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
+POSTMO_PIC_PATH = os.getenv(
+    "POSTMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
 )
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "")
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 ONNX_IR_VERSION = 9
 
@@ -465,7 +465,7 @@ def houmo_export_llm(args):
     processor.image_processor.min_pixels = fixed_pixels
     processor.image_processor.max_pixels = fixed_pixels
 
-    image = Image.open(f"{HOUMO_PIC_PATH}/ocr.jpeg").convert("RGB")
+    image = Image.open(f"{POSTMO_PIC_PATH}/ocr.jpeg").convert("RGB")
     messages = [
         {
             "role": "user",
@@ -662,7 +662,7 @@ def houmo_export_vision(args):
     fixed_pixels = fixed_output_width * fixed_output_height
     processor.image_processor.min_pixels = fixed_pixels
     processor.image_processor.max_pixels = fixed_pixels
-    image = Image.open(f"{HOUMO_PIC_PATH}/ocr.jpeg").convert("RGB")
+    image = Image.open(f"{POSTMO_PIC_PATH}/ocr.jpeg").convert("RGB")
     messages = [
         {
             "role": "user",
@@ -903,7 +903,7 @@ def parse_args():
     )
     parser.add_argument("--work-dir", type=str, default="work_dirs/")
     parser.add_argument(
-        "--out-dir", type=str, default="output/{}".format(HOUMO_TARGET)
+        "--out-dir", type=str, default="output/{}".format(POSTMO_TARGET)
     )
     parser.add_argument("--llm_config", type=str, default="llm_config.py")
     parser.add_argument("--vision_config", type=str, default="vision_config.py")

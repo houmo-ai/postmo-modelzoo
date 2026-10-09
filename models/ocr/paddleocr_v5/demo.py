@@ -53,8 +53,8 @@ if str(IMODELZOO_UTILS_PATH) not in sys.path:
     sys.path.insert(0, str(IMODELZOO_UTILS_PATH))
 from houmo_engine.perf import PerfTracker
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 class CTCLabelDecode:
@@ -973,12 +973,12 @@ def get_args():
     parser.add_argument("--rec-limit", type=int, default=0, help="limit number of rec samples when using --rec-list")
     parser.add_argument(
         "--det-path",
-        default=str(SCRIPT_DIR / "output" / HOUMO_TARGET / "paddleocr_v5_det_xh2_b1_1core_O2.hmm"),
+        default=str(SCRIPT_DIR / "output" / POSTMO_TARGET / "paddleocr_v5_det_xh2_b1_1core_O2.hmm"),
         help="compiled detection .hmm path",
     )
     parser.add_argument(
         "--rec-path",
-        default=str(SCRIPT_DIR / "output" / HOUMO_TARGET / "paddleocr_v5_rec_xh2_b6_1core_O2.hmm"),
+        default=str(SCRIPT_DIR / "output" / POSTMO_TARGET / "paddleocr_v5_rec_xh2_b6_1core_O2.hmm"),
         help="compiled recognition .hmm path",
     )
     parser.add_argument("--character-dict", default=_default_dict_path())

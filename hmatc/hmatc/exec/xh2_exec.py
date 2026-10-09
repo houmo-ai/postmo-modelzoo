@@ -258,7 +258,7 @@ class Xh2Exec(BaseExec):
         calib_data = self.quant_cfg.get("calib_data")
         if not os.path.isdir(calib_data):
             calib_data = os.path.join(
-                os.environ.get("HOUMO_DATASETS_PATH", ""), calib_data
+                os.environ.get("POSTMO_DATASETS_PATH", ""), calib_data
             )
             if not os.path.isdir(calib_data):
                 logger.fatal(f"Not found calib_data path: {calib_data}")

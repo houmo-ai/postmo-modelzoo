@@ -31,8 +31,8 @@ import numpy as np
 import torchaudio
 from loguru import logger
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -44,14 +44,14 @@ def get_args() -> argparse.Namespace:
         "--model_path",
         dest="model_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "emotion2vec-plus_large.hmm"),
+        default=os.path.join("output", POSTMO_TARGET, "emotion2vec-plus_large.hmm"),
         help="HMM model path",
     )
     parser.add_argument(
         "--quant-embedding",
         dest="quant_embedding",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="classification weights used for the overall audio result",
     )
     parser.add_argument(

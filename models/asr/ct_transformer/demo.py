@@ -32,9 +32,9 @@ import numpy as np
 import yaml
 from loguru import logger
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
-DEFAULT_HMM_DIR = Path(__file__).resolve().parent / "output" / HOUMO_TARGET
+DEFAULT_HMM_DIR = Path(__file__).resolve().parent / "output" / POSTMO_TARGET
 DEFAULT_INPUT = (
     Path(__file__).resolve().parent
     / "ct_transformer"

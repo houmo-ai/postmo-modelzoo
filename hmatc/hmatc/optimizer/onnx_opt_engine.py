@@ -64,10 +64,10 @@ class HMAppOnnxOptConvert(object):
         self.opt_cfg['model_name'] = self.get_model_name()
         self.opt_cfg['platform'] = cfg.get('target', None)
         if self.opt_cfg['platform'] is None:
-            self.opt_cfg['platform'] = os.getenv('HOUMO_TARGET', None)
+            self.opt_cfg['platform'] = os.getenv('POSTMO_TARGET', None)
             if self.opt_cfg['platform'] is None:
                 logger.error("Unable to obtain chip version model!")
-                raise ValueError("Please set HOUMO_TARGET environment variable")
+                raise ValueError("Please set POSTMO_TARGET environment variable")
     
     def opt(self):
         if self.opt_status:

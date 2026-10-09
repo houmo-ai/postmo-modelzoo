@@ -20,8 +20,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef HOUMO_AUDIO_PROCESSOR_H
-#define HOUMO_AUDIO_PROCESSOR_H
+#ifndef POSTMO_AUDIO_PROCESSOR_H
+#define POSTMO_AUDIO_PROCESSOR_H
 
 #include <cstdint>
 #include <memory>
@@ -224,4 +224,4 @@ class AudioProcessor {
 
 }  // namespace houmo
 
-#endif  // HOUMO_AUDIO_PROCESSOR_H
+#endif  // POSTMO_AUDIO_PROCESSOR_H

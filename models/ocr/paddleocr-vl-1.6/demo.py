@@ -49,13 +49,13 @@ from hmatc.utils.utils import first_not_none, get_model_configs
 
 from hmatc.python.get_hm_devices import get_hm_devices
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = SCRIPT_DIR / "config.yaml"
-HOUMO_PIC_PATH = os.getenv(
-    "HOUMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
+POSTMO_PIC_PATH = os.getenv(
+    "POSTMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
 )
 SPATIAL_MERGE_SIZE = 2
 TEMPORAL_PATCH_SIZE = 1
@@ -79,7 +79,7 @@ def get_default_tokenizer_dir(model_config: dict) -> str:
 
 
 def get_default_image_inputs() -> list[list[str]]:
-    return [[os.path.join(HOUMO_PIC_PATH, "ocr.jpeg")]]
+    return [[os.path.join(POSTMO_PIC_PATH, "ocr.jpeg")]]
 
 
 def normalize_image_inputs(
@@ -154,7 +154,7 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -291,16 +291,16 @@ def get_args() -> argparse.Namespace:
         args.tokenizer_dir = get_default_tokenizer_dir(config)
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+            "output", POSTMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
         )
     if args.decode_path is None:
         args.decode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+            "output", POSTMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
         )
     if args.vision_path is None:
         args.vision_path = os.path.join(
             "output",
-            HOUMO_TARGET,
+            POSTMO_TARGET,
             f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}.hmm",
         )
     args.image_path = first_not_none(args.image_path, get_default_image_inputs())

@@ -31,7 +31,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 unit_tests_dir = Path(script_dir) / "unit_tests"
 
 # Download models from local server
-os.environ["HOUMO_MODELZOO_URL"] = "http://artifactory.houmo.ai/artifactory/Dadao"
+os.environ["POSTMO_MODELZOO_URL"] = "http://artifactory.houmo.ai/artifactory/Dadao"
 
 # Set up library paths
 ori_ld = os.getenv("LD_LIBRARY_PATH", "")
@@ -44,11 +44,11 @@ append_pythonpath = f"{script_dir}/hmodel/xh2"
 os.environ["PYTHONPATH"] = f"{ori_pythonpath}:{append_pythonpath}" if ori_pythonpath else append_pythonpath
 
 # Set up dataset path
-os.environ["HOUMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
-if os.getenv("HOUMO_EXAMPLES_PATH", None) is None or not os.getenv("HOUMO_EXAMPLES_PATH"):
-    os.environ["HOUMO_EXAMPLES_PATH"] = os.path.abspath(f"{script_dir}/../")
+os.environ["POSTMO_DATASETS_PATH"] = f"{script_dir}/../data/datasets/"
+if os.getenv("POSTMO_EXAMPLES_PATH", None) is None or not os.getenv("POSTMO_EXAMPLES_PATH"):
+    os.environ["POSTMO_EXAMPLES_PATH"] = os.path.abspath(f"{script_dir}/../")
 
-os.environ["HOUMO_VERSION"] = "1.5.0"
+os.environ["POSTMO_VERSION"] = "1.5.0"
 
 
 def pytest_ignore_collect(collection_path, config):

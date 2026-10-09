@@ -24,9 +24,9 @@ from pathlib import Path
 
 from loguru import logger
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH", ".")
-assert HOUMO_TARGET == "xh2", "Only support HOUMO_TARGET: xh2"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+POSTMO_EXAMPLES_PATH = os.getenv("POSTMO_EXAMPLES_PATH", ".")
+assert POSTMO_TARGET == "xh2", "Only support POSTMO_TARGET: xh2"
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ class ModelFiles:
 def get_args(argv=None):
     # fmt: off
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default=f"output/e2b/{HOUMO_TARGET}", help="model directory")
+    parser.add_argument("--model", default=f"output/e2b/{POSTMO_TARGET}", help="model directory")
     parser.add_argument("--ndevice", type=int, default=1, help="maximum device number")
     parser.add_argument("--question", default=None, help="question to ask")
     parser.add_argument("--system_prompt", default=None, help="system prompt to control assistant behavior")
@@ -140,7 +140,7 @@ def resolve_input(path, input_name):
 
     resolved = Path(path)
     if not resolved.is_file():
-        resolved = Path(HOUMO_EXAMPLES_PATH) / path
+        resolved = Path(POSTMO_EXAMPLES_PATH) / path
     if not resolved.is_file():
         logger.warning(f"{input_name} not found: {resolved}, ignoring input")
         return None

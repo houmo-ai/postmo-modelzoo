@@ -40,8 +40,8 @@ from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs
 
 TARGET_TYPE = torch.float16
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -444,7 +444,7 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -474,7 +474,7 @@ def get_args() -> argparse.Namespace:
         dest="layout_path",
         type=str,
         default=os.path.join(
-            os.path.dirname(__file__), "output", HOUMO_TARGET, "ppdoclayoutv3.hmm"
+            os.path.dirname(__file__), "output", POSTMO_TARGET, "ppdoclayoutv3.hmm"
         ),
         help="houmo PP-DocLayoutV3 model path",
     )
@@ -606,17 +606,17 @@ def get_args() -> argparse.Namespace:
         args.vit_path = [
             os.path.join(
                 "output",
-                HOUMO_TARGET,
+                POSTMO_TARGET,
                 f"{model_prefix}_visual_{image_size_w}x{image_size_h}x{max_size_t}.hmm",
             )
         ]
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_prefill.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_prefill.hmm"
         )
     if args.decode_path is None:
         args.decode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_decode.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_decode.hmm"
         )
     if args.ndevice > 1:
         args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")

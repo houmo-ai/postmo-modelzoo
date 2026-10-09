@@ -1,7 +1,7 @@
 # Reusable CMake module for utils/cpp/houmo_engine.
 #
 # Usage:
-#   include($ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake)
+#   include($ENV{POSTMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake)
 #   target_link_libraries(your_target PRIVATE houmo_engine)
 #
 # Sets up:
@@ -13,27 +13,27 @@ if(_HM_ENGINE_LOADED)
 endif()
 set(_HM_ENGINE_LOADED TRUE)
 
-if(NOT DEFINED ENV{HOUMO_EXAMPLES_PATH})
-  message(FATAL_ERROR "HOUMO_EXAMPLES_PATH not set")
+if(NOT DEFINED ENV{POSTMO_EXAMPLES_PATH})
+  message(FATAL_ERROR "POSTMO_EXAMPLES_PATH not set")
 endif()
 
-file(TO_CMAKE_PATH "$ENV{HOUMO_EXAMPLES_PATH}" HOUMO_EXAMPLES_PATH_CMAKE)
-include("${HOUMO_EXAMPLES_PATH_CMAKE}/cmake/tcim_runtime.cmake")
+file(TO_CMAKE_PATH "$ENV{POSTMO_EXAMPLES_PATH}" POSTMO_EXAMPLES_PATH_CMAKE)
+include("${POSTMO_EXAMPLES_PATH_CMAKE}/cmake/tcim_runtime.cmake")
 
-set(HOUMO_ENGINE_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/cpp/houmo_engine")
+set(POSTMO_ENGINE_DIR "${POSTMO_EXAMPLES_PATH_CMAKE}/utils/cpp/houmo_engine")
 if(ANDROID_ABI)
-  set(HM_LIB_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/android")
+  set(HM_LIB_DIR "${POSTMO_EXAMPLES_PATH_CMAKE}/utils/android")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-  set(HM_LIB_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/ohos")
+  set(HM_LIB_DIR "${POSTMO_EXAMPLES_PATH_CMAKE}/utils/ohos")
 else()
-  set(HM_LIB_DIR "${HOUMO_EXAMPLES_PATH_CMAKE}/utils/lib")
+  set(HM_LIB_DIR "${POSTMO_EXAMPLES_PATH_CMAKE}/utils/lib")
 endif()
 
-set(HM_TOKENIZER_INC "${HOUMO_EXAMPLES_PATH_CMAKE}/3rdparty/tokenizer.cpp/include")
-set(HM_THIRDPARTY_INC "${HOUMO_EXAMPLES_PATH_CMAKE}/3rdparty")
+set(HM_TOKENIZER_INC "${POSTMO_EXAMPLES_PATH_CMAKE}/3rdparty/tokenizer.cpp/include")
+set(HM_THIRDPARTY_INC "${POSTMO_EXAMPLES_PATH_CMAKE}/3rdparty")
 
 set(HM_INCLUDE_DIRS
-  ${HOUMO_ENGINE_DIR}/include
+  ${POSTMO_ENGINE_DIR}/include
   ${HM_TOKENIZER_INC}
   ${HM_THIRDPARTY_INC}
   ${TCIM_RUNTIME_INCLUDE}
@@ -49,11 +49,11 @@ if(MSVC)
 
   if(HM_ENGINE_AUTO_BUILD AND NOT TARGET houmo_infer_build)
     file(GLOB_RECURSE _hm_engine_src
-      ${HOUMO_ENGINE_DIR}/src/*.cc
-      ${HOUMO_ENGINE_DIR}/src/*.h
+      ${POSTMO_ENGINE_DIR}/src/*.cc
+      ${POSTMO_ENGINE_DIR}/src/*.h
     )
     file(GLOB_RECURSE _hm_engine_inc
-      ${HOUMO_ENGINE_DIR}/include/*.h
+      ${POSTMO_ENGINE_DIR}/include/*.h
     )
 
     add_custom_command(
@@ -62,12 +62,12 @@ if(MSVC)
         ${HM_LIB_DIR}/houmo_infer.dll
         ${HM_LIB_DIR}/tokenizer_lib.lib
         ${HM_LIB_DIR}/tokenizer_lib.dll
-      COMMAND cmd /c call "${HOUMO_ENGINE_DIR}/build_win.bat"
-      WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
+      COMMAND cmd /c call "${POSTMO_ENGINE_DIR}/build_win.bat"
+      WORKING_DIRECTORY ${POSTMO_ENGINE_DIR}
       DEPENDS
-        ${HOUMO_ENGINE_DIR}/build_win.bat
-        ${HOUMO_ENGINE_DIR}/CMakeLists.txt
-        "${HOUMO_EXAMPLES_PATH_CMAKE}/cmake/tcim_runtime.cmake"
+        ${POSTMO_ENGINE_DIR}/build_win.bat
+        ${POSTMO_ENGINE_DIR}/CMakeLists.txt
+        "${POSTMO_EXAMPLES_PATH_CMAKE}/cmake/tcim_runtime.cmake"
         ${_hm_engine_src}
         ${_hm_engine_inc}
       COMMENT "Building houmo_engine Windows artifacts..."
@@ -106,31 +106,31 @@ else()
   )
 
   if(ANDROID_ABI)
-    set(_HM_BUILD_SCRIPT "${HOUMO_ENGINE_DIR}/build_ndk.sh")
+    set(_HM_BUILD_SCRIPT "${POSTMO_ENGINE_DIR}/build_ndk.sh")
   elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-    set(_HM_BUILD_SCRIPT "${HOUMO_ENGINE_DIR}/build_OHOS.sh")
+    set(_HM_BUILD_SCRIPT "${POSTMO_ENGINE_DIR}/build_OHOS.sh")
   else()
-    set(_HM_BUILD_SCRIPT "${HOUMO_ENGINE_DIR}/build_linux.sh")
+    set(_HM_BUILD_SCRIPT "${POSTMO_ENGINE_DIR}/build_linux.sh")
   endif()
   option(HM_ENGINE_AUTO_BUILD "Auto-build houmo_infer when sources change" ON)
 
   if(HM_ENGINE_AUTO_BUILD AND NOT TARGET houmo_infer_build)
     file(GLOB_RECURSE _hm_engine_src
-      ${HOUMO_ENGINE_DIR}/src/*.cc
-      ${HOUMO_ENGINE_DIR}/src/*.h
+      ${POSTMO_ENGINE_DIR}/src/*.cc
+      ${POSTMO_ENGINE_DIR}/src/*.h
     )
     file(GLOB_RECURSE _hm_engine_inc
-      ${HOUMO_ENGINE_DIR}/include/*.h
+      ${POSTMO_ENGINE_DIR}/include/*.h
     )
 
     add_custom_command(
       OUTPUT ${HM_LIB_DIR}/libhoumo_infer.so
       COMMAND bash ${_HM_BUILD_SCRIPT}
-      WORKING_DIRECTORY ${HOUMO_ENGINE_DIR}
+      WORKING_DIRECTORY ${POSTMO_ENGINE_DIR}
       DEPENDS
         ${_HM_BUILD_SCRIPT}
-        ${HOUMO_ENGINE_DIR}/CMakeLists.txt
-        "$ENV{HOUMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake"
+        ${POSTMO_ENGINE_DIR}/CMakeLists.txt
+        "$ENV{POSTMO_EXAMPLES_PATH}/cmake/tcim_runtime.cmake"
         ${_hm_engine_src}
         ${_hm_engine_inc}
       COMMENT "Building houmo_engine (${_HM_BUILD_SCRIPT})..."

@@ -4,10 +4,10 @@
 
 使用数据集前，请从官方渠道获取数据并遵守其许可协议、使用条款、隐私政策及商用限制。因下载、使用或分发第三方数据产生的风险和责任由使用者自行承担。COCO 采样的来源与署名信息见根目录 `DATASET_NOTICE.md`。
 
-默认情况下，示例通过环境变量 `HOUMO_DATASETS_PATH` 定位本目录。用户也可以将该变量设置为仓库外的数据集目录：
+默认情况下，示例通过环境变量 `POSTMO_DATASETS_PATH` 定位本目录。用户也可以将该变量设置为仓库外的数据集目录：
 
 ```bash
-export HOUMO_DATASETS_PATH=/path/to/datasets
+export POSTMO_DATASETS_PATH=/path/to/datasets
 ```
 
 ## 数据集许可信息

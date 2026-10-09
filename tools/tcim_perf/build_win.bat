@@ -1,5 +1,5 @@
 set PROJECT_DIR=%cd%
-set HOUMO_EXAMPLES_PATH=%PROJECT_DIR%\..\..
+set POSTMO_EXAMPLES_PATH=%PROJECT_DIR%\..\..
 set BUILD_TYPE=Release
 if "%1" neq "" (set BUILD_TYPE=%1)
 set BUILD_DIR=build_vs2022

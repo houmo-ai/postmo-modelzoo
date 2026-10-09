@@ -38,11 +38,11 @@ from xhquant.xhonnxruntime.hmonnx_inference import HMONNXInference
 THIS_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = THIS_DIR / "config.yaml"
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_WORK_DIR = THIS_DIR / "work_dirs" / "cam"
-DEFAULT_OUT_DIR = os.path.join("output", HOUMO_TARGET, "hmquant")
+DEFAULT_OUT_DIR = os.path.join("output", POSTMO_TARGET, "hmquant")
 FEATURE_DIM = 80
 DEFAULT_FIXED_FRAMES = 529
 DEFAULT_THRESHOLD = 0.31

@@ -57,7 +57,7 @@
 设置目标平台：
 
 ```bash
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 ```
 
 安装示例运行所需的 python 依赖，建议使用 venv：
@@ -83,7 +83,7 @@ sudo apt-get install -y python3-tk
 python3 get_model.py --type raw
 ```
 
-如果仅查看演示结果，可选择下载芯片模型和演示依赖，下载后的文件存放在当前目录或 `output/${HOUMO_TARGET}` 相关目录中：
+如果仅查看演示结果，可选择下载芯片模型和演示依赖，下载后的文件存放在当前目录或 `output/${POSTMO_TARGET}` 相关目录中：
 
 ```bash
 python3 get_model.py --type hmm
@@ -111,10 +111,10 @@ cd models/diffusion/z-image
 python3 ptq.py
 ```
 
-`ptq.py` 默认量化 `dit`、`vae` 和 `text_encoder` 三个子模型。量化完成的模型和演示依赖存放在 `output/${HOUMO_TARGET}/hmquant` 目录：
+`ptq.py` 默认量化 `dit`、`vae` 和 `text_encoder` 三个子模型。量化完成的模型和演示依赖存放在 `output/${POSTMO_TARGET}/hmquant` 目录：
 
 ```bash
-output/${HOUMO_TARGET}/hmquant
+output/${POSTMO_TARGET}/hmquant
 |-- dit
 |   |-- hmquant_z-image-turbo_6b_w8a8h1_sefp_256_2048_dit.onnx
 |   `-- zimage_dit-XH2a-w8a8h1_sefp_external_data
@@ -146,7 +146,7 @@ python3 ptq.py --export_demo_deps only
 
 ### 2.4 编译
 
-将量化模型编译为在芯片上运行的模型。默认从 `output/${HOUMO_TARGET}/hmquant` 读取量化结果，并输出到 `output/${HOUMO_TARGET}`：
+将量化模型编译为在芯片上运行的模型。默认从 `output/${POSTMO_TARGET}/hmquant` 读取量化结果，并输出到 `output/${POSTMO_TARGET}`：
 
 ```bash
 python3 build.py
@@ -170,14 +170,14 @@ Z-Image-Turbo 模型使用 python API 进行演示。
 
 1. `demo.py` 默认从 `config.yaml` 读取模型名称和规格，并默认读取：
 
-  - `output/${HOUMO_TARGET}/z-image-turbo-6b_encoder.hmm`
-  - `output/${HOUMO_TARGET}/z-image-turbo-6b_dit.hmm`
-  - `output/${HOUMO_TARGET}/z-image-turbo-6b_vae.hmm`
-  - `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
-  - `output/${HOUMO_TARGET}/hmquant/hf_config/tokenizer`
-  - `output/${HOUMO_TARGET}/hmquant/hf_config/scheduler/scheduler_config.json`
-  - `output/${HOUMO_TARGET}/hmquant/hf_config/t_embedder.pt`
-  - `output/${HOUMO_TARGET}/hmquant/hf_config/transformer_config.json`
+  - `output/${POSTMO_TARGET}/z-image-turbo-6b_encoder.hmm`
+  - `output/${POSTMO_TARGET}/z-image-turbo-6b_dit.hmm`
+  - `output/${POSTMO_TARGET}/z-image-turbo-6b_vae.hmm`
+  - `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
+  - `output/${POSTMO_TARGET}/hmquant/hf_config/tokenizer`
+  - `output/${POSTMO_TARGET}/hmquant/hf_config/scheduler/scheduler_config.json`
+  - `output/${POSTMO_TARGET}/hmquant/hf_config/t_embedder.pt`
+  - `output/${POSTMO_TARGET}/hmquant/hf_config/transformer_config.json`
 
 2. `demo.py` 会从 VAE HMM 输入 shape 推导生成图像的 `height` 和 `width`，并从 DIT HMM 输入 shape 推导图像 token 长度和文本 token 长度，不需要用户手动传入分辨率。
 
@@ -413,9 +413,9 @@ Prompt
 运行 `python3 demo.py` 后，脚本先解析命令行参数和 `config.yaml`。如果用户没有显式传入模型路径，脚本默认按以下规则查找编译后的 HMM 文件：
 
 ```text
-output/${HOUMO_TARGET}/${model_name}-${model_size}_encoder.hmm
-output/${HOUMO_TARGET}/${model_name}-${model_size}_dit.hmm
-output/${HOUMO_TARGET}/${model_name}-${model_size}_vae.hmm
+output/${POSTMO_TARGET}/${model_name}-${model_size}_encoder.hmm
+output/${POSTMO_TARGET}/${model_name}-${model_size}_dit.hmm
+output/${POSTMO_TARGET}/${model_name}-${model_size}_vae.hmm
 ```
 
 随后 `HmZImage` 会加载两类内容：
@@ -423,7 +423,7 @@ output/${HOUMO_TARGET}/${model_name}-${model_size}_vae.hmm
 - host 侧依赖：`tokenizer`、`scheduler_config.json`、`transformer_config.json`、`t_embedder.pt`。
 - 设备侧模型：`text_encoder`、`dit`、`vae` 三个 HMM runtime。
 
-其中 host 侧依赖来自 `output/${HOUMO_TARGET}/hmquant/hf_config` 和 `quant_embedding.pt`。这些文件不是完整模型主体，但决定了 prompt 如何 tokenize、scheduler 如何生成时间步、latent 和 image shape 如何换算，以及 DiT 的 timestep embedding 如何生成。
+其中 host 侧依赖来自 `output/${POSTMO_TARGET}/hmquant/hf_config` 和 `quant_embedding.pt`。这些文件不是完整模型主体，但决定了 prompt 如何 tokenize、scheduler 如何生成时间步、latent 和 image shape 如何换算，以及 DiT 的 timestep embedding 如何生成。
 
 ### 2. 自动推导分辨率和序列长度
 

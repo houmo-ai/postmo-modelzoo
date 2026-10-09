@@ -113,8 +113,8 @@ if [[ -f "${SCRIPT_DIR}/requirements.txt" ]]; then
     export PYTHONPATH="${PYTHONPATH:-}"
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "Gemma4 demo"
 
-    gptq_requirements="${HOUMO_EXAMPLES_PATH:-}/hmodel/gptqmodel/requirements.txt"
-    if [[ -n "${HOUMO_EXAMPLES_PATH:-}" && -f "${gptq_requirements}" ]]; then
+    gptq_requirements="${POSTMO_EXAMPLES_PATH:-}/hmodel/gptqmodel/requirements.txt"
+    if [[ -n "${POSTMO_EXAMPLES_PATH:-}" && -f "${gptq_requirements}" ]]; then
         python3 -m pip install -r "${gptq_requirements}"
     fi
 fi

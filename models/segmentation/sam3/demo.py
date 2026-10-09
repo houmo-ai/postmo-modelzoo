@@ -33,8 +33,8 @@ from eval_util import GOLD_GTS, evaluate_engine, locate_dataset
 from sam3_engine import SAM3Engine
 from sam3_processor import DEFAULT_MODEL_DIR
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 CURRENT_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = CURRENT_DIR / "config.yml"
@@ -63,7 +63,7 @@ def parse_bool(value: str) -> bool:
 
 
 def default_image_path() -> str:
-	root = Path(os.getenv("HOUMO_EXAMPLES_PATH", CURRENT_DIR.parents[2]))
+	root = Path(os.getenv("POSTMO_EXAMPLES_PATH", CURRENT_DIR.parents[2]))
 	return str(root / "data" / "pic" / "sam3_test_image.jpg")
 
 
@@ -143,7 +143,7 @@ def get_args() -> argparse.Namespace:
 		default_model = CURRENT_DIR / "work_dirs" / f"{model_shape_name}_sim.onnx"
 		default_output = "demo_onnx_result.png"
 	else:
-		default_model = CURRENT_DIR / "output" / HOUMO_TARGET / f"{model_shape_name}.hmm"
+		default_model = CURRENT_DIR / "output" / POSTMO_TARGET / f"{model_shape_name}.hmm"
 		default_output = "demo_hmm_result.png"
 	args.model = first_not_none(
 		args.model,
@@ -162,7 +162,7 @@ def run_evaluation(args: argparse.Namespace) -> None:
 		f"{args.model_name}_{args.model_size}_"
 		f"{args.max_size_w}x{args.max_size_h}"
 	)
-	hmm_model = CURRENT_DIR / "output" / HOUMO_TARGET / f"{model_shape_name}.hmm"
+	hmm_model = CURRENT_DIR / "output" / POSTMO_TARGET / f"{model_shape_name}.hmm"
 	if args.backend in ("hmm", "xh2") and args.model is not None:
 		hmm_model = Path(args.model)
 	if not hmm_model.is_file():

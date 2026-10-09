@@ -34,10 +34,10 @@ from hmatc.utils.utils import (
     parse_context_length,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", "Only supported xh2!"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", "Only supported xh2!"
 
-HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+POSTMO_CORE_NUM = int(os.getenv("POSTMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -78,7 +78,7 @@ def get_args() -> argparse.Namespace:
         "--model_dir",
         dest="model_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant"),
         help="path to the model dir",
     )
     parser.add_argument(
@@ -142,7 +142,7 @@ def get_args() -> argparse.Namespace:
         "--output_dir",
         dest="output_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET),
+        default=os.path.join("output", POSTMO_TARGET),
         help="build output dir",
     )
     args = parser.parse_args()
@@ -153,7 +153,7 @@ def get_args() -> argparse.Namespace:
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
-    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", POSTMO_CORE_NUM))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
     args.batch = first_not_none(args.batch, model_config.get("batch", 10))
     if args.context_length is None:

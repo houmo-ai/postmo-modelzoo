@@ -165,7 +165,7 @@ python3 ptq.py
 2. 完整的 `docker run -it --gpus all ...` 命令
 3. 进入 docker 后执行 `source env.sh`，并 `cd` 到当前模型目录再运行 `ptq.py` 的说明与示例命令
 
-[可选] 量化完成的模型存放在`output/$HOUMO_TARGET/hmquant`目录：
+[可选] 量化完成的模型存放在`output/$POSTMO_TARGET/hmquant`目录：
 ```bash
 .
 |-- prefill
@@ -189,7 +189,7 @@ python3 build.py
 xxx 模型使用 python API 进行演示。
 
 1. 实际 Demo 入口默认从 `config.yaml` 推导 `tokenizer_dir`，并默认读取：
-- `output/${HOUMO_TARGET}/xxx.hmm`
+- `output/${POSTMO_TARGET}/xxx.hmm`
 - ...
 
 2. 执行脚本，推理完成将输出性能结果。

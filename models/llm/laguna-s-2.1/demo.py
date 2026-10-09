@@ -35,8 +35,8 @@ from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.perf_infomations import InferencePerformanceTracker, PERFTYPE
 from hmatc.utils.utils import first_not_none, get_model_configs, parse_context_length
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 DEFAULT_SYSTEM_PROMPT = (
 	"你是由 Poolside 开发的、乐于助人且对话流畅的助手。"
@@ -102,9 +102,9 @@ def parse_args() -> argparse.Namespace:
 	args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))
 	args.context_length = first_not_none(args.context_length, parse_context_length(model_config.get("context_length", "256k")))
 	args.tokenizer_dir = first_not_none(args.tokenizer_dir, get_default_tokenizer_dir(model_config))
-	args.embedding_path = first_not_none(args.embedding_path, os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"))
-	args.prefill_path = first_not_none(args.prefill_path, os.path.join("output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"))
-	args.decode_path = first_not_none(args.decode_path, os.path.join("output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"))
+	args.embedding_path = first_not_none(args.embedding_path, os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"))
+	args.prefill_path = first_not_none(args.prefill_path, os.path.join("output", POSTMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"))
+	args.decode_path = first_not_none(args.decode_path, os.path.join("output", POSTMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"))
 	if args.ndevice > 1:
 		args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")
 		args.decode_path = args.decode_path.replace(".hmm", ".hmms")

@@ -31,8 +31,8 @@ from hmatc.utils.utils import (
 
 from quant_pipline import quant_llm, export_llm, move_llm
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -64,7 +64,7 @@ def parse_args():
     )
     parser.add_argument("--model-size", type=str, default=None, help="model size")
     parser.add_argument("--work-dir", type=str, default="work_dirs/")
-    parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
+    parser.add_argument("--out-dir", type=str, default="output/{}".format(POSTMO_TARGET))
     parser.add_argument("--skip-quarot", action="store_true", help="skip_quarot")
     parser.add_argument("--skip-gptq", action="store_true", help="skip_gptq")
     parser.add_argument("--w-bits", type=int, default=8)

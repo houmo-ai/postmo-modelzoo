@@ -29,7 +29,7 @@ TEST_VENV_ACTIVE=0
 dir_path="ornith_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
-    gptq_requirements="${HOUMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"
+    gptq_requirements="${POSTMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"
     if [ -f "${gptq_requirements}" ]; then
         pip3 install -r "${gptq_requirements}"
     fi

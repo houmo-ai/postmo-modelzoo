@@ -58,14 +58,14 @@ from xh_model_zoo.xh_llm.models.qwen3_vl import (
 from xh_model_zoo.utils.memory_tracker import MemoryTracker  # isort:skip
 from xh_model_zoo.utils.time_profiler import TimeProfiler  # isort:skip
 
-HOUMO_DATASETS_PATH = os.getenv(
-    "HOUMO_DATASETS_PATH",
+POSTMO_DATASETS_PATH = os.getenv(
+    "POSTMO_DATASETS_PATH",
     str(Path(__file__).resolve().parents[3] / "data" / "datasets"),
 )
-HOUMO_PIC_PATH = os.getenv(
-    "HOUMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
+POSTMO_PIC_PATH = os.getenv(
+    "POSTMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
 )
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "")
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 def get_default_model_dir(model_config: dict) -> str:
@@ -240,7 +240,7 @@ def parse_args():
     )
     parser.add_argument("--work-dir", type=str, default="work_dirs/")
     parser.add_argument(
-        "--out-dir", type=str, default="output/{}".format(HOUMO_TARGET)
+        "--out-dir", type=str, default="output/{}".format(POSTMO_TARGET)
     )
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument(
@@ -249,7 +249,7 @@ def parse_args():
     parser.add_argument(
         "--sample-image-path", 
         type=str, 
-        default=f"{HOUMO_PIC_PATH}/beach.jpeg", 
+        default=f"{POSTMO_PIC_PATH}/beach.jpeg", 
         help="sample image for vision export (--image_path)",
     )
     parser.add_argument(

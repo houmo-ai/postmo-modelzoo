@@ -5,8 +5,8 @@
 import os
 from hmatc.utils.utils import hmatc_get_file, get_houmo_version
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 if __name__ == "__main__":
     import argparse
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": "qwen3",

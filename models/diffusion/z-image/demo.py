@@ -50,8 +50,8 @@ import tcim_lite as tcim
 from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 DEFAULT_PROMPT = "一只长得像蝴蝶一样缤纷绚丽的奇异花朵，开在丛林中，散发着柔和的光芒"
@@ -1329,8 +1329,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
     parser.add_argument("--model_name", type=str, default=None, help="model name")
     parser.add_argument("--model_size", type=str, default=None, help="model size")
-    parser.add_argument("--deps_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant", "hf_config"), help="directory containing extracted demo dependencies")
-    parser.add_argument("--embedding_path", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"), help="token embedding weight path")
+    parser.add_argument("--deps_dir", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant", "hf_config"), help="directory containing extracted demo dependencies")
+    parser.add_argument("--embedding_path", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"), help="token embedding weight path")
     parser.add_argument("--encoder_path", type=str, default=None, help="compiled text encoder hmm path")
     parser.add_argument("--dit_path", type=str, default=None, help="compiled dit hmm path")
     parser.add_argument("--vae_path", type=str, default=None, help="compiled vae hmm path")
@@ -1360,7 +1360,7 @@ def get_args() -> argparse.Namespace:
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
 
     # build.py 默认用该前缀输出三个 HMM 文件；测试自定义编译模型时仍可显式传路径。
-    model_path_prefix = f"./output/{HOUMO_TARGET}/{args.model_name}-{args.model_size}"
+    model_path_prefix = f"./output/{POSTMO_TARGET}/{args.model_name}-{args.model_size}"
     args.encoder_path = first_not_none(
         args.encoder_path, f"{model_path_prefix}_encoder.hmm"
     )

@@ -23,7 +23,7 @@ TEST_VENV_ACTIVE=0
 dir_path="minicpm_venv"
 if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
     setup_python_venv "${dir_path}" "${SCRIPT_DIR}/requirements.txt" "${dir_path} demo"
-    gptq_requirements="${HOUMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"
+    gptq_requirements="${POSTMO_EXAMPLES_PATH}/hmodel/gptqmodel/requirements.txt"
     if [ -f "${gptq_requirements}" ]; then
         pip3 install -r "${gptq_requirements}"
     fi
@@ -82,8 +82,8 @@ if should_run_step "demo"; then
     DEMO_ARGS+=("${SYSTEM_PROMPT_ARGS[@]}")
     python3 demo.py "${DEMO_ARGS[@]}"
 
-    python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" \
-        --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+    python3 "${POSTMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" \
+        --path "output/${POSTMO_TARGET}/hmquant/quant_embedding.pt"
     if command -v llm_perf &>/dev/null; then
         echo "Execute performance cases (${MODEL_NAME}-${MODEL_SIZE})."
         if [[ "${NDEVICE}" -gt 1 ]]; then
@@ -95,10 +95,10 @@ if should_run_step "demo"; then
         for visual_profile in 4x 16x; do
             llm_perf --model_name "${MODEL_NAME}-${MODEL_SIZE}" --devices "${devices_param}" \
                 --input 256,1024,2048 --output 256,256,256 --loop 1 --batch 1 \
-                --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
-                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
-                --visual "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_${visual_profile}.hmm" \
-                --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin"
+                --prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.${model_suffix}" \
+                --decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.${model_suffix}" \
+                --visual "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_visual_${visual_profile}.hmm" \
+                --embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding.bin"
         done
     fi
 fi

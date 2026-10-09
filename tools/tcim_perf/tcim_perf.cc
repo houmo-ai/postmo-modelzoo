@@ -1090,7 +1090,7 @@ int PerfFunc(CliArguments &arguments) {
     is_result_check = false;
   }
 
-  if (auto target = std::getenv("HOUMO_TARGET")) {
+  if (auto target = std::getenv("POSTMO_TARGET")) {
     if (!strcmp(target, "xh2")) {
       is_result_check = false;
       hm_target = "xh2";
@@ -1101,7 +1101,7 @@ int PerfFunc(CliArguments &arguments) {
   }
 
   if (module_num == 0) {
-    auto core_num = std::getenv("HOUMO_CORE_NUM");
+    auto core_num = std::getenv("POSTMO_CORE_NUM");
     if (core_num) {
       module_num = (atoi(core_num) * 2);
     } else {
@@ -1119,7 +1119,7 @@ int PerfFunc(CliArguments &arguments) {
     }
   }
 
-  if (auto device = std::getenv("HOUMO_DEVICES")) {
+  if (auto device = std::getenv("POSTMO_DEVICES")) {
     if (device) device_id = atoi(device);
   }
 

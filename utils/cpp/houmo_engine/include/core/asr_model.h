@@ -20,8 +20,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef HOUMO_ASR_MODEL_H
-#define HOUMO_ASR_MODEL_H
+#ifndef POSTMO_ASR_MODEL_H
+#define POSTMO_ASR_MODEL_H
 
 #include <functional>
 #include <memory>
@@ -333,4 +333,4 @@ class ASRContext : public Context {
 
 }  // namespace houmo
 
-#endif  // HOUMO_ASR_MODEL_H
+#endif  // POSTMO_ASR_MODEL_H

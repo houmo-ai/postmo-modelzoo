@@ -66,7 +66,7 @@ hmatc quant -c encoder.yml
 hmatc quant -c decoder.yml
 ```
 
-量化完成的模型存放在 `output/${HOUMO_TARGET}/hmquant` 目录。
+量化完成的模型存放在 `output/${POSTMO_TARGET}/hmquant` 目录。
 
 ### 2.4 编译
 
@@ -133,7 +133,7 @@ cd models/segmentation/sam2
 python3 demo.py \
   --backend hmm \
   --mode 2 \
-  --image ${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg \
+  --image ${POSTMO_EXAMPLES_PATH}/data/pic/beach.jpeg \
   --point 800 800
 ```
 
@@ -144,7 +144,7 @@ cd models/segmentation/sam2
 python3 demo.py \
   --backend onnx \
   --mode 2 \
-  --image ${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg \
+  --image ${POSTMO_EXAMPLES_PATH}/data/pic/beach.jpeg \
   --point 800 800
 ```
 
@@ -155,7 +155,7 @@ cd models/segmentation/sam2
 python3 demo.py \
   --backend hmm \
   --mode 3 \
-  --image ${HOUMO_EXAMPLES_PATH}/data/pic/beach.jpeg \
+  --image ${POSTMO_EXAMPLES_PATH}/data/pic/beach.jpeg \
   --grid-size 8
 ```
 
@@ -166,7 +166,7 @@ cd models/segmentation/sam2
 python3 demo.py \
   --backend onnx \
   --mode 0 \
-  --dataset_dir ${HOUMO_EXAMPLES_PATH}/data/datasets/coco2017 \
+  --dataset_dir ${POSTMO_EXAMPLES_PATH}/data/datasets/coco2017 \
   --eval-num 32
 ```
 
@@ -177,7 +177,7 @@ cd models/segmentation/sam2
 python3 demo.py \
   --backend hmm \
   --mode 0 \
-  --dataset_dir ${HOUMO_EXAMPLES_PATH}/data/datasets/coco2017 \
+  --dataset_dir ${POSTMO_EXAMPLES_PATH}/data/datasets/coco2017 \
   --eval-num 32 \
   --max-ann-per-image 3
 ```

@@ -106,7 +106,7 @@ cd models/ocr/paddleocr-vl-1.6
 python3 ptq.py --model-name paddleocr-vl-1.6 --model-size 0.9b
 ```
 
-量化产物默认位于 `output/$HOUMO_TARGET/hmquant`。
+量化产物默认位于 `output/$POSTMO_TARGET/hmquant`。
 
 ```text
 output/xh2/hmquant

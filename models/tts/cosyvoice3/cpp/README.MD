@@ -124,7 +124,7 @@ source env.sh
 ```
 
 需要设置的环境变量：
-- `HOUMO_TARGET`: 目标芯片类型，设置为 `xh2`
+- `POSTMO_TARGET`: 目标芯片类型，设置为 `xh2`
 - `TCIM_RUNTIME_PATH`: TCIM Runtime库路径（必需）
 
 对于Android平台交叉编译，还需设置：
@@ -135,7 +135,7 @@ source env.sh
 **Linux平台编译：**
 
 ```bash
-cd ${HOUMO_EXAMPLES_PATH}/models/tts/cosyvoice3/cpp
+cd ${POSTMO_EXAMPLES_PATH}/models/tts/cosyvoice3/cpp
 ./build.sh
 ```
 
@@ -146,7 +146,7 @@ cd ${HOUMO_EXAMPLES_PATH}/models/tts/cosyvoice3/cpp
 ```bash
 # 设置NDK路径
 export NDK_PATH=/path/to/android-ndk-r28c
-export HOUMO_SDK_PATH=/path/to/houmo-drv-xh2
+export POSTMO_SDK_PATH=/path/to/houmo-drv-xh2
 export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 
 # 编译
@@ -158,8 +158,8 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-tcim-runtime-xh2
 ```bash
 # 设置 OHOS SDK 和相关环境变量
 export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
-export HOUMO_TARGET=xh2
-export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export POSTMO_TARGET=xh2
+export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
 export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
 
 # 方式一：使用预编译的三方音频库（需提前准备好 OHOS 版本的 .so 文件）
@@ -191,10 +191,10 @@ export TCIM_RUNTIME_PATH=/path/to/houmo-sdk
 在cosyvoice3目录下执行：
 
 ```bash
-cd ${HOUMO_EXAMPLES_PATH}/models/tts/cosyvoice3
+cd ${POSTMO_EXAMPLES_PATH}/models/tts/cosyvoice3
 
 # 设置环境变量
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 export TCIM_BACKEND=Xh2HalBackend
 
 # 运行推理

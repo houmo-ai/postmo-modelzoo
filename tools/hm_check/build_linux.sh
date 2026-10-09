@@ -25,7 +25,7 @@ Options:
   -g GENERATOR      CMake generator (optional, e.g. "Ninja")
   -j JOBS           Parallel jobs for build (default: number of CPUs)
   --tcim PATH       Set TCIM_RUNTIME_PATH (default: read from TCIM_RUNTIME_PATH env var)
-  --houmo PATH      Set HOUMO_SDK_PATH (default: read from HOUMO_SDK_PATH env var)
+  --houmo PATH      Set POSTMO_SDK_PATH (default: read from POSTMO_SDK_PATH env var)
   --install [PATH]  Install after building (default: ${SOURCE_DIR}/../bin, always enabled by default)
   --no-install      Skip installation after building
   -h                Show this help
@@ -36,7 +36,7 @@ Example:
   $0 -b build -c Release -j 8 --tcim $DADAO_VENV/lib/python3.12/site-packages/tcim_lite --houmo /usr/local/houmo-sdk --no-install
 
 Notes:
-  By default the script will read [TCIM_RUNTIME_PATH](file:///data/weiguo.xing/repo/imodelzoo/hmatc/setup.py#L29-L29) and `HOUMO_SDK_PATH` from environment.
+  By default the script will read [TCIM_RUNTIME_PATH](file:///data/weiguo.xing/repo/imodelzoo/hmatc/setup.py#L29-L29) and `POSTMO_SDK_PATH` from environment.
   If they are not set, the script will attempt to auto-detect common installation paths.
   You can also explicitly provide paths via `--tcim` and `--houmo`.
   Installation runs by default unless --no-install is specified.
@@ -79,7 +79,7 @@ if [[ -n "$TCIM" ]]; then
   export TCIM_RUNTIME_PATH="$TCIM"
 fi
 if [[ -n "$HOUMO" ]]; then
-  export HOUMO_SDK_PATH="$HOUMO"
+  export POSTMO_SDK_PATH="$HOUMO"
 fi
 
 # If environment vars are not set, try to auto-detect common installation paths
@@ -99,19 +99,19 @@ Please set TCIM_RUNTIME_PATH (e.g. export TCIM_RUNTIME_PATH=$DADAO_VENV/lib/pyth
   exit 1
 fi
 
-if [[ -z "${HOUMO_SDK_PATH:-}" ]]; then
+if [[ -z "${POSTMO_SDK_PATH:-}" ]]; then
   candidates=("/usr/local/houmo-sdk")
   for p in "${candidates[@]}"; do
     if [[ -d "$p" && ( -d "$p/include" || -d "$p/inc" ) ]]; then
-      export HOUMO_SDK_PATH="$p"
-      echo "Auto-detected HOUMO_SDK_PATH: $p"
+      export POSTMO_SDK_PATH="$p"
+      echo "Auto-detected POSTMO_SDK_PATH: $p"
       break
     fi
   done
 fi
-if [[ -z "${HOUMO_SDK_PATH:-}" ]]; then
-  echo "Environment variable HOUMO_SDK_PATH is not set and auto-detection failed.
-Please set HOUMO_SDK_PATH (e.g. export HOUMO_SDK_PATH=/usr/local/houmo-sdk) or pass --houmo /path." >&2
+if [[ -z "${POSTMO_SDK_PATH:-}" ]]; then
+  echo "Environment variable POSTMO_SDK_PATH is not set and auto-detection failed.
+Please set POSTMO_SDK_PATH (e.g. export POSTMO_SDK_PATH=/usr/local/houmo-sdk) or pass --houmo /path." >&2
   exit 1
 fi
 
@@ -121,7 +121,7 @@ echo "Configuration: $CONFIG"
 echo "Generator: ${GENERATOR:-(default)}"
 echo "Jobs: $JOBS"
 echo "TCIM_RUNTIME_PATH: $TCIM_RUNTIME_PATH"
-echo "HOUMO_SDK_PATH: $HOUMO_SDK_PATH"
+echo "POSTMO_SDK_PATH: $POSTMO_SDK_PATH"
 
 mkdir -p "$BUILD_DIR"
 

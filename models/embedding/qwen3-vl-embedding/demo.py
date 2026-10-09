@@ -45,13 +45,13 @@ from hmatc.utils.perf_infomations import (
 from hmatc.utils.utils import first_not_none, get_model_configs
 from processing_qwen3_vl import Qwen3VLProcessor
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(SCRIPT_DIR, "config.yaml")
-HOUMO_PIC_PATH = os.getenv(
-    "HOUMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
+POSTMO_PIC_PATH = os.getenv(
+    "POSTMO_PIC_PATH", str(Path(__file__).resolve().parents[3] / "data" / "pic")
 )
 DEFAULT_INSTRUCTION = "Represent the user's input."
 
@@ -100,7 +100,7 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -121,7 +121,7 @@ def get_args() -> argparse.Namespace:
         "--image",
         dest="image",
         type=str,
-        default=f"{HOUMO_PIC_PATH}/beach.jpeg",
+        default=f"{POSTMO_PIC_PATH}/beach.jpeg",
         help="demo image path",
     )
     parser.add_argument(
@@ -173,12 +173,12 @@ def get_args() -> argparse.Namespace:
     if args.vit_path is None:
         args.vit_path = os.path.join(
             "output",
-            HOUMO_TARGET,
+            POSTMO_TARGET,
             f"{args.model_name}-{args.model_size}_visual_{args.max_size_w}x{args.max_size_h}x{args.max_size_t}.hmm",
         )
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+            "output", POSTMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
         )
     if args.ndevice > 1 and args.prefill_path.endswith(".hmm"):
         args.prefill_path = args.prefill_path.replace(".hmm", ".hmms")

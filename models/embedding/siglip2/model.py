@@ -39,7 +39,7 @@ PROMPT_TEMPLATE = "a photo of a {}"
 
 
 def default_imagenet_dir():
-    examples_path = os.getenv("HOUMO_EXAMPLES_PATH")
+    examples_path = os.getenv("POSTMO_EXAMPLES_PATH")
     if examples_path:
         return str(Path(examples_path) / "data" / "datasets" / "imagenet")
     return "imagenet"

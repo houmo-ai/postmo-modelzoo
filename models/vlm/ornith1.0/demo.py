@@ -33,15 +33,15 @@ import yaml
 
 MODEL_DIR = Path(__file__).resolve().parent
 IMODELZOO_ROOT = MODEL_DIR.parents[2]
-HOUMO_ENGINE = IMODELZOO_ROOT / "utils" / "python"
-sys.path.insert(0, str(HOUMO_ENGINE))
+POSTMO_ENGINE = IMODELZOO_ROOT / "utils" / "python"
+sys.path.insert(0, str(POSTMO_ENGINE))
 
 from houmo_engine.perf import PerfTracker
 from processor import create_processor, process_visual_info
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-if HOUMO_TARGET not in (None, "xh2"):
-    raise ValueError(f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+if POSTMO_TARGET not in (None, "xh2"):
+    raise ValueError(f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}")
 
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
 DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / "xh2"

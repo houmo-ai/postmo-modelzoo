@@ -31,12 +31,12 @@ from hmatc.utils.utils import (
     get_platform,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
-DEFAULT_MODEL_DIR = os.path.join("output", HOUMO_TARGET, "hmquant")
-DEFAULT_OUTPUT_DIR = os.path.join("output", HOUMO_TARGET)
+DEFAULT_MODEL_DIR = os.path.join("output", POSTMO_TARGET, "hmquant")
+DEFAULT_OUTPUT_DIR = os.path.join("output", POSTMO_TARGET)
 
 
 def get_args() -> argparse.Namespace:
@@ -105,7 +105,7 @@ def build_one(args, suffix):
         ndevice=args.ndevice,
         flash_attn=args.flash_attention,
         parallel_jobs=args.parallel_jobs,
-        target=HOUMO_TARGET,
+        target=POSTMO_TARGET,
     )
 
 

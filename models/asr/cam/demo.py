@@ -19,8 +19,8 @@ from loguru import logger
 from hmatc.utils.monitor import ProcessMemoryMonitor
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 FILE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(FILE_DIR, "config.yaml")
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     ).expanduser()
     model_path = first_not_none(
         args.model_path,
-        os.path.join("output", HOUMO_TARGET, "cam_embedding.hmm"),
+        os.path.join("output", POSTMO_TARGET, "cam_embedding.hmm"),
     )
 
     print(f"Initializing HMM inference pipeline...")

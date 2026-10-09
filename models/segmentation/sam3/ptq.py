@@ -50,12 +50,12 @@ from xhquant.api import (
 from xhquant.utils.onnxsim_large_model.simplify_large_onnx import simplify_large_onnx
 
 THIS_DIR = Path(__file__).resolve().parent
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = THIS_DIR / "config.yml"
 DEFAULT_WORK_DIR = THIS_DIR / "work_dirs"
-DEFAULT_OUT_DIR = THIS_DIR / "output" / HOUMO_TARGET / "hmquant"
+DEFAULT_OUT_DIR = THIS_DIR / "output" / POSTMO_TARGET / "hmquant"
 MIN_EXPORT_GPU_MEMORY_GB = 20
 ONNX_IR_VERSION = 8
 ONNX_OPSET_VERSION = 18

@@ -32,7 +32,7 @@
   - Windows平台支持ASR模拟性能测试，`ENABLE_ASR` 默认开启
   - Windows编译复用 `houmo-llm-engine` 产物，`build_win.bat` 会自动触发 `houmo-llm-engine` Windows构建
   - Windows编译支持多核心并行构建，默认使用 `%NUMBER_OF_PROCESSORS%`
-  - Windows运行时依赖统一安装到 `$HOUMO_EXAMPLES_PATH/utils/lib`，请确保该目录已加入 `PATH`
+  - Windows运行时依赖统一安装到 `$POSTMO_EXAMPLES_PATH/utils/lib`，请确保该目录已加入 `PATH`
   - CMake平台配置复用 `utils/cpp/houmo_engine/cmake/platforms`，便于后续按平台维护
 - [20260626]
   - ASR性能测试改为模拟数据模式（PerfAsr），不再依赖真实音频、Tokenizer、Embedding
@@ -48,7 +48,7 @@
   - 支持Whisper、GlmAsr、Qwen3Asr三种ASR模型
 - [20260424]
   - 修改--ndevices参数为--devices，由指定设备数量改为指定设备ID
-  - --devices不设置时优先从HOUMO_VISIBLE_DEVICES读取，环境变量未设置则默认--devices 0
+  - --devices不设置时优先从POSTMO_VISIBLE_DEVICES读取，环境变量未设置则默认--devices 0
   - 对于--devices入参数量大于等于2时，增加模型名称必须为hmms校验和对应设备ID的CTC校验。
 
 ## 1.工具说明
@@ -235,7 +235,7 @@ codec_frames_per_second = target_codec_frames / codec_generation_seconds
 - --embedding       : 指定embedding模型路径，需要转换成bin文件，支持相对/绝对路径。
 - --input           : 指定prefill阶段输入token数量，支持单值或逗号分隔的多组参数，例如`256,512,1024`。
 - --output          : 指定decode阶段输出token数量，支持单值或逗号分隔的多组参数，组数必须与--input一致。
-- --devices         : 指定模型使用的device_id，不指定时优先从HOUMO_VISIBLE_DEVICES环境变量读取，如果环境变量未设置默认为0，支持单值或逗号分隔的多组参数，例如:0 或者0,1。
+- --devices         : 指定模型使用的device_id，不指定时优先从POSTMO_VISIBLE_DEVICES环境变量读取，如果环境变量未设置默认为0，支持单值或逗号分隔的多组参数，例如:0 或者0,1。
 - --loop            : 指定循环执行单个模型次数，不指定默认为1。
 - --batch           : 指定模型的batch数，不指定则--batch的值为1。多batch模型必须指定，会校验从模型读取到的batch和用户指定的值是否一致。目前多batch仅支持xh2.
 - --no_warm_up      : 默认执行warm_up，配置后会跳过warm_up流程。
@@ -254,7 +254,7 @@ codec_frames_per_second = target_codec_frames / codec_generation_seconds
 - --decode           : ASR模式下指定decode模型路径。
 - --chunk            : 模拟encoder分块数，默认1。程序加载模型后根据encoder_window计算audio_len（audio_len=chunk×encoder_window×0.01s）。
 - --token_per_second : 模拟每秒decode token数，默认3。每个chunk的decode轮数=该chunk音频时长×token_per_second。
-- --devices          : 指定模型使用的device_id，不指定时优先从HOUMO_VISIBLE_DEVICES环境变量读取，如果环境变量未设置默认为0。
+- --devices          : 指定模型使用的device_id，不指定时优先从POSTMO_VISIBLE_DEVICES环境变量读取，如果环境变量未设置默认为0。
 - --loop             : 指定循环执行次数，不指定默认为1。
 - --no_warm_up       : 默认执行warm_up，配置后会跳过warm_up流程。
 - --interval         : 配置DeviceMonitor监控线程的采样间隔时间，单位毫秒(ms)，默认为500ms。
@@ -289,7 +289,7 @@ codec_frames_per_second = target_codec_frames / codec_generation_seconds
 - --text_embedding         : 指定文本token embedding文件，即`text_embedding.bin`，必填。
 - --tts_audio_length       : 请求音频时长，单位秒，必填，必须是有限且大于0的单值。设置此参数将触发TTS性能测试流程。
 - --token_per_second       : 每秒模拟正文token数，只支持正整数，默认3。
-- --devices                : 指定单个device_id，不指定时优先从HOUMO_VISIBLE_DEVICES读取，环境变量未设置时默认0。TTS不支持多device。
+- --devices                : 指定单个device_id，不指定时优先从POSTMO_VISIBLE_DEVICES读取，环境变量未设置时默认0。TTS不支持多device。
 - --loop                   : 指定正式性能测试轮数，默认1，范围1-1000000。
 - --no_warm_up             : 默认执行一次完整TTS warm_up，配置后跳过warm_up。
 - --interval               : 配置DeviceMonitor和HostMonitor采样间隔，单位毫秒(ms)，默认500ms。
@@ -333,7 +333,7 @@ Qwen3-TTS需要以下三个二进制文件：
 请进入Qwen3-TTS demo目录，通过`get_model.py`下载预编译HMM并自动准备C++/llm_perf所需的embedding资产：
 
 ```bash
-cd ${HOUMO_EXAMPLES_PATH}/models/tts/qwen3-tts
+cd ${POSTMO_EXAMPLES_PATH}/models/tts/qwen3-tts
 
 python3 get_model.py \
   --type hmm \
@@ -350,7 +350,7 @@ python3 get_model.py \
 对于CustomVoice，`get_model.py --type hmm`下载预编译模型后会调用demo目录的Qwen3-TTS专用转换逻辑，一次性生成三份`.bin`文件。默认产物位置为：
 
 ```text
-models/tts/qwen3-tts/output/${HOUMO_TARGET}/
+models/tts/qwen3-tts/output/${POSTMO_TARGET}/
   qwen3-tts-<model_size>_text_projection.hmm
   qwen3-tts-<model_size>_talker_prefill.hmm
   qwen3-tts-<model_size>_talker_decode.hmm
@@ -367,15 +367,15 @@ models/tts/qwen3-tts/output/${HOUMO_TARGET}/
 
 | llm_perf参数 | 默认产物 |
 | --- | --- |
-| `--text_projection` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_text_projection.hmm` |
-| `--talker_prefill` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_talker_prefill.hmm` |
-| `--talker_decode` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_talker_decode.hmm` |
-| `--code_predictor_prefill` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_code_predictor_prefill.hmm` |
-| `--code_predictor_decode` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_code_predictor_decode.hmm` |
-| `--stateful_decoder` | `output/${HOUMO_TARGET}/qwen3-tts-<model_size>_stateful_decoder.hmm` |
-| `--embedding` | `output/${HOUMO_TARGET}/hmquant/quant_embedding.bin` |
-| `--code_embedding` | `output/${HOUMO_TARGET}/hmquant/quant_embedding_code_predictor.bin` |
-| `--text_embedding` | `output/${HOUMO_TARGET}/hmquant/text_embedding.bin` |
+| `--text_projection` | `output/${POSTMO_TARGET}/qwen3-tts-<model_size>_text_projection.hmm` |
+| `--talker_prefill` | `output/${POSTMO_TARGET}/qwen3-tts-<model_size>_talker_prefill.hmm` |
+| `--talker_decode` | `output/${POSTMO_TARGET}/qwen3-tts-<model_size>_talker_decode.hmm` |
+| `--code_predictor_prefill` | `output/${POSTMO_TARGET}/qwen3-tts-<model_size>_code_predictor_prefill.hmm` |
+| `--code_predictor_decode` | `output/${POSTMO_TARGET}/qwen3-tts-<model_size>_code_predictor_decode.hmm` |
+| `--stateful_decoder` | `output/${POSTMO_TARGET}/qwen3-tts-<model_size>_stateful_decoder.hmm` |
+| `--embedding` | `output/${POSTMO_TARGET}/hmquant/quant_embedding.bin` |
+| `--code_embedding` | `output/${POSTMO_TARGET}/hmquant/quant_embedding_code_predictor.bin` |
+| `--text_embedding` | `output/${POSTMO_TARGET}/hmquant/text_embedding.bin` |
 
 TTS perf不使用SpeechTokenizer HMM、真实文本tokenizer或模型目录中的`tokenizer.json`。如果上述三个`.bin`文件缺失，不要使用通用`convert_embed.py`逐个转换，应重新执行Qwen3-TTS目录下的`get_model.py --type hmm`，确保CodePredictor embedding的15组权重顺序正确。
 
@@ -385,8 +385,8 @@ TTS perf不使用SpeechTokenizer HMM、真实文本tokenizer或模型目录中�
 ``` shell
 # --devices 指定使用0,1运行2chip模型
 ./llm_perf --prefill prefill_model.hmms --decode decode_model.hmms --embedding quant_embedding.bin --input 100 --output 2048 --devices 0,1 --loop 2 --batch 1 --no_warm_up
-# 环境变量HOUMO_VISIBLE_DEVICES指定使用device 1
-HOUMO_VISIBLE_DEVICES=1 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --loop 2 --batch 1 --no_warm_up
+# 环境变量POSTMO_VISIBLE_DEVICES指定使用device 1
+POSTMO_VISIBLE_DEVICES=1 ./llm_perf --prefill prefill_model.hmm --decode decode_model.hmm --embedding quant_embedding.bin --input 100 --output 2048 --loop 2 --batch 1 --no_warm_up
 # 禁用warm_up
 ./llm_perf --prefill prefill_model.hmms --decode decode_model.hmms --embedding quant_embedding.bin --input 100 --output 2048 --devices 0,1 --loop 2 --batch 1 --no_warm_up
 # 开启warm_up
@@ -567,11 +567,11 @@ cd tools/llm_perf/
 
 ```bash
 # 1. 需要下载Android NDK，并设置NDK_PATH。
-# 2. 需要下载Android版本houmo-drv-xh2，设置HOUMO_SDK_PATH为当前Android版本路径。
+# 2. 需要下载Android版本houmo-drv-xh2，设置POSTMO_SDK_PATH为当前Android版本路径。
 # 3. 需要下载Android版本runtime-sdk，设置TCIM_RUNTIME_PATH为当前Android版本路径。
 # 示例如下：
 # export NDK_PATH={the_path_of_android}/android-ndk-r28c
-# export HOUMO_SDK_PATH={the_path_of_android}/houmo-drv-xh2
+# export POSTMO_SDK_PATH={the_path_of_android}/houmo-drv-xh2
 # export TCIM_RUNTIME_PATH={the_path_of_android}/houmo-tcim-runtime-xh2
 ./build_ndk.sh
 ```
@@ -582,12 +582,12 @@ cd tools/llm_perf/
 
 ```bash
 # 1. 需要下载 OpenHarmony SDK，并设置 OHOS_SDK。
-# 2. 需要下载 OHOS 版本 houmo-sdk，设置 HOUMO_SDK_PATH 为当前 OHOS 版本路径。
+# 2. 需要下载 OHOS 版本 houmo-sdk，设置 POSTMO_SDK_PATH 为当前 OHOS 版本路径。
 # 3. 需要下载 OHOS 版本 runtime-sdk，设置 TCIM_RUNTIME_PATH 为当前 OHOS 版本路径。
 # 示例如下：
 # export OHOS_SDK={the_path_of_ohos}/release/6.0-Release/linux/native
-# export HOUMO_TARGET=xh2
-# export HOUMO_SDK_PATH={the_path_of_ohos}/houmo-sdk
+# export POSTMO_TARGET=xh2
+# export POSTMO_SDK_PATH={the_path_of_ohos}/houmo-sdk
 # export TCIM_RUNTIME_PATH={the_path_of_ohos}/houmo
 ./build_OHOS.sh
 ```
@@ -604,8 +604,8 @@ build_win.bat
 **编译生成的llm_perf可执行文件在tools/bin目录下，在win11运行llm_perf.exe前需要参考 `tools/win_envs` 正确设置Windows环境变量：**
 1. 推荐在根目录执行 `env.bat --set`，该脚本会调用 `tools/win_envs/set_environs.py` 根据 `tools/win_envs/env.json` 配置环境变量。
 2. 执行完成后需要重新打开cmd窗口，使新的环境变量生效。
-3. 确认 `PATH` 中包含 `%HOUMO_EXAMPLES_PATH%\utils\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等运行时依赖。
-4. 确认 `HOUMO_TARGET=xh2`、`TCIM_BACKEND=Xh2HalBackend`、`TCIM_RUNTIME_PATH`、`HOUMO_SDK_PATH` 等变量已按 `tools/win_envs/env.json` 正确设置。
+3. 确认 `PATH` 中包含 `%POSTMO_EXAMPLES_PATH%\utils\lib`，该目录保存 `houmo_infer.dll`、`tokenizer_lib.dll`、`kaldi-native-fbank-core.dll`、`samplerate.dll` 等运行时依赖。
+4. 确认 `POSTMO_TARGET=xh2`、`TCIM_BACKEND=Xh2HalBackend`、`TCIM_RUNTIME_PATH`、`POSTMO_SDK_PATH` 等变量已按 `tools/win_envs/env.json` 正确设置。
 5. C++样例依赖 `libhal_xh2a.dll` 和 `tcim_runtime_lite.dll`，可通过 `env.bat --set` 加入PATH，或和 `llm_perf.exe` 放在同一目录。
 6. Windows平台当前默认开启ASR模拟性能测试；如需关闭，可在CMake配置时添加 `-DENABLE_ASR=OFF`。
 

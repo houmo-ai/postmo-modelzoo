@@ -62,8 +62,8 @@ from xh_model_zoo.utils.time_profiler import time_profiler
 from xh_model_zoo.xh_llm.models.eval_model_type import EvalModelType
 from xh_model_zoo.xh_llm.utils import decode_next_token
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
@@ -86,7 +86,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--model_dir", dest="model_dir", type=str, default=None, help="input hf model path")
     parser.add_argument("--model_name", dest="model_name", type=str, default=None, help="output hmonnx model name")
     parser.add_argument("--model_size", dest="model_size", type=str, default=None, help="model size")
-    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="output directory")
+    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant"), help="output directory")
     parser.add_argument("--work_dir", dest="work_dir", type=str, default="./work_dirs", help="working directory")
     parser.add_argument("--context_length", dest="context_length", type=int, default=None, help="max sequence length")
     parser.add_argument("--input_sequence_length", dest="input_sequence_length", type=int, default=None, help="input sequence length")
@@ -201,7 +201,7 @@ def quantize_campplus(
     # Load the ONNX model and logger.info input/output node information
     model = onnx_fix_shape(fixed_dims, campplus_onnx, simplified_campplus)
 
-    hmonnx_name = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{batch_size}x{sequence_length}_campplus.onnx"
+    hmonnx_name = f"hmquant_{POSTMO_TARGET}_{model_name}_{quant_type}_{batch_size}x{sequence_length}_campplus.onnx"
     model_input = torch.randn(fixed_dims["batch_size"], fixed_dims["sequence_length"], 80)
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     quant_config = create_quant_config(quant_scheme)
@@ -505,7 +505,7 @@ def quantize_speech_tokenizer(
     )
     test_simplified_model(speech_tokenizer_onnx, converted_onnx)
 
-    hmonnx_name = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{fixed_feat_length}_speech_tokenizer.onnx"
+    hmonnx_name = f"hmquant_{POSTMO_TARGET}_{model_name}_{quant_type}_{fixed_feat_length}_speech_tokenizer.onnx"
     model_input = torch.randn(1, 128, fixed_feat_length)
     mask = torch.randn(*mask_shape)
     mask1 = torch.randn(*mask1_shape)
@@ -603,7 +603,7 @@ def quantize_llm_qwen2(
     quant_cfg_path = f"{script_dir}/quant_cfg_qwen2_05b_instruct_xh2a_2k.py"
     llm_qwen2_work_dir = os.path.join(work_dir, "llm_qwen2")
     os.makedirs(llm_qwen2_work_dir, exist_ok=True)
-    hmonnx_prefix = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}"
+    hmonnx_prefix = f"hmquant_{POSTMO_TARGET}_{model_name}_{quant_type}"
 
     # create ONNX output directories
     prefill_onnx_dir = os.path.join(output_dir, "llm_prefill")
@@ -854,7 +854,7 @@ def quantize_llm_decoder(
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(golden_dir, exist_ok=True)
 
-    hmonnx_name = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{llm_input_size}_llm_decoder.onnx"
+    hmonnx_name = f"hmquant_{POSTMO_TARGET}_{model_name}_{quant_type}_{llm_input_size}_llm_decoder.onnx"
     model_input = torch.randn(1, llm_input_size)
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     quant_config = create_quant_config(quant_scheme)
@@ -886,7 +886,7 @@ def quantize_flow_spk_embed_affine_layer(
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(golden_dir, exist_ok=True)
 
-    hmonnx_name = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{spk_embed_dim}_flow_spk.onnx"
+    hmonnx_name = f"hmquant_{POSTMO_TARGET}_{model_name}_{quant_type}_{spk_embed_dim}_flow_spk.onnx"
     model_input = torch.randn(1, spk_embed_dim)
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     quant_config = create_quant_config(quant_scheme)
@@ -928,7 +928,7 @@ def quantize_flow_encoder(
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(golden_dir, exist_ok=True)
 
-    hmonnx_name = f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{channels}x{in_channels}_flow_encoder.onnx"
+    hmonnx_name = f"hmquant_{POSTMO_TARGET}_{model_name}_{quant_type}_{channels}x{in_channels}_flow_encoder.onnx"
     model_input = torch.randn(1, channels, in_channels)
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
     quant_config = create_quant_config(quant_scheme)
@@ -983,7 +983,7 @@ def quantize_flow_decoder(
     model = onnx_fix_shape(fixed_dims, model_path, model_path_simplify)
 
     hmonnx_name = (
-        f"hmquant_{HOUMO_TARGET}_{model_name}_{quant_type}_{batch_size}x{seq_len}x{out_channels}_flow_decoder.onnx"
+        f"hmquant_{POSTMO_TARGET}_{model_name}_{quant_type}_{batch_size}x{seq_len}x{out_channels}_flow_decoder.onnx"
     )
     x, mask, mu, t, spks, cond = get_dummy_input(batch_size, seq_len, out_channels)
     quant_scheme = QuantScheme(target_device=DeviceType.XH2a, quant_type=quant_type)
@@ -1290,7 +1290,7 @@ def quantize_hift(
         )
         config = create_quant_config(scheme)
         hmonnx_name = (
-            f"hmquant_{HOUMO_TARGET}_{current_model_name}_{current_quant_type}_"
+            f"hmquant_{POSTMO_TARGET}_{current_model_name}_{current_quant_type}_"
             f"{current_batch_size}x{current_seq_len}_hift.onnx"
         )
         hmonnx_path = os.path.join(current_output_path, hmonnx_name)

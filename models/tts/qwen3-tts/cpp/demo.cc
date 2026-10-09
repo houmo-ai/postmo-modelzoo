@@ -96,7 +96,7 @@ std::string ModelTag(const std::string& model_name,
 std::string DefaultHmmPath(const std::string& model_name,
                            const std::string& model_size,
                            const std::string& sub_model_name) {
-  const char* target = std::getenv("HOUMO_TARGET");
+  const char* target = std::getenv("POSTMO_TARGET");
   return "output/" + std::string(target == nullptr ? "xh2" : target) + "/" +
          ModelTag(model_name, model_size) + "_" + sub_model_name + ".hmm";
 }

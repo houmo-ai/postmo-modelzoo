@@ -36,8 +36,8 @@ import tcim_lite as tcim
 from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs, parse_context_length
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -97,7 +97,7 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -134,7 +134,7 @@ def get_args() -> argparse.Namespace:
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
             "output",
-            HOUMO_TARGET,
+            POSTMO_TARGET,
             f"{args.model_name}-{args.model_size}_prefill.hmm",
         )
     args.context_max_length = first_not_none(
@@ -186,7 +186,7 @@ class HmQwen:
             tokenizer_dir, padding_side="left"
         )
         embedding_weight = torch.load(embedding_path, map_location="cpu")
-        if HOUMO_TARGET == "xh2":
+        if POSTMO_TARGET == "xh2":
             embedding_weight = embedding_weight["weight"]
         self.embedding_weight = embedding_weight.reshape(-1, self.embedding_len).float()
         self.context_length = 0

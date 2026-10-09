@@ -29,7 +29,7 @@ if should_run_step "quant"; then
         exit 1
     fi
 
-    BASE_DIR=$HOUMO_EXAMPLES_PATH
+    BASE_DIR=$POSTMO_EXAMPLES_PATH
     if [ -z "$BASE_DIR" ]; then
         BASE_DIR=$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")
         echo "No environment variables were found; we have backtracked to the example root directory: $BASE_DIR"

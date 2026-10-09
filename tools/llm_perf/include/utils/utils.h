@@ -148,7 +148,7 @@ static void HelpUsage(char* argv[]) {
          "  --token_per_second NUM       Simulated text tokens per second "
          "(positive integer, default: 3).\n"
          "  --devices NUM                Single device id (default: CLI, "
-         "HOUMO_VISIBLE_DEVICES, or 0).\n"
+         "POSTMO_VISIBLE_DEVICES, or 0).\n"
          "  --loop NUM                   Loop test rounds (default: 1).\n"
          "  --no_warm_up                 Disable warm-up.\n"
          "  --interval NUM               Monitoring interval in ms "

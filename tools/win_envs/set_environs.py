@@ -123,15 +123,15 @@ class WinEnvironsGenerater:
         origin_envs = list(self.all_environments.keys())
         tcim_package_path = find_tcim_path()
         assert tcim_package_path is not None, f"Please install houmo_tcim_runtime_xh2 package first, it is Required!"
-        self.nullEnvManualSet("HOUMO_SDK_PATH", need=True)
-        self.all_environments["HOUMO_MODELZOO_URL"] = self.env_manager.read_env_var_from_sh_file(
-            "env.sh", "HOUMO_MODELZOO_URL"
+        self.nullEnvManualSet("POSTMO_SDK_PATH", need=True)
+        self.all_environments["POSTMO_MODELZOO_URL"] = self.env_manager.read_env_var_from_sh_file(
+            "env.sh", "POSTMO_MODELZOO_URL"
         )
-        self.all_environments["HOUMO_TARGET"] = self.settings["support_target"]
+        self.all_environments["POSTMO_TARGET"] = self.settings["support_target"]
         self.all_environments["TCIM_BACKEND"] = (
             "Xh2HalBackend" if self.settings["support_target"] == "xh2" else "Xh1HalBackend"
         )
-        self.all_environments["HOUMO_EXAMPLES_PATH"] = normalize_windows_path(
+        self.all_environments["POSTMO_EXAMPLES_PATH"] = normalize_windows_path(
             os.path.abspath(os.path.join(os.path.abspath(__file__), "../../../"))
         )
         self.all_environments["PYTHON_DIR"] = normalize_windows_path(
@@ -146,30 +146,30 @@ class WinEnvironsGenerater:
         else:
             self.nullEnvManualSet("CMAKE_PATH", need=False)
 
-        self.all_environments["HOUMO_PATH"] = tcim_package_path
+        self.all_environments["POSTMO_PATH"] = tcim_package_path
 
         pattern = r"v\d+\.\d+\.\d+"
-        self.all_environments["HOUMO_VERSION"] = re.search(pattern, self.all_environments["HOUMO_SDK_PATH"]).group()
+        self.all_environments["POSTMO_VERSION"] = re.search(pattern, self.all_environments["POSTMO_SDK_PATH"]).group()
         try:
             import tcim_lite
 
             tcim_verison = tcim_lite.runtime.get_version().split("\n")[0]
-            if tcim_verison != self.all_environments["HOUMO_VERSION"]:
+            if tcim_verison != self.all_environments["POSTMO_VERSION"]:
                 _tcim_verison = re.search(pattern, tcim_verison).group()
-                if _tcim_verison != self.all_environments["HOUMO_VERSION"]:
+                if _tcim_verison != self.all_environments["POSTMO_VERSION"]:
                     print(
-                        f'[ERROR]: tcim version : {tcim_verison}, houmo_sdk version : {self.all_environments["HOUMO_VERSION"]}'
+                        f'[ERROR]: tcim version : {tcim_verison}, houmo_sdk version : {self.all_environments["POSTMO_VERSION"]}'
                     )
                     print("[ERROR]: tcim version and houmo sdk version not equal!, please check!")
                     exit()
                 else:
                     print("[WARNING]: tcim version version date may not equal to houmo_sdk verison date.")
                     print(
-                        f'[WARNING]: tcim version : {tcim_verison}, houmo_sdk version : {self.all_environments["HOUMO_VERSION"]}'
+                        f'[WARNING]: tcim version : {tcim_verison}, houmo_sdk version : {self.all_environments["POSTMO_VERSION"]}'
                     )
             else:
                 print(
-                    f'[INFO]: tcim version : {tcim_verison}, houmo_sdk version : {self.all_environments["HOUMO_VERSION"]}'
+                    f'[INFO]: tcim version : {tcim_verison}, houmo_sdk version : {self.all_environments["POSTMO_VERSION"]}'
                 )
         except Exception as e:
             print(f"[ERROR] {e}, Failed to import tcim_lite, please install runtime sdk!")
@@ -179,10 +179,10 @@ class WinEnvironsGenerater:
             os.path.join(self.all_environments["TCIM_RUNTIME_PATH"], "bin")
         )
         utils_lib_path = normalize_windows_path(
-            os.path.join(self.all_environments["HOUMO_EXAMPLES_PATH"], "utils", "lib")
+            os.path.join(self.all_environments["POSTMO_EXAMPLES_PATH"], "utils", "lib")
         )
         xh2a_dll_path = normalize_windows_path(
-            os.path.join(self.all_environments["HOUMO_SDK_PATH"], "hal", "lib")
+            os.path.join(self.all_environments["POSTMO_SDK_PATH"], "hal", "lib")
         )
         env_paths = self.env_manager.get_user_path()
         for env in env_paths:

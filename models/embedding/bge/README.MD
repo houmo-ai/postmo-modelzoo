@@ -101,8 +101,8 @@ bge模型使用python API进行演示
 
 1. `demo.py` 默认从 `config.yaml` 推导 tokenizer 目录，并默认读取：
 
-  - `output/${HOUMO_TARGET}/bge-m3-0.5b.hmm`
-  - `output/${HOUMO_TARGET}/bge-reranker-v2-m3-0.5b.hmm`
+  - `output/${POSTMO_TARGET}/bge-m3-0.5b.hmm`
+  - `output/${POSTMO_TARGET}/bge-reranker-v2-m3-0.5b.hmm`
 
 2. 执行脚本，推理完成将输出性能结果。
 

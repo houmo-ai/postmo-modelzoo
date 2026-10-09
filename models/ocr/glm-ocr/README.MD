@@ -77,7 +77,7 @@ python3 ptq.py --model_name glm-ocr --model_size 0.9b
 - `--hf_model_dir`: 原始模型目录，默认从 `config.yaml` 的 `modelscope_repo` 推导为 `GLM-OCR`
 - `--model_name`: 输出模型名前缀，默认 `glm-ocr`
 - `--model_size`: 输出模型规格，默认 `0.9b`
-- `--output_dir`: 量化输出目录，默认 `output/$HOUMO_TARGET/hmquant`
+- `--output_dir`: 量化输出目录，默认 `output/$POSTMO_TARGET/hmquant`
 - `--image_path`: 导出视觉分支时使用的示例图片，默认 `../../../data/pic/ocr.jpeg`
 - `--prompt`: 导出时使用的默认提示词，默认 `Text Recognition:`
 - `--max_new_tokens`: 默认 `256`
@@ -87,7 +87,7 @@ python3 ptq.py --model_name glm-ocr --model_size 0.9b
 - `--image_size_h`: 图像高度，默认 `672`
 - `--max_size_t`: 默认 `2`
 
-默认产物目录为 `output/$HOUMO_TARGET/hmquant`，其中会包含以下核心文件或子目录：
+默认产物目录为 `output/$POSTMO_TARGET/hmquant`，其中会包含以下核心文件或子目录：
 
 ```text
 output/xh2/hmquant
@@ -116,10 +116,10 @@ python3 build.py --model_name glm-ocr --model_size 0.9b
 GLM-OCR 模型使用 python API 进行演示。
 
 1. `demo.py` 默认从 `config.yaml` 推导 `tokenizer_dir`，并默认读取：
-- `output/${HOUMO_TARGET}/glm-ocr-0.9b_prefill.hmm`
-- `output/${HOUMO_TARGET}/glm-ocr-0.9b_decode.hmm`
-- `output/${HOUMO_TARGET}/glm-ocr-0.9b_visual_672x672x2.hmm`
-- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `output/${POSTMO_TARGET}/glm-ocr-0.9b_prefill.hmm`
+- `output/${POSTMO_TARGET}/glm-ocr-0.9b_decode.hmm`
+- `output/${POSTMO_TARGET}/glm-ocr-0.9b_visual_672x672x2.hmm`
+- `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
 
 2. 当 `ndevice > 1` 时，`prefill` 和 `decode` 会自动切换为 `.hmms`，视觉模型仍保持 `.hmm`。
 

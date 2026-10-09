@@ -29,8 +29,8 @@ from hmatc.utils.utils import (
     parse_context_length,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1024)
     parser.add_argument("--resume", action="store_true", help="resume from the cache")
     parser.add_argument("--work-dir", type=str, default="work_dirs/")
-    parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
+    parser.add_argument("--out-dir", type=str, default="output/{}".format(POSTMO_TARGET))
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument(
         "--context-length", type=int, default=None, help="max sequence length"

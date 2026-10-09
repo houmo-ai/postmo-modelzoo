@@ -82,7 +82,7 @@ cd models/omni/qwen3-omni
 python3 ptq.py --model-name qwen3-omni --model-size 30b-a3b --gptqmodel
 ```
 
-量化完成的模型存放在 `output/$HOUMO_TARGET/hmquant` 目录。
+量化完成的模型存放在 `output/$POSTMO_TARGET/hmquant` 目录。
 
 ### 2.4 编译
 

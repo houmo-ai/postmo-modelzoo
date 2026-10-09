@@ -312,9 +312,9 @@ def main():
     elif current_command == "compare":
         data_path = args.data_path
         if not os.path.exists(data_path):
-            # If not exists, look in HOUMO_DATASETS_PATH environment variable
-            HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
-            data_path = os.path.join(HOUMO_DATASETS_PATH, data_path)
+            # If not exists, look in POSTMO_DATASETS_PATH environment variable
+            POSTMO_DATASETS_PATH = os.environ.get("POSTMO_DATASETS_PATH", "")
+            data_path = os.path.join(POSTMO_DATASETS_PATH, data_path)
             if not os.path.exists(data_path):
                 logger.fatal(f"{data_path} or {args.data_path} not exists.")
         new_res_info = hm_exec.compare(data_path, args.device_id)

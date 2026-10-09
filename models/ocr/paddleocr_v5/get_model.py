@@ -24,8 +24,8 @@ import sys
 
 from hmatc.utils.utils import get_file_from_jfrog, get_houmo_version
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 def get_args() -> argparse.Namespace:
@@ -43,7 +43,7 @@ def get_args() -> argparse.Namespace:
         "--build_model_dir",
         dest="build_model_dir",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET),
+        default=os.path.join("output", POSTMO_TARGET),
         help="where to save build models",
     )
     parser.add_argument(
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     model_dir = args.model_dir
 
     model_name = "paddleocr_v5"
-    target = HOUMO_TARGET.lower()
+    target = POSTMO_TARGET.lower()
     det_raw_path = "models/raw/onnx/paddleocr_v5_det_sim.onnx"
     rec_raw_path = "models/raw/onnx/paddleocr_v5_rec_sim.onnx"
     batch = 1
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     version = get_houmo_version()
     hmm_path = (
         f"models/{target}-{version}/{model_name}/"
-        f"{model_name}_{HOUMO_TARGET}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
+        f"{model_name}_{POSTMO_TARGET}_b{batch}_{ncore}core_{opt_level}_{version}.tar.xz"
     )
 
     if model_type in ["raw"]:

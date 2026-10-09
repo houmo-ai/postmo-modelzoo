@@ -25,7 +25,7 @@
 - `ncore=2`
 - `ndevice=1`
 - `quant_type=w8a8_sefp`
-- `HOUMO_TARGET=xh2`（未设置时由脚本默认使用 `xh2`）
+- `POSTMO_TARGET=xh2`（未设置时由脚本默认使用 `xh2`）
 
 HMM 的输入为固定 batch=1 的文本序列，当前编译产物的静态输入长度通常为
 `fixed_length=220`。`demo.py` 会从 HMM 输入 shape 读取该值，而不是根据输入文本重新
@@ -258,7 +258,7 @@ Performance Details:
 默认路径如下：
 
 - metadata 目录：`<demo.py 所在目录>/ct_transformer`
-- HMM 目录：`<demo.py 所在目录>/output/<HOUMO_TARGET>`，`HOUMO_TARGET` 默认为 `xh2`
+- HMM 目录：`<demo.py 所在目录>/output/<POSTMO_TARGET>`，`POSTMO_TARGET` 默认为 `xh2`
 - 输入文件：`<demo.py 所在目录>/ct_transformer/example/punc_example.txt`
 
 如果指定了 `--model_path`，它优先于 `--hmm_dir`。否则程序先查找 `<hmm_dir>/<model_name>.hmm`，再查找 HMM 目录下一级子目录中的同名文件。

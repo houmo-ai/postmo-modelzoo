@@ -35,9 +35,9 @@ from hmatc.utils.utils import (
     parse_context_length,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", "Only supported xh2!"
-HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", "Only supported xh2!"
+POSTMO_CORE_NUM = int(os.getenv("POSTMO_CORE_NUM", 2))
 GOLDEN_THRESH = 0.98
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -69,7 +69,7 @@ def get_args() -> argparse.Namespace:
     # fmt: off
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
-    parser.add_argument("--model_dir", dest="model_dir", type=str, default=os.path.join("output", HOUMO_TARGET, "hmquant"), help="path to the model dir")
+    parser.add_argument("--model_dir", dest="model_dir", type=str, default=os.path.join("output", POSTMO_TARGET, "hmquant"), help="path to the model dir")
     parser.add_argument("--model_name", dest="model_name", type=str, default=None, help="output houmo model name")
     parser.add_argument("--batch", dest="batch", type=int, default=None, help="batch size")
     parser.add_argument("--ncore", dest="ncore", type=int, default=None, help="core number")
@@ -78,7 +78,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--model_size", dest="model_size", type=str, default=None, help="model size")
     parser.add_argument("--j", dest="j", type=int, default=int(multiprocessing.cpu_count()*0.7), help="build parallel jobs")
     parser.add_argument("--stage", dest="stage", type=str, default="build", choices=["build", "test", "all"], help="build stage")
-    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", HOUMO_TARGET), help="build output dir")
+    parser.add_argument("--output_dir", dest="output_dir", type=str, default=os.path.join("output", POSTMO_TARGET), help="build output dir")
     parser.add_argument("--prefill_length", dest="prefill_length", type=int, default=None, help="prefill_length")
     parser.add_argument("--enable_xh2_stable_output", dest="enable_xh2_stable_output", action="store_true", help="enable xh2 stable output")
     parser.add_argument("--flash_attention", dest="flash_attention", nargs=2, type=int, default=(2, 0), help="FlashAttention modes for LLM and non-LLM; both support 0/1/2")
@@ -89,7 +89,7 @@ def get_args() -> argparse.Namespace:
     args.model_name = first_not_none(args.model_name, default_model_name)
     args.model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(args.model_name, {}).get(args.model_size, {})
-    args.ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    args.ncore = first_not_none(args.ncore, model_config.get("ncore", POSTMO_CORE_NUM))
     args.batch = first_not_none(args.batch, model_config.get("batch", 1))
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 0))
     args.prefill_length = first_not_none(args.prefill_length, model_config.get("prefill_length", 256))

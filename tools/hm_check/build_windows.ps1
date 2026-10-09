@@ -27,14 +27,14 @@ if (-not (Check-Command cmake)) {
 }
 
 if ($TCIM -ne "") { $env:TCIM_RUNTIME_PATH = $TCIM }
-if ($HOUMO -ne "") { $env:HOUMO_SDK_PATH = $HOUMO }
+if ($HOUMO -ne "") { $env:POSTMO_SDK_PATH = $HOUMO }
 
 if (-not $env:TCIM_RUNTIME_PATH) {
     Write-Error "Environment variable TCIM_RUNTIME_PATH is not set. Provide via -TCIM or set it in system environment."
     exit 1
 }
-if (-not $env:HOUMO_SDK_PATH) {
-    Write-Error "Environment variable HOUMO_SDK_PATH is not set. Provide via -HOUMO or set it in system environment."
+if (-not $env:POSTMO_SDK_PATH) {
+    Write-Error "Environment variable POSTMO_SDK_PATH is not set. Provide via -HOUMO or set it in system environment."
     exit 1
 }
 
@@ -44,7 +44,7 @@ Write-Host "Generator: $Generator"
 Write-Host "Platform: $Platform"
 Write-Host "Configuration: $Configuration"
 Write-Host "TCIM_RUNTIME_PATH: $env:TCIM_RUNTIME_PATH"
-Write-Host "HOUMO_SDK_PATH: $env:HOUMO_SDK_PATH"
+Write-Host "POSTMO_SDK_PATH: $env:POSTMO_SDK_PATH"
 
 if (-not (Test-Path $BuildDir)) { New-Item -ItemType Directory -Path $BuildDir | Out-Null }
 

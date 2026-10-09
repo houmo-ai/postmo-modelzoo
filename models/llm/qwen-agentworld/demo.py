@@ -43,8 +43,8 @@ from hmatc.utils.perf_infomations import (
 from hmatc.python.get_hm_devices import get_hm_devices
 from hmatc.utils.utils import first_not_none, get_model_configs
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+POSTMO_EXAMPLES_PATH = os.getenv("POSTMO_EXAMPLES_PATH")
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -110,7 +110,7 @@ def get_args() -> argparse.Namespace:
         "--embedding_path",
         dest="embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="houmo embedding weight path",
     )
     parser.add_argument(
@@ -215,11 +215,11 @@ def get_args() -> argparse.Namespace:
         args.tokenizer_dir = get_default_tokenizer_dir(model_config)
     if args.prefill_path is None:
         args.prefill_path = os.path.join(
-            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
+            "output", POSTMO_TARGET, f"{args.model_name}-{args.model_size}_prefill.hmm"
         )
     if args.decode_path is None:
         args.decode_path = os.path.join(
-            "output", HOUMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
+            "output", POSTMO_TARGET, f"{args.model_name}-{args.model_size}_decode.hmm"
         )
     if args.ndevice > 1:
         if args.prefill_path.endswith(".hmm"):
@@ -435,7 +435,7 @@ class SamplingManager:
         self, logits: np.ndarray, previous_tokens: Optional[Sequence[Any]] = None
     ) -> np.ndarray:
         logits = logits[0]
-        if HOUMO_TARGET == "xh2":
+        if POSTMO_TARGET == "xh2":
             logits = logits[0]
         probs = self.process_logits(logits, previous_tokens)
         if np.all(probs == 0):
@@ -863,7 +863,7 @@ class HmQwen:
 
             self.perf_tracker.perf_start(PERFTYPE.DECODE_TOKEN_TIME)
             next_id = self.samplingmanager.sample(input_data, self.generated_ids)
-            if HOUMO_TARGET == "xh1":
+            if POSTMO_TARGET == "xh1":
                 next_id = np.array(next_id)
             next_id = torch.from_numpy(next_id[0])
             if next_id == self.tokenizer.eos_token_id:

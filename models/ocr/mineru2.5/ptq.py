@@ -32,8 +32,8 @@ from xhquant.api import Config, xhquant_init
 from xhmodel_merak.xh_llm import AutoLLMConfig, AutoLLMModel, format_model_name
 from xhmodel_merak.xh_llm.models.qwen2_vl import XHQwen2VLModel, XHQwen2VLModelConfig
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -354,7 +354,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", dest="config_path", type=str, default=DEFAULT_CONFIG_PATH, help="path to config.yaml")
     parser.add_argument("--model_name", type=str, default=None, help="model name for output files")
     parser.add_argument("--model_size", type=str, default=None, help="model size identifier for output files")
-    parser.add_argument("--out-dir", type=str, default=f"./output/{HOUMO_TARGET}", help="output directory")
+    parser.add_argument("--out-dir", type=str, default=f"./output/{POSTMO_TARGET}", help="output directory")
     parser.add_argument("--chip-arch", type=str, default="XH2a", choices=["XH2a", "YueHui"])
     parser.add_argument("--context-length", type=int, default=4096, help="max sequence length")
     parser.add_argument("--prefill-chunk-length", type=int, default=256, help="prefill chunk length")

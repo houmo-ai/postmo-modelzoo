@@ -318,14 +318,14 @@ class ModelRegistrar {
  * ```
  */
 #if defined(_MSC_VER)
-#define HOUMO_USED_ATTR
+#define POSTMO_USED_ATTR
 #else
-#define HOUMO_USED_ATTR __attribute__((used))
+#define POSTMO_USED_ATTR __attribute__((used))
 #endif
 
 #define REGISTER_MODEL(ModelT, name, series, creator, description)            \
   namespace {                                                                \
-  HOUMO_USED_ATTR                                                            \
+  POSTMO_USED_ATTR                                                            \
   ::houmo::ModelRegistrar<::houmo::ModelT> registrar_##name(#name, series,   \
                                                             creator,         \
                                                             description);    \

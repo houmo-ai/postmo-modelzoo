@@ -3,13 +3,13 @@ project(tokenizer LANGUAGES C CXX)
 
 # Include directories
 include_directories(include)
-if(DEFINED ENV{HOUMO_EXAMPLES_PATH})
-    include_directories($ENV{HOUMO_EXAMPLES_PATH}/3rdparty)
+if(DEFINED ENV{POSTMO_EXAMPLES_PATH})
+    include_directories($ENV{POSTMO_EXAMPLES_PATH}/3rdparty)
 else()
-    message(FATAL_ERROR "ENV{HOUMO_EXAMPLES_PATH} not set!")
+    message(FATAL_ERROR "ENV{POSTMO_EXAMPLES_PATH} not set!")
 endif()
 
-set(SOURCE_DIR $ENV{HOUMO_EXAMPLES_PATH}/3rdparty/tokenizer.cpp)
+set(SOURCE_DIR $ENV{POSTMO_EXAMPLES_PATH}/3rdparty/tokenizer.cpp)
 include_directories(${SOURCE_DIR}/third_party)
 
 if(MSVC)
@@ -46,7 +46,7 @@ endif()
 target_include_directories(tokenizer_lib PUBLIC
     ${SOURCE_DIR}/include
     ${SOURCE_DIR}/third_party
-    $ENV{HOUMO_EXAMPLES_PATH}/3rdparty
+    $ENV{POSTMO_EXAMPLES_PATH}/3rdparty
 )
 target_link_libraries(tokenizer_lib onig)
 target_compile_definitions(tokenizer_lib PUBLIC UTF8PROC_STATIC)

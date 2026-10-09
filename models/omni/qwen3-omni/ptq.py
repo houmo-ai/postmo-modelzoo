@@ -51,17 +51,17 @@ DEFAULT_SAMPLE_DIR = f"{script_dir}/sample_data"
 def _ensure_xh_model_zoo_on_path():
     """Called on ImportError to locate hmodel/xh2 when env.sh was not sourced."""
     import sys as _sys
-    _root = os.environ.get("HOUMO_EXAMPLES_PATH")
+    _root = os.environ.get("POSTMO_EXAMPLES_PATH")
     if not _root:
         _c = Path(script_dir).resolve()
         for _p in (_c, *_c.parents):
             if (_p / "env.sh").is_file() and (_p / "hmodel" / "xh2").is_dir():
                 _root = str(_p)
-                os.environ["HOUMO_EXAMPLES_PATH"] = _root
+                os.environ["POSTMO_EXAMPLES_PATH"] = _root
                 break
     if not _root:
         raise RuntimeError(
-            "HOUMO_EXAMPLES_PATH is not set and cannot be inferred "
+            "POSTMO_EXAMPLES_PATH is not set and cannot be inferred "
             "from script location. Source env.sh before running ptq.py."
         )
     _xh2 = osp.join(_root, "hmodel", "xh2")
@@ -112,8 +112,8 @@ from _hmonnx_pipeline import (
 )
 
 
-HOUMO_DATASETS_PATH = os.getenv('HOUMO_DATASETS_PATH', '')
-HOUMO_TARGET = os.getenv('HOUMO_TARGET', 'xh2')
+POSTMO_DATASETS_PATH = os.getenv('POSTMO_DATASETS_PATH', '')
+POSTMO_TARGET = os.getenv('POSTMO_TARGET', 'xh2')
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 CONFIG_BRIDGE_ATTRS = ("bos_token_id", "eos_token_id", "pad_token_id", "vocab_size")
 OPTIONAL_TEXT_ASSET_FILES = (
@@ -144,7 +144,7 @@ def _find_examples_root_from_script(start_dir: str) -> str | None:
 
 
 def _resolve_gptqmodel_repo_path() -> str:
-    examples_path = os.environ.get("HOUMO_EXAMPLES_PATH")
+    examples_path = os.environ.get("POSTMO_EXAMPLES_PATH")
     candidates = []
     if examples_path:
         candidates.append(Path(examples_path).resolve())
@@ -159,9 +159,9 @@ def _resolve_gptqmodel_repo_path() -> str:
         gptq_path = candidate / "hmodel" / "gptqmodel"
         if gptq_path.is_dir() and any(gptq_path.iterdir()):
             if not examples_path:
-                os.environ["HOUMO_EXAMPLES_PATH"] = str(candidate)
+                os.environ["POSTMO_EXAMPLES_PATH"] = str(candidate)
                 logger.warning(
-                    "HOUMO_EXAMPLES_PATH is not set; falling back to inferred repo root: {}",
+                    "POSTMO_EXAMPLES_PATH is not set; falling back to inferred repo root: {}",
                     candidate,
                 )
             return str(gptq_path)
@@ -169,7 +169,7 @@ def _resolve_gptqmodel_repo_path() -> str:
     searched = ", ".join(str(path) for path in candidates) or script_dir
     raise RuntimeError(
         "Unable to locate a valid in-repo gptqmodel directory. "
-        f"Searched from: {searched}. Check HOUMO_EXAMPLES_PATH / env.sh."
+        f"Searched from: {searched}. Check POSTMO_EXAMPLES_PATH / env.sh."
     )
 
 
@@ -1312,7 +1312,7 @@ def export_code2wav(native_model, model_name, work_dir, quant_type):
 
 def gptq_quant_text(args):
 
-    # Force the in-repo gptqmodel ($HOUMO_EXAMPLES_PATH/hmodel/gptqmodel, on
+    # Force the in-repo gptqmodel ($POSTMO_EXAMPLES_PATH/hmodel/gptqmodel, on
     # PYTHONPATH via env.sh) to win over the gptqmodel preinstalled in
     # /opt/venv/houmo. site-packages can otherwise shadow PYTHONPATH (editable
     # .pth entries, venv launch order), so we prepend the repo path explicitly
@@ -1778,7 +1778,7 @@ def parse_args():
     parser.add_argument("--model-name", type=str, default=None, help="output hmonnx model name")
     parser.add_argument("--model-size", type=str, default=None, help="model size")
     parser.add_argument("--work-dir", type=str, default="work_dirs")
-    parser.add_argument("--out-dir", type=str, default="output/{}".format(HOUMO_TARGET))
+    parser.add_argument("--out-dir", type=str, default="output/{}".format(POSTMO_TARGET))
     parser.add_argument("--sample-path", type=str, default=DEFAULT_SAMPLE_DIR, help="sample data path for capture")
     parser.add_argument("--debug", action="store_true", help="debug mode")
     parser.add_argument("--context-length", type=str, default=None, help="max sequence length")

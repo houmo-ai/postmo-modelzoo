@@ -36,8 +36,8 @@ from hmatc.utils.utils import first_not_none, get_model_configs
 
 MODEL_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 COMPONENTS = ("audio_tower", "audio_encoder", "qwen3", "audio_decoder")
 ARTIFACTS = (
@@ -162,7 +162,7 @@ def _release_prefix(
     """Build the default all-lowercase prefix used by the release layout."""
     modelscope_repo = (model_config.get("modelscope_repo") or [model_name])[0]
     modelscope_name = str(modelscope_repo).rsplit("/", maxsplit=1)[-1].lower()
-    return f"hmquant_{HOUMO_TARGET}_{modelscope_name}_{quant_type.lower()}_256_{context_length}_{date.today():%Y%m%d}"
+    return f"hmquant_{POSTMO_TARGET}_{modelscope_name}_{quant_type.lower()}_256_{context_length}_{date.today():%Y%m%d}"
 
 
 def _rename_release_files(component_dir: Path, prefix: str, component: str) -> None:
@@ -421,11 +421,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-dir", "--model_dir", dest="model_dir", default="Fun-Audio-Chat-8B")
     parser.add_argument(
         "--audio",
-        default=str(Path(os.getenv("HOUMO_EXAMPLES_PATH", MODEL_DIR.parents[2])) / "data" / "audio" / "question.wav"),
+        default=str(Path(os.getenv("POSTMO_EXAMPLES_PATH", MODEL_DIR.parents[2])) / "data" / "audio" / "question.wav"),
         help="reference audio used to build the static audio encoder graph",
     )
     parser.add_argument(
-        "--output-dir", "--output_dir", dest="output_dir", default=os.path.join("output", HOUMO_TARGET, "hmquant")
+        "--output-dir", "--output_dir", dest="output_dir", default=os.path.join("output", POSTMO_TARGET, "hmquant")
     )
     parser.add_argument("--device", default="cuda:0", help="device for Merak workflow export (default: %(default)s)")
     parser.add_argument("--system-prompt", dest="system_prompt", default=None)

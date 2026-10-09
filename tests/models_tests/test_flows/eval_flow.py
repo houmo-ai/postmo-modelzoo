@@ -166,7 +166,7 @@ def _validate_eval_case(onnx, hm, names, thresholds, index):
             failures.append(f"{side} eval case {index} missing metric {name}")
             continue
         threshold = float(thresholds[name])
-        if os.getenv("HOUMO_FULL_DATASET") is None:
+        if os.getenv("POSTMO_FULL_DATASET") is None:
             threshold *= PARTIAL_DATASET_THRESHOLD_FACTOR
         metrics[f"{name}.onnx.{index}"] = onnx[name]
         metrics[f"{name}.hm.{index}"] = hm[name]

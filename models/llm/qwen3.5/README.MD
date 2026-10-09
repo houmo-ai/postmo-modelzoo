@@ -197,7 +197,7 @@ python3 ptq.py \
 - `--quant_config_path`：显式 workflow yaml；不传时根据 `workflow_config` 自动生成。
 - `--mtp`：使用自动生成的 `_mtp.yaml` workflow。
 - `--lora`：使用自动生成的 `_lora.yaml` workflow，并导出 LoRA adapter 相关 hmonnx。
-- `--output_dir`：最终 hmquant 产物输出目录，默认 `./output/${HOUMO_TARGET}/hmquant`。
+- `--output_dir`：最终 hmquant 产物输出目录，默认 `./output/${POSTMO_TARGET}/hmquant`。
 - `--work_dir`：quant/export 中间输出目录，默认 `./work_dirs`。
 - `--device`：quant、export、golden 和 quick test 使用的设备，默认 `cuda`。
 - `--overwrite`：export 前删除已有的 export 输出目录。
@@ -217,7 +217,7 @@ python3 ptq.py \
 阶段报 `Workflow config not found`。DFlash、GPTQ 或其他变体可通过
 `--quant_config_path` 显式指定对应的 workflow yaml。
 
-量化导出输出位于 `output/${HOUMO_TARGET}/hmquant`。
+量化导出输出位于 `output/${POSTMO_TARGET}/hmquant`。
 
 ### 2.4 编译
 
@@ -239,7 +239,7 @@ LoRA 编译：
 python3 build.py --model_name qwen3.6 --model_size 35b-a3b --lora
 ```
 
-LoRA 编译会在 `output/${HOUMO_TARGET}/hmquant/lora/` 下查找 adapter。若存在多个 adapter，脚本会逐个编译并为每个 adapter 保存独立的 LoRA input 目录，避免互相覆盖。其中编译出的对应的hmm模型仅保留一个，因为不同的lora对应的模型结构是一致的。
+LoRA 编译会在 `output/${POSTMO_TARGET}/hmquant/lora/` 下查找 adapter。若存在多个 adapter，脚本会逐个编译并为每个 adapter 保存独立的 LoRA input 目录，避免互相覆盖。其中编译出的对应的hmm模型仅保留一个，因为不同的lora对应的模型结构是一致的。
 
 标准输出名称为：
 
@@ -277,7 +277,7 @@ LoRA 演示：
 python3 python/demo.py --model_name qwen3.6 --model_size 35b-a3b --lora
 ```
 
-开启 `--lora` 后，demo 会在 `output/${HOUMO_TARGET}` 下自动查找 `${model_name}-${model_size}_${adapter_name}_prefill_lora_input/`。若存在多个 adapter，默认选择排序后的第一个目录，并在日志中打印选中的 LoRA input 目录。
+开启 `--lora` 后，demo 会在 `output/${POSTMO_TARGET}` 下自动查找 `${model_name}-${model_size}_${adapter_name}_prefill_lora_input/`。若存在多个 adapter，默认选择排序后的第一个目录，并在日志中打印选中的 LoRA input 目录。
 
 交互模式下可输入 `switch lora` 动态切换 LoRA：
 
@@ -312,7 +312,7 @@ bash test.sh
 bash test.sh -s all
 ```
 
-运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录。
+运行前请确保 `POSTMO_EXAMPLES_PATH` 指向当前仓库根目录。
 
 `test.sh` 支持以下常用参数：
 

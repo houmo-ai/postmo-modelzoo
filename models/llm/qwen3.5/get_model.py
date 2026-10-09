@@ -29,8 +29,8 @@ from hmatc.utils.utils import (
     get_model_configs,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 LORA_DATASET_DIR = "3.5-35B-lora"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -140,7 +140,7 @@ def _move_lora_dataset_to_work_dirs(download_dir: str) -> None:
     candidates = [
         Path(LORA_DATASET_DIR),
         Path(download_dir) / LORA_DATASET_DIR,
-        Path(os.getenv("HOUMO_DATASETS_PATH", ".")) / LORA_DATASET_DIR,
+        Path(os.getenv("POSTMO_DATASETS_PATH", ".")) / LORA_DATASET_DIR,
     ]
     for source in candidates:
         source = source.resolve()
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     )
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": model_name,

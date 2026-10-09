@@ -42,33 +42,33 @@ Houmo Inference Framework 是面向 Houmo NPU 的 C++17 推理基础库。当前
 - CMake >= 3.16.3
 - C++17 编译器
 - TCIM Runtime (`tcim_runtime_lite`)
-- `$HOUMO_EXAMPLES_PATH/3rdparty/tokenizer.cpp`
-- `$HOUMO_EXAMPLES_PATH/3rdparty/half/half.hpp`
-- `$HOUMO_EXAMPLES_PATH/3rdparty/stb/stb_image.h`
-- `$HOUMO_EXAMPLES_PATH/3rdparty/miniaudio/miniaudio.h`
-- Eigen 头文件，当前从 `$HOUMO_EXAMPLES_PATH/3rdparty` 引入
+- `$POSTMO_EXAMPLES_PATH/3rdparty/tokenizer.cpp`
+- `$POSTMO_EXAMPLES_PATH/3rdparty/half/half.hpp`
+- `$POSTMO_EXAMPLES_PATH/3rdparty/stb/stb_image.h`
+- `$POSTMO_EXAMPLES_PATH/3rdparty/miniaudio/miniaudio.h`
+- Eigen 头文件，当前从 `$POSTMO_EXAMPLES_PATH/3rdparty` 引入
 
-必须设置 `HOUMO_EXAMPLES_PATH` 和 `TCIM_RUNTIME_PATH`。未设置 `TCIM_RUNTIME_PATH` 时，CMake 配置会直接失败。
+必须设置 `POSTMO_EXAMPLES_PATH` 和 `TCIM_RUNTIME_PATH`。未设置 `TCIM_RUNTIME_PATH` 时，CMake 配置会直接失败。
 
-TCIM Runtime 的公共 CMake 配置位于 `$HOUMO_EXAMPLES_PATH/cmake/tcim_runtime.cmake`。
+TCIM Runtime 的公共 CMake 配置位于 `$POSTMO_EXAMPLES_PATH/cmake/tcim_runtime.cmake`。
 
 ## 构建
 
 ### Linux
 
-脚本只接受 Linux `x86_64` / `aarch64`，且当前仅支持 `HOUMO_TARGET=xh2`：
+脚本只接受 Linux `x86_64` / `aarch64`，且当前仅支持 `POSTMO_TARGET=xh2`：
 
 ```bash
-export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
 export TCIM_RUNTIME_PATH=/path/to/tcim_lite
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 ./build_linux.sh
 ```
 
 Linux 平台的安装规则将 `houmo_infer` 和 `tokenizer_lib` 安装到：
 
 ```text
-$HOUMO_EXAMPLES_PATH/utils/lib
+$POSTMO_EXAMPLES_PATH/utils/lib
 ```
 
 `convert_embed.py` 安装到 CMake install prefix 的根目录。需要注意，平台文件为库目标设置了绝对安装目录，因此 `-DCMAKE_INSTALL_PREFIX` 不会改变库的安装位置。
@@ -78,7 +78,7 @@ $HOUMO_EXAMPLES_PATH/utils/lib
 Android 脚本要求 Linux `x86_64` 和 Android NDK r28c，固定使用 `arm64-v8a`、`android-35` 和 Ninja：
 
 ```bash
-export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
 export TCIM_RUNTIME_PATH=/path/to/android/tcim_lite
 export NDK_PATH=/path/to/android-ndk-r28c
 ./build_ndk.sh release
@@ -90,7 +90,7 @@ export NDK_PATH=/path/to/android-ndk-r28c
 ./build_ndk.sh debug -DCMAKE_VERBOSE_MAKEFILE=ON
 ```
 
-Android 库安装到 `$HOUMO_EXAMPLES_PATH/utils/android`，`convert_embed.py` 安装到当前目录下的 `android/` install prefix。
+Android 库安装到 `$POSTMO_EXAMPLES_PATH/utils/android`，`convert_embed.py` 安装到当前目录下的 `android/` install prefix。
 
 ### OpenHarmony (OHOS)
 
@@ -98,23 +98,23 @@ OHOS 脚本用于交叉编译，需要 OpenHarmony SDK 和 Houmo SDK：
 
 ```bash
 export OHOS_SDK=/path/to/OpenHarmony/release/6.0-Release/linux/native
-export HOUMO_EXAMPLES_PATH=/path/to/imodelzoo
+export POSTMO_EXAMPLES_PATH=/path/to/imodelzoo
 export TCIM_RUNTIME_PATH=/path/to/ohos/houmo-sdk
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 ./build_OHOS.sh
 ```
 
-OHOS 库安装到 `$HOUMO_EXAMPLES_PATH/utils/ohos`，`convert_embed.py` 安装到当前目录下的 `bin/` install prefix。OHOS 使用 musl libc，额外链接 `c++` 和 `c++abi`。
+OHOS 库安装到 `$POSTMO_EXAMPLES_PATH/utils/ohos`，`convert_embed.py` 安装到当前目录下的 `bin/` install prefix。OHOS 使用 musl libc，额外链接 `c++` 和 `c++abi`。
 
 ### Windows
 
-先配置 `HOUMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH` 及运行时 DLL 搜索路径，再执行：
+先配置 `POSTMO_EXAMPLES_PATH`、`TCIM_RUNTIME_PATH` 及运行时 DLL 搜索路径，再执行：
 
 ```bat
 build_win.bat
 ```
 
-脚本使用 Visual Studio 2022 x64 和 `Release` 配置。DLL/LIB 安装到 `%HOUMO_EXAMPLES_PATH%\utils\lib`，`convert_embed.py` 安装到当前目录的 `bin\` install prefix。
+脚本使用 Visual Studio 2022 x64 和 `Release` 配置。DLL/LIB 安装到 `%POSTMO_EXAMPLES_PATH%\utils\lib`，`convert_embed.py` 安装到当前目录的 `bin\` install prefix。
 
 ### 手动 CMake
 
@@ -128,10 +128,10 @@ cmake --install build
 
 ## Embedding 转换
 
-`convert_embed.py` 将 PyTorch `.pt` embedding 权重导出为同名 FP16/原始 dtype `.bin` 文件。当前脚本要求 `HOUMO_TARGET=xh2` 且依赖 PyTorch：
+`convert_embed.py` 将 PyTorch `.pt` embedding 权重导出为同名 FP16/原始 dtype `.bin` 文件。当前脚本要求 `POSTMO_TARGET=xh2` 且依赖 PyTorch：
 
 ```bash
-export HOUMO_TARGET=xh2
+export POSTMO_TARGET=xh2
 python convert_embed.py --path /path/to/embedding.pt
 ```
 

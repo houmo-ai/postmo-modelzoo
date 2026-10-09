@@ -68,9 +68,9 @@ class BaseExec(object, metaclass=abc.ABCMeta):
         self.model_cfg = cfg.get("model")
         self.save_dir = self.model_cfg.get("save_dir")
         self.model_path = self.model_cfg.get("model_path", "")
-        HOUMO_MODEL_PATH = os.environ.get("HOUMO_MODEL_PATH", "")
+        POSTMO_MODEL_PATH = os.environ.get("POSTMO_MODEL_PATH", "")
         if not os.path.isfile(self.model_path):
-            new_model_path = os.path.join(HOUMO_MODEL_PATH, self.model_path)
+            new_model_path = os.path.join(POSTMO_MODEL_PATH, self.model_path)
             if not os.path.isfile(new_model_path):
                 logger.fatal(f"Not found model_path: {self.model_path}")
             self.model_path = new_model_path
@@ -380,8 +380,8 @@ class BaseExec(object, metaclass=abc.ABCMeta):
 
     @staticmethod
     def resolve_data_path(data_dir, stage):
-        HOUMO_DATASETS_PATH = os.environ.get("HOUMO_DATASETS_PATH", "")
-        houmo_data_dir = os.path.join(HOUMO_DATASETS_PATH, data_dir)
+        POSTMO_DATASETS_PATH = os.environ.get("POSTMO_DATASETS_PATH", "")
+        houmo_data_dir = os.path.join(POSTMO_DATASETS_PATH, data_dir)
         if os.path.exists(data_dir):
             return data_dir
         if os.path.exists(houmo_data_dir):

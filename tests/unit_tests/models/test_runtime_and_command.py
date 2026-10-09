@@ -116,13 +116,13 @@ def test_runtime_context_preserves_legacy_separate_stage_resolution(
     tmp_path: Path,
 ) -> None:
     no_infer = RuntimeContext.from_environment(
-        {"HOUMO_TARGET": "xh2", "SKIP_INFER": "ON"},
+        {"POSTMO_TARGET": "xh2", "SKIP_INFER": "ON"},
         tests_root=tmp_path,
         asic=False,
         host_platform="x86_64",
     )
     infer = RuntimeContext.from_environment(
-        {"HOUMO_TARGET": "xh2", "SKIP_INFER": "OFF"},
+        {"POSTMO_TARGET": "xh2", "SKIP_INFER": "OFF"},
         tests_root=tmp_path,
         asic=True,
         host_platform="aarch64",

@@ -27,16 +27,16 @@ except ImportError:
 
 
 def _get_default_devices(ndevices: int = 1) -> List[int]:
-    """Return the default device IDs, respecting HOUMO_VISIBLE_DEVICES."""
+    """Return the default device IDs, respecting POSTMO_VISIBLE_DEVICES."""
     DEFAULT_RUN_DEVEVICES = [i for i in range(ndevices)]
-    if not os.getenv("HOUMO_VISIBLE_DEVICES"):
+    if not os.getenv("POSTMO_VISIBLE_DEVICES"):
         return DEFAULT_RUN_DEVEVICES
 
-    env_devices = os.getenv("HOUMO_VISIBLE_DEVICES").split(",")
+    env_devices = os.getenv("POSTMO_VISIBLE_DEVICES").split(",")
     env_devices = [int(dev.strip()) for dev in env_devices]
     assert (
         len(env_devices) >= ndevices
-    ), f"Not enough devices specified in HOUMO_VISIBLE_DEVICES. Required: {ndevices}, Provided: {len(env_devices)}"
+    ), f"Not enough devices specified in POSTMO_VISIBLE_DEVICES. Required: {ndevices}, Provided: {len(env_devices)}"
 
     dev_start_idx = sorted(env_devices)[0]
     return [dev_start_idx + i for i in range(ndevices)]

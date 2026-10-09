@@ -73,7 +73,7 @@
 
 ### 2.1 环境准备
 
-所有脚本当前只支持 `HOUMO_TARGET=xh2`，运行前需要先 source 后摩工具链环境，确保 `HOUMO_TARGET`、编译工具、运行时库等环境变量已生效：
+所有脚本当前只支持 `POSTMO_TARGET=xh2`，运行前需要先 source 后摩工具链环境，确保 `POSTMO_TARGET`、编译工具、运行时库等环境变量已生效：
 
 ```bash
 source env.sh
@@ -155,7 +155,7 @@ Base-only 子模型给 CustomVoice，会报错。
 
 常用参数：
 
-- `--output_dir`：量化产物输出目录，默认 `output/${HOUMO_TARGET}/hmquant`；
+- `--output_dir`：量化产物输出目录，默认 `output/${POSTMO_TARGET}/hmquant`；
 - `--work_dir`：中间工作目录前缀，脚本会自动追加模型 tag，例如 `work_dirs_qwen3-tts_0.6b-base`；
 - `--debug`：保留中间工作目录，默认量化结束后会清理；
 - `--dump_golden`：导出 golden 数据，便于验证；
@@ -167,7 +167,7 @@ Base-only 子模型给 CustomVoice，会报错。
 - `--frontend_audio_samples`：Base `speech_tokenizer_encoder` 静态输入采样点数，默认 `101760`；
 - `--frontend_mel_frames` / `--frontend_mel_dim`：Base `speaker_encoder` 静态 mel 输入形状，默认 `400 x 128`。
 
-量化完成的模型和辅助文件存放在 `output/${HOUMO_TARGET}/hmquant` 目录。demo 运行还会使用其中的 `quant_embedding.pt`、`quant_embedding_code_predictor.pt` 和 `decode_padding_shapes.json`。
+量化完成的模型和辅助文件存放在 `output/${POSTMO_TARGET}/hmquant` 目录。demo 运行还会使用其中的 `quant_embedding.pt`、`quant_embedding_code_predictor.pt` 和 `decode_padding_shapes.json`。
 
 ### 2.4 编译
 
@@ -205,8 +205,8 @@ python3 build.py --model_name qwen3-tts --model_size 0.6b-base --models talker_p
 
 常用参数：
 
-- `--model_dir`：HMONNX / hmquant 输入目录，默认 `output/${HOUMO_TARGET}/hmquant`；
-- `--output_dir`：HMM 输出目录，默认 `output/${HOUMO_TARGET}`；
+- `--model_dir`：HMONNX / hmquant 输入目录，默认 `output/${POSTMO_TARGET}/hmquant`；
+- `--output_dir`：HMM 输出目录，默认 `output/${POSTMO_TARGET}`；
 - `--stage`：编译阶段，默认 `build`；
 - `--context_length` / `--prefill_length` / `--ncore` / `--ndevice` / `--batch`：覆盖 `config.yaml` 中的编译配置；
 - `--flash_attention`：两个整数，分别控制 LLM prefill/decode 和 non-LLM 子模型的 FlashAttention 开关，默认 `2 1`。
@@ -225,7 +225,7 @@ Qwen3-TTS 模型使用 Python API 进行演示。`CustomVoice` 和 `Base` 两类
 
 #### 2.5.1 CustomVoice 演示
 
-`demo.py` 支持 `0.6b-customvoice` 和 `1.7b-customvoice`。脚本默认根据 `--model_name` / `--model_size` 从 `output/${HOUMO_TARGET}` 推导 HMM 路径，具体编译产物见 2.4。oneshot 模式需要 Talker、CodePredictor、TextProjection 和 SpeechTokenizer；streaming 模式会额外使用 `stateful_decoder_hmm`。
+`demo.py` 支持 `0.6b-customvoice` 和 `1.7b-customvoice`。脚本默认根据 `--model_name` / `--model_size` 从 `output/${POSTMO_TARGET}` 推导 HMM 路径，具体编译产物见 2.4。oneshot 模式需要 Talker、CodePredictor、TextProjection 和 SpeechTokenizer；streaming 模式会额外使用 `stateful_decoder_hmm`。
 
 非流式执行示例：
 ```bash
@@ -260,9 +260,9 @@ python3 demo.py \
 
 #### 2.5.2 Base 演示
 
-`Base` 模型用于 voice clone，使用 `demo_base.py` 运行。示例参考音频为 `${HOUMO_EXAMPLES_PATH}/data/audio/clone_1.wav`，参考文本为 `甚至出现交易几乎停滞的情况。`，可以通过 `--ref_audio` 和 `--ref_text` 显式指定。
+`Base` 模型用于 voice clone，使用 `demo_base.py` 运行。示例参考音频为 `${POSTMO_EXAMPLES_PATH}/data/audio/clone_1.wav`，参考文本为 `甚至出现交易几乎停滞的情况。`，可以通过 `--ref_audio` 和 `--ref_text` 显式指定。
 
-`demo_base.py` 默认根据 `--model_name` / `--model_size` 从 `output/${HOUMO_TARGET}` 推导 HMM 路径，具体编译产物见 2.4。Base voice clone 除 Talker、CodePredictor、TextProjection 和音频解码器外，还需要 `speech_tokenizer_encoder_hmm` 和 `speaker_encoder_hmm`。
+`demo_base.py` 默认根据 `--model_name` / `--model_size` 从 `output/${POSTMO_TARGET}` 推导 HMM 路径，具体编译产物见 2.4。Base voice clone 除 Talker、CodePredictor、TextProjection 和音频解码器外，还需要 `speech_tokenizer_encoder_hmm` 和 `speaker_encoder_hmm`。
 
 非流式执行示例：
 ```bash

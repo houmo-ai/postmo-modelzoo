@@ -21,7 +21,7 @@ endif()
 # ---------------------------------------------------------------------
 # Load houmo_engine config (houmo_engine INTERFACE library)
 # ---------------------------------------------------------------------
-include("$ENV{HOUMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
+include("$ENV{POSTMO_EXAMPLES_PATH}/cmake/houmo_engine.cmake")
 
 # ---------------------------------------------------------------------
 # Sample target

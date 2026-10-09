@@ -5,7 +5,7 @@ if [ -e build ];then
   mkdir build
 fi
 if [ $(uname -s) = "Linux" ] &&  ([ $(uname -m) = "x86_64" ] || [ $(uname -m) = "aarch64" ]); then
-  if [ "$HOUMO_TARGET" = "xh2" ]; then
+  if [ "$POSTMO_TARGET" = "xh2" ]; then
     set -e
 
     WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

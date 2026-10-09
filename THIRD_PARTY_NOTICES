@@ -191,7 +191,7 @@ stb_image is used for image decoding (load RGB) in houmo-llm-engine:
 
 The header is included from the shared common path:
     3rdparty/stb/stb_image.h
-via HOUMO_EXAMPLES_PATH / 3rdparty.
+via POSTMO_EXAMPLES_PATH / 3rdparty.
 
 Users are responsible for complying with the stb_image license terms when using,
 redistributing, or modifying stb_image.

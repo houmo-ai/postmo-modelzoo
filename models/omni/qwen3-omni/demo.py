@@ -60,13 +60,13 @@ from hmatc.utils.utils import first_not_none, get_model_configs
 # ═══════════════════════════════════════════════════════════════════════════════
 # Constants
 # ═══════════════════════════════════════════════════════════════════════════════
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = str(SCRIPT_DIR / "config.yaml")
 DEFAULT_MODEL_DIR = str(SCRIPT_DIR / "Qwen3-Omni-30B-A3B-Instruct")
-DEFAULT_HMQUANT_DIR = SCRIPT_DIR / "output" / HOUMO_TARGET / "hmquant"
+DEFAULT_HMQUANT_DIR = SCRIPT_DIR / "output" / POSTMO_TARGET / "hmquant"
 DEFAULT_SAMPLE_DIR = SCRIPT_DIR / "sample_data"
 
 # Example modes. image/audio/prompt are written inline per example (see main()),
@@ -2237,7 +2237,7 @@ def get_args():
     args.ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
 
     pfx = f"{args.model_name}-{args.model_size}"
-    hmm_dir = os.path.join("output", HOUMO_TARGET)
+    hmm_dir = os.path.join("output", POSTMO_TARGET)
     engine_defaults = {
         "visual_path": f"{pfx}_visual.hmm",
         "audio_path": f"{pfx}_audio.hmm",

@@ -32,8 +32,8 @@ from pathlib import Path
 from hmatc.utils.utils import get_model_configs
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET == "xh2", f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET == "xh2", f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
 
 def _configs_merak_dir() -> Path:
@@ -120,7 +120,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-dir", default="MiniCPM-V-4_5")
     parser.add_argument("--config-path", default=str(DEFAULT_CONFIG_PATH))
     parser.add_argument(
-        "--output-dir", "--output_dir", dest="output_dir", default=os.path.join("output", HOUMO_TARGET, "hmquant")
+        "--output-dir", "--output_dir", dest="output_dir", default=os.path.join("output", POSTMO_TARGET, "hmquant")
     )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--overwrite", action="store_true")

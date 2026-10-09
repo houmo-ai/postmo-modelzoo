@@ -197,7 +197,7 @@ bash test.sh -s all --quant_type w8a8_sefp
 参数说明：
 - `--model_dir`: HMONNX模型目录（默认 `work_dirs/cam/hmonnx`）
 - `--model_name`: 输出模型名（默认 `cam_embedding`）
-- `--ncore`: 核心数（默认 `$HOUMO_CORE_NUM` 或 2）
+- `--ncore`: 核心数（默认 `$POSTMO_CORE_NUM` 或 2）
 - `--stage build`: 仅构建
 - `--stage test`: 仅测试（与golden比对余弦相似度）
 - `--stage all`: 构建 + 测试
@@ -291,7 +291,7 @@ cam/
 3. TCIM构建仅支持x86_64平台
 4. `demo.py` 中的特征提取依赖 `modelscope` pipeline 加载 CAMPPlus 模型
 5. 所有脚本均需在 `cam/` 目录下执行
-6. `HOUMO_TARGET` 环境变量默认为 `xh2`，可通过 `export HOUMO_TARGET=xh2` 设置
+6. `POSTMO_TARGET` 环境变量默认为 `xh2`，可通过 `export POSTMO_TARGET=xh2` 设置
 
 ## 6 免责声明
 

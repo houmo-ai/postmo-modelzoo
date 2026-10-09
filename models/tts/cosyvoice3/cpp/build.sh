@@ -33,7 +33,7 @@ if [ ! -e 3rdparty/audio_3rdparty ];then
 fi
 python3 scripts/convert_embeddings.py
 if [ $(uname -s) = "Linux" ]; then
-  if [ "$HOUMO_TARGET" = "xh2" ]; then
+  if [ "$POSTMO_TARGET" = "xh2" ]; then
     set -e
 
     WORK_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

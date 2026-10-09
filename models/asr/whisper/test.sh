@@ -62,17 +62,17 @@ if should_run_step "demo"; then
         python3 get_model.py --type hmm --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
     fi
     echo "Execute python demo (${MODEL_NAME}-${MODEL_SIZE})."
-    python3 demo.py --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3" --tokenizer_path "${MODEL_NAME}-${MODEL_SIZE}" --language "auto" \
+    python3 demo.py --audio "${POSTMO_EXAMPLES_PATH}/data/audio/audio.mp3" --tokenizer_path "${MODEL_NAME}-${MODEL_SIZE}" --language "auto" \
     --model_name "${MODEL_NAME}" --model_size "${MODEL_SIZE}"
 
     echo "Execute cpp demo (${MODEL_NAME}-${MODEL_SIZE})."
     cd cpp && ./build_linux.sh && cd ..
     ./bin/demo \
-    --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
-    --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-    --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
+    --encode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
+    --prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
+    --decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
     --tokenizer "${MODEL_NAME}-${MODEL_SIZE}" \
-    --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+    --audio "${POSTMO_EXAMPLES_PATH}/data/audio/audio.mp3"
 fi
 
 if [[ "${TEST_VENV_ACTIVE:-0}" -eq "1" ]]; then

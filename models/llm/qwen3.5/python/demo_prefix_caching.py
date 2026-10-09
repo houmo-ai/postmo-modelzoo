@@ -28,16 +28,16 @@ from pathlib import Path
 
 MODEL_DIR = Path(__file__).resolve().parents[1]
 IMODELZOO_ROOT = Path(__file__).resolve().parents[4]
-HOUMO_EXAMPLES_PATH = Path(os.getenv("HOUMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
+POSTMO_EXAMPLES_PATH = Path(os.getenv("POSTMO_EXAMPLES_PATH", str(IMODELZOO_ROOT)))
 sys.path.insert(0, str(MODEL_DIR))
-sys.path.insert(0, str(HOUMO_EXAMPLES_PATH / "utils" / "python"))
+sys.path.insert(0, str(POSTMO_EXAMPLES_PATH / "utils" / "python"))
 
 from houmo_engine.sampling import GreedySamplingParams
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET", "xh2")
+POSTMO_TARGET = os.getenv("POSTMO_TARGET", "xh2")
 DEFAULT_CONFIG_PATH = MODEL_DIR / "config.yaml"
-DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / HOUMO_TARGET
-DEFAULT_IMAGE_PATHS = [str(HOUMO_EXAMPLES_PATH / "data" / "pic" / "beach.jpeg")]
+DEFAULT_OUTPUT_DIR = MODEL_DIR / "output" / POSTMO_TARGET
+DEFAULT_IMAGE_PATHS = [str(POSTMO_EXAMPLES_PATH / "data" / "pic" / "beach.jpeg")]
 DEFAULT_IMAGE_TOKEN_GEARS = (96, 196, 384, 704, 1536)
 
 

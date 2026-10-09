@@ -160,7 +160,7 @@ def test_activated_python_environment_exposes_venv_commands(
 def test_shared_python_environment_forwards_quant_requirements(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.delenv("HOUMO_EXAMPLES_PATH", raising=False)
+    monkeypatch.delenv("POSTMO_EXAMPLES_PATH", raising=False)
     (tmp_path / "requirements_ptq.txt").write_text("ptq\n", encoding="utf-8")
     (tmp_path / "requirements.txt").write_text("runtime\n", encoding="utf-8")
     calls = []
@@ -197,7 +197,7 @@ def test_model_py_reqs_prefer_workspace_over_datasets(
     workspace_requirement = workspace / requirement_name
     workspace_requirement.write_bytes(b"workspace")
     (datasets / requirement_name).write_bytes(b"datasets")
-    monkeypatch.setenv("HOUMO_DATASETS_PATH", str(datasets))
+    monkeypatch.setenv("POSTMO_DATASETS_PATH", str(datasets))
     calls = []
 
     def prepare(received_workspace, requirements, **kwargs):
@@ -230,7 +230,7 @@ def test_model_py_reqs_fall_back_to_datasets_path(tmp_path: Path, monkeypatch) -
     requirement_name = "model-dependency.whl"
     dataset_requirement = datasets / requirement_name
     dataset_requirement.write_bytes(b"datasets")
-    monkeypatch.setenv("HOUMO_DATASETS_PATH", str(datasets))
+    monkeypatch.setenv("POSTMO_DATASETS_PATH", str(datasets))
     calls = []
 
     def prepare(received_workspace, requirements, **kwargs):

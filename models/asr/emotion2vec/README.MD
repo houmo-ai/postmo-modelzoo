@@ -136,7 +136,7 @@ export PYTHONPATH=/hmdd/3rdparty/xh2modelzoo:$PYTHONPATH
 python3 ptq.py
 ```
 
-默认量化类型为 `w8a8h1_sefp`。量化完成的主要产物位于 `output/$HOUMO_TARGET/hmquant`：
+默认量化类型为 `w8a8h1_sefp`。量化完成的主要产物位于 `output/$POSTMO_TARGET/hmquant`：
 
 ```text
 output/xh2/hmquant/
@@ -168,8 +168,8 @@ python3 build.py
 
 Emotion2vec+ 模型使用 python API 进行演示。`demo.py` 默认读取：
 
-- `output/${HOUMO_TARGET}/emotion2vec-plus_large.hmm`
-- `output/${HOUMO_TARGET}/hmquant/quant_embedding.pt`
+- `output/${POSTMO_TARGET}/emotion2vec-plus_large.hmm`
+- `output/${POSTMO_TARGET}/hmquant/quant_embedding.pt`
 - `emotion2vec_plus_large/tokens.txt`
 - `../../../data/audio/audio.mp3`
 

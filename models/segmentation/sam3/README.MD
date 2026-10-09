@@ -151,7 +151,7 @@ python3 demo.py
 默认参数如下：
 
 - HMM 模型：`output/xh2/sam3_0.8b_1008x1008.hmm`
-- 输入图片：`${HOUMO_EXAMPLES_PATH}/data/pic/sam3_test_image.jpg`
+- 输入图片：`${POSTMO_EXAMPLES_PATH}/data/pic/sam3_test_image.jpg`
 - 文本提示：`shoe`
 - 输出图片：`demo_hmm_result.png`
 - 性能测试：默认开启，`warmup=1`、`repeat=1`

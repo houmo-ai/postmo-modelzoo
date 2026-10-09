@@ -28,11 +28,11 @@ from hmatc.utils.utils import (
     hmatc_get_file,
 )
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 
-HOUMO_EXAMPLES_PATH = os.getenv("HOUMO_EXAMPLES_PATH")
-HOUMO_CORE_NUM = int(os.getenv("HOUMO_CORE_NUM", 2))
+POSTMO_EXAMPLES_PATH = os.getenv("POSTMO_EXAMPLES_PATH")
+POSTMO_CORE_NUM = int(os.getenv("POSTMO_CORE_NUM", 2))
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -126,17 +126,17 @@ if __name__ == "__main__":
     model_size = first_not_none(args.model_size, default_model_size)
     model_config = model_configs.get(model_name, {}).get(model_size, {})
     ndevice = first_not_none(args.ndevice, model_config.get("ndevice", 1))
-    ncore = first_not_none(args.ncore, model_config.get("ncore", HOUMO_CORE_NUM))
+    ncore = first_not_none(args.ncore, model_config.get("ncore", POSTMO_CORE_NUM))
     context_length = first_not_none(
         args.context_length, model_config.get("context_length", "2k")
     )
 
     shutil.copy2(
-        os.path.join(HOUMO_EXAMPLES_PATH, "data", "audio", "audio.mp3"), "./audio.mp3"
+        os.path.join(POSTMO_EXAMPLES_PATH, "data", "audio", "audio.mp3"), "./audio.mp3"
     )
 
     model_cfgs = {
-        "target": HOUMO_TARGET,
+        "target": POSTMO_TARGET,
         "version": get_houmo_version(),
         "model_type": "llm",
         "model_name": model_name,

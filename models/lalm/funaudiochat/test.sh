@@ -61,7 +61,7 @@ if should_run_step "quant"; then
         --model-name "${MODEL_NAME}" \
         --model-size "${MODEL_SIZE}" \
         --model-dir "Fun-Audio-Chat-8B" \
-        --audio "${HOUMO_EXAMPLES_PATH}/data/audio/question.wav"
+        --audio "${POSTMO_EXAMPLES_PATH}/data/audio/question.wav"
 fi
 
 if should_run_step "demo" && ! should_skip_download; then
@@ -76,8 +76,8 @@ fi
 if should_run_step "build"; then
     echo "Build FunAudioChat HMM graphs."
     python3 build.py \
-        --model_dir "output/${HOUMO_TARGET}/hmquant" \
-        --output_dir "output/${HOUMO_TARGET}" \
+        --model_dir "output/${POSTMO_TARGET}/hmquant" \
+        --output_dir "output/${POSTMO_TARGET}" \
         --ndevice "${NDEVICE}" \
         --enable_common_subgraph
 fi

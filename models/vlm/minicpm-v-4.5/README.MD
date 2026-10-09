@@ -26,7 +26,7 @@ python3 get_model.py --type raw --source_type modelscope
 python3 ptq.py
 ```
 
-默认使用 xh2modelzoo 的 `minicpm_v_4_5_xh2a_w4a8_gptq.yaml` workflow，量化类型为 `w4a8h0_ssfp`，输出到 `output/${HOUMO_TARGET}/hmquant/`。
+默认使用 xh2modelzoo 的 `minicpm_v_4_5_xh2a_w4a8_gptq.yaml` workflow，量化类型为 `w4a8h0_ssfp`，输出到 `output/${POSTMO_TARGET}/hmquant/`。
 
 当前 workflow 可能先在 `hmquant` 根目录下生成带量化版本和日期的模型子目录。
 `ptq.py` 会在导出后将该子目录中的 `prefill`、`decode`、`vision_1x`、`vision_6x`
@@ -61,8 +61,8 @@ python3 demo.py
 python3 build.py
 ```
 
-默认读取 `output/${HOUMO_TARGET}/hmquant/`，并在
-`output/${HOUMO_TARGET}/` 生成：
+默认读取 `output/${POSTMO_TARGET}/hmquant/`，并在
+`output/${POSTMO_TARGET}/` 生成：
 
 - `minicpm-v-4.5-8b_prefill.hmm`
 - `minicpm-v-4.5-8b_decode.hmm`

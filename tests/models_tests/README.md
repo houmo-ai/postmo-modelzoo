@@ -78,13 +78,13 @@ demo      -> demo.py
 
 | 环境变量 | 默认值 | 含义 |
 | --- | --- | --- |
-| `HOUMO_TARGET` | `xh2` | 当前 backend。默认值会同步到父进程环境，模型子进程也能读取到。 |
+| `POSTMO_TARGET` | `xh2` | 当前 backend。默认值会同步到父进程环境，模型子进程也能读取到。 |
 | `USE_RELEASED_MODELS` | `ON` | `ON/on` 为 release 模式，其他值为 development 模式。 |
 | `SKIP_INFER` | 未设置 | `ON` 或 `OFF` 都表示启用 separate；当前机器是否为 ASIC 决定 no-infer 或 infer 阶段。 |
 | `IMODELZOO_MODELS_PATH` | `tests/models_<backend>` | `cached_models` 的物理根目录。 |
-| `HOUMO_EXAMPLES_PATH` | 仓库根目录 | 查找 `hm_gptq` requirements 的基准路径。 |
-| `HOUMO_DATASETS_PATH` | `<repo>/data/datasets` | 数据集路径，也用于解析 quant 的 `prerequisites.py_reqs`。 |
-| `HOUMO_FULL_DATASET` | 未设置 | 设置后 eval 使用完整阈值；未设置时阈值乘 `0.5`。 |
+| `POSTMO_EXAMPLES_PATH` | 仓库根目录 | 查找 `hm_gptq` requirements 的基准路径。 |
+| `POSTMO_DATASETS_PATH` | `<repo>/data/datasets` | 数据集路径，也用于解析 quant 的 `prerequisites.py_reqs`。 |
+| `POSTMO_FULL_DATASET` | 未设置 | 设置后 eval 使用完整阈值；未设置时阈值乘 `0.5`。 |
 | `IMODELZOO_ALLOW_XH2_NCORE4` | `OFF` | `ON` 时允许默认被过滤的 xh2 `ncore=4` HMATC build case。 |
 | `IMODELZOO_MIRROR_COMMAND_OUTPUT` | `ON` | 是否把模型命令输出在写日志的同时镜像到 pytest 终端。 |
 
@@ -440,7 +440,7 @@ HMATC v2 不使用 v1 inference workspace bundle：
 
 compare 从输出中解析 `Cosine Distance` 表格。第一列必须为 `name`，且至少包含两个 `X vs Y` 指标列；框架不匹配固定的 `onnx/hmquant/hmonnx/hmm` 列名，而是校验所有 output 行和实际指标。缺表、列数不足、非数字或任意值低于阈值都会失败。默认阈值 xh1=`1.0`、xh2=`0.90`，可由 `validation` 覆盖。
 
-eval 对每个 case 分别执行 ONNX 和 HM，并要求 `hm_metric >= onnx_metric * eval_threshold`；未设置 `HOUMO_FULL_DATASET` 时配置阈值再乘 `0.5`。
+eval 对每个 case 分别执行 ONNX 和 HM，并要求 `hm_metric >= onnx_metric * eval_threshold`；未设置 `POSTMO_FULL_DATASET` 时配置阈值再乘 `0.5`。
 
 perf 默认指标为：
 
@@ -527,7 +527,7 @@ pytest --log-cli-level=INFO -s \
 
 | 现象 | 优先检查 |
 | --- | --- |
-| 模型 import 时断言 `HOUMO_TARGET` | 当前 backend 和子进程环境；未设置时应自动同步为 `xh2`。 |
+| 模型 import 时断言 `POSTMO_TARGET` | 当前 backend 和子进程环境；未设置时应自动同步为 `xh2`。 |
 | `compiled artifact case ... is missing` | `compile_params.output_dir`、最终 `cached_results/<case>`、manifest 和非空 `.hmm/.hmms`。 |
 | `cached_models` 资源目录缺失 | demo 参数引用、匹配的 `get_model type=hmm` case，以及 get_model 是否实际生成目标目录。 |
 | HMATC 找不到 ONNX/YAML | raw artifact 是否缓存和恢复、infer 是否使用相同 cache、YAML 是否位于 workspace 内。 |
@@ -536,7 +536,7 @@ pytest --log-cli-level=INFO -s \
 | HMATC v2 build 找不到 quant | build `override.save_dir` 是否与某个 quant case 的逻辑 `save_dir` 完全一致，且两者 `config` 是否一致。 |
 | pytest 只显示 venv 日志 | 使用 `-s` 或 `--capture=tee-sys`，确认 `IMODELZOO_MIRROR_COMMAND_OUTPUT` 未关闭，再检查完整 case log。 |
 | 所有 xh2 compile case 被跳过 | 是否只有 `ncore=4`；需要时设置 `IMODELZOO_ALLOW_XH2_NCORE4=ON`。 |
-| eval 阈值比预期宽松 | 未设置 `HOUMO_FULL_DATASET` 时阈值会乘 `0.5`。 |
+| eval 阈值比预期宽松 | 未设置 `POSTMO_FULL_DATASET` 时阈值会乘 `0.5`。 |
 | release 下 LLM quant/compile skip | 当前 policy 如此；将 `USE_RELEASED_MODELS` 设置为非 `ON/on` 进入 development。 |
 
 提交前至少执行：

@@ -97,7 +97,7 @@ if should_run_step "demo"; then
         demo_args+=("${SYSTEM_PROMPT_ARGS[@]}")
         python3 demo_asr.py "${demo_args[@]}"
         python3 python/demo.py "${demo_args[@]}"
-        python3 "${HOUMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${HOUMO_TARGET}/hmquant/quant_embedding.pt"
+        python3 "${POSTMO_EXAMPLES_PATH}/tools/llm_perf/convert_embed.py" --path "output/${POSTMO_TARGET}/hmquant/quant_embedding.pt"
         echo "Execute cpp demo."
         cd cpp && ./build_linux.sh && cd ..
         if [ "$MODEL_SIZE" = "0.6b" ]; then
@@ -106,19 +106,19 @@ if should_run_step "demo"; then
             tokenizer_path="Qwen3-ASR-1.7B"
         fi
         ./bin/demo \
-        --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
-        --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-        --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
-        --embedding "output/${HOUMO_TARGET}/hmquant/quant_embedding.bin" \
+        --encode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
+        --prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
+        --decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
+        --embedding "output/${POSTMO_TARGET}/hmquant/quant_embedding.bin" \
         --tokenizer "${tokenizer_path}" \
-        --audio "${HOUMO_EXAMPLES_PATH}/data/audio/audio.mp3"
+        --audio "${POSTMO_EXAMPLES_PATH}/data/audio/audio.mp3"
         if command -v llm_perf &>/dev/null; then
             echo "Execute performance case (${MODEL_NAME}-${MODEL_SIZE})."
             cd "${SCRIPT_DIR}"
             devices_param=$(get_devices_param "${NDEVICE}")
-            llm_perf --encode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
-                --prefill "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
-                --decode "output/${HOUMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
+            llm_perf --encode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_encode.hmm" \
+                --prefill "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_prefill.hmm" \
+                --decode "output/${POSTMO_TARGET}/${MODEL_NAME}-${MODEL_SIZE}_decode.hmm" \
                 --no_warm_up
         fi
     else

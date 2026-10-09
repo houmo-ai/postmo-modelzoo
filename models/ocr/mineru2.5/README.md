@@ -111,7 +111,7 @@ python3 ptq.py --model <模型路径> --chip-arch XH2a --context-length 4096 --p
 
 量化过程会同时导出 LLM（prefill/decode）和 ViT（含所有静态分桶）模型，并生成 `mineru_visual_buckets.json` 分桶清单文件。
 
-量化结果位于 `output/${HOUMO_TARGET}/hmquant`。
+量化结果位于 `output/${POSTMO_TARGET}/hmquant`。
 
 ### 2.4 编译
 
@@ -175,7 +175,7 @@ bash test.sh
 bash test.sh -s all
 ```
 
-运行前请确保 `HOUMO_EXAMPLES_PATH` 指向当前仓库根目录。
+运行前请确保 `POSTMO_EXAMPLES_PATH` 指向当前仓库根目录。
 
 `test.sh` 支持以下常用参数：
 

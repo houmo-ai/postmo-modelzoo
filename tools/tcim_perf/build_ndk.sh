@@ -4,7 +4,7 @@ set -e
 
 ## if user not set NDK_PATH, use default path
 if [ x${NDK_PATH} == x ]; then
-  export NDK_PATH=${HOUMO_EXAMPLES_PATH}/toolchains/android-ndk-r28c
+  export NDK_PATH=${POSTMO_EXAMPLES_PATH}/toolchains/android-ndk-r28c
 fi
 
 RUN() {

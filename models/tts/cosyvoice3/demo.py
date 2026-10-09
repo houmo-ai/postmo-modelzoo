@@ -58,8 +58,8 @@ warnings.filterwarnings("ignore", category=UserWarning, module="torchaudio")
 warnings.filterwarnings("ignore", category=UserWarning, module="torch.functional")
 
 
-HOUMO_TARGET = os.getenv("HOUMO_TARGET")
-assert HOUMO_TARGET in ["xh2"], f"Unsupported HOUMO_TARGET: {HOUMO_TARGET}"
+POSTMO_TARGET = os.getenv("POSTMO_TARGET")
+assert POSTMO_TARGET in ["xh2"], f"Unsupported POSTMO_TARGET: {POSTMO_TARGET}"
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 
@@ -197,14 +197,14 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--sos_emb_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "llm_sos_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "llm_sos_embedding.pt"),
         help="Path to SOS embedding file",
     )
     parser.add_argument(
         "--task_id_emb_path",
         type=str,
         default=os.path.join(
-            "output", HOUMO_TARGET, "hmquant", "llm_task_id_embedding.pt"
+            "output", POSTMO_TARGET, "hmquant", "llm_task_id_embedding.pt"
         ),
         help="Path to task ID embedding file",
     )
@@ -212,14 +212,14 @@ def get_args() -> argparse.Namespace:
         "--speech_embedding_path",
         type=str,
         default=os.path.join(
-            "output", HOUMO_TARGET, "hmquant", "llm_speech_embedding.pt"
+            "output", POSTMO_TARGET, "hmquant", "llm_speech_embedding.pt"
         ),
         help="Path to speech embedding file",
     )
     parser.add_argument(
         "--token_embedding_path",
         type=str,
-        default=os.path.join("output", HOUMO_TARGET, "hmquant", "quant_embedding.pt"),
+        default=os.path.join("output", POSTMO_TARGET, "hmquant", "quant_embedding.pt"),
         help="Path to token embedding file",
     )
     parser.add_argument(
@@ -244,7 +244,7 @@ def get_args() -> argparse.Namespace:
         "--input_embedding",
         type=str,
         default=os.path.join(
-            "output", HOUMO_TARGET, "hmquant", "flow_input_embedding.pt"
+            "output", POSTMO_TARGET, "hmquant", "flow_input_embedding.pt"
         ),
         help="Path to flow input embedding file",
     )
@@ -309,43 +309,43 @@ def get_args() -> argparse.Namespace:
     model_prefix = f"{args.model_name}-{args.model_size}"
     if args.campplus_path is None:
         args.campplus_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_campplus.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_campplus.hmm"
         )
     if args.speech_tokenizer_path is None:
         args.speech_tokenizer_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_speech_tokenizer.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_speech_tokenizer.hmm"
         )
     if args.prefill_model_path is None:
         args.prefill_model_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_llm_qwen2_prefill.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_llm_qwen2_prefill.hmm"
         )
     if args.decode_model_path is None:
         args.decode_model_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_llm_qwen2_decode.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_llm_qwen2_decode.hmm"
         )
     if args.llm_decoder_path is None:
         args.llm_decoder_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_llm_decoder.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_llm_decoder.hmm"
         )
     if args.spk_embed_affine_layer is None:
         args.spk_embed_affine_layer = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_flow_spk.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_flow_spk.hmm"
         )
     if args.pre_lookahead_layer is None:
         args.pre_lookahead_layer = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_flow_encoder.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_flow_encoder.hmm"
         )
     if args.flow_decoder_path is None:
         args.flow_decoder_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_flow_decoder.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_flow_decoder.hmm"
         )
     if args.hift_part1_path is None:
         args.hift_part1_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_hift_part1.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_hift_part1.hmm"
         )
     if args.hift_part2_path is None:
         args.hift_part2_path = os.path.join(
-            "output", HOUMO_TARGET, f"{model_prefix}_hift_part2.hmm"
+            "output", POSTMO_TARGET, f"{model_prefix}_hift_part2.hmm"
         )
     return args
 

@@ -246,15 +246,15 @@ should_skip_download() {
 
 check_houmo_target() {
     local expected_target="$1"
-    local current_target="${HOUMO_TARGET:-}"
+    local current_target="${POSTMO_TARGET:-}"
 
     if [[ -z "${expected_target}" ]]; then
-        echo "Error: Missing expected HOUMO_TARGET value." >&2
+        echo "Error: Missing expected POSTMO_TARGET value." >&2
         return 1
     fi
 
     if [[ -z "${current_target}" || "${current_target}" != "${expected_target}" ]]; then
-        echo "Only supports HOUMO_TARGET as ${expected_target}." >&2
+        echo "Only supports POSTMO_TARGET as ${expected_target}." >&2
         return 1
     fi
 

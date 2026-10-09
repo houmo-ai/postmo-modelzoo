@@ -14,11 +14,11 @@ if exist "build" (
 )
 mkdir "build"
 
-rem Image/audio/Eigen headers are under %HOUMO_EXAMPLES_PATH%\3rdparty\
+rem Image/audio/Eigen headers are under %POSTMO_EXAMPLES_PATH%\3rdparty\
 
 echo All dependencies are ready
 
-set HOUMO_EXAMPLES_PATH=%HOUMO_EXAMPLES_PATH%
+set POSTMO_EXAMPLES_PATH=%POSTMO_EXAMPLES_PATH%
 set BUILD_TYPE=Release
 set BUILD_JOBS=%NUMBER_OF_PROCESSORS%
 set BUILD_DIR=build_vs2022
